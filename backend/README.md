@@ -45,7 +45,7 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 | Sales | `GET/POST /api/sales`, `GET /api/sales/:id` |
 | Expenses (recurring, e.g. salaries) | `GET/POST /api/expenses`, `PUT/DELETE /api/expenses/:id` |
 | Dashboard | `GET /api/dashboard/summary` — inventory valuation, net worth after pending invoices, today/month revenue & profit, recurring expense burn rate, alert counts |
-| Stats | `GET /api/stats/top-products?period=day\|month&date=&sortBy=quantity\|profit`, `GET /api/stats/margins?limit=` (highest-margin items), `GET /api/stats/revenue?period=day\|month&from=&to=` |
+| Stats | `GET /api/stats/top-products?period=day\|month&date=&sortBy=quantity\|profit` (each item includes `category`, so a client can chart sales by category without a separate endpoint), `GET /api/stats/margins?limit=` (highest-margin items), `GET /api/stats/revenue?period=day\|month&from=&to=` |
 | Alerts | `GET /api/alerts?days=` — low-stock items + due-soon/overdue supplier invoices (polled by the Android app for reminders) |
 | Working days | `GET /api/workdays/today`, `POST /api/workdays/today` (`{ isWorking }`) — see below |
 | Uploads | `POST /api/uploads/image` (multipart `image` field) — used for barcode-less "fallback" products |

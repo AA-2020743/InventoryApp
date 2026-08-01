@@ -186,6 +186,7 @@ data class DashboardSummaryDto(
 data class TopProductItemDto(
     val productId: String,
     val name: String,
+    val category: String?,
     val quantitySold: Double,
     val revenue: String,
     val cost: String,

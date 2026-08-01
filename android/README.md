@@ -66,7 +66,9 @@ time from Settings.
   alerts.
 - **Statistics**: top-selling items and highest-margin items, sortable by
   quantity or profit, plus a calendar/month picker to browse sales and
-  stats for any specific day or month.
+  stats for any specific day or month. Pie charts break the selected
+  period's sales down by category and by item (revenue share), drawn
+  directly with Compose Canvas — no charting library dependency.
 - **Localization**: English and Arabic (with RTL layout), switchable from
   Settings without reinstalling.
 - **Theme**: light, dark, or follow system, switchable from Settings.

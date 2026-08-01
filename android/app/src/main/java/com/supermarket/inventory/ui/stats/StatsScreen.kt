@@ -39,10 +39,12 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
+import com.supermarket.inventory.ui.common.PieChart
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
+import com.supermarket.inventory.ui.common.topSlicesWithOther
 import com.supermarket.inventory.ui.theme.LossRed
 import com.supermarket.inventory.ui.theme.ProfitGreen
 import java.time.Instant
@@ -55,6 +57,8 @@ import java.time.format.DateTimeFormatter
 fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showDatePicker by remember { mutableStateOf(false) }
+    val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
+    val otherLabel = stringResource(R.string.stats_other)
 
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.stats_title)) }) }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -89,7 +93,24 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
             } else {
                 LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
                     item { PeriodSummaryCard(state) }
-                    item { Spacer(Modifier.height(12.dp)) }
+                    item { Spacer(Modifier.height(16.dp)) }
+                    if (state.topProducts.isNotEmpty()) {
+                        item {
+                            Column {
+                                val categoryData = state.topProducts
+                                    .groupBy { it.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
+                                    .map { (category, items) -> category to items.sumOf { it.revenue.toDoubleOrNull() ?: 0.0 } }
+                                Text(stringResource(R.string.stats_by_category), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                                PieChart(topSlicesWithOther(categoryData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
+                                Spacer(Modifier.height(20.dp))
+
+                                val itemData = state.topProducts.map { it.name to (it.revenue.toDoubleOrNull() ?: 0.0) }
+                                Text(stringResource(R.string.stats_by_item), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                                PieChart(topSlicesWithOther(itemData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
+                                Spacer(Modifier.height(16.dp))
+                            }
+                        }
+                    }
                     item { SortRow(state, viewModel) }
                     item { Text(stringResource(R.string.stats_top_products), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
                     items(state.topProducts) { TopProductRow(it) }

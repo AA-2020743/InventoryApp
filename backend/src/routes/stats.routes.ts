@@ -44,6 +44,7 @@ statsRouter.get(
       {
         productId: string;
         name: string;
+        category: string | null;
         quantitySold: number;
         revenue: Prisma.Decimal;
         cost: Prisma.Decimal;
@@ -63,6 +64,7 @@ statsRouter.get(
         byProduct.set(key, {
           productId: item.productId,
           name: item.product.name,
+          category: item.product.category,
           quantitySold: qty,
           revenue: item.subtotal,
           cost,

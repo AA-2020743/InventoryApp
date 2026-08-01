@@ -141,6 +141,10 @@
     <string name="stats_sort_profit">By profit</string>
     <string name="stats_quantity_sold">%1$s sold</string>
     <string name="stats_margin_percent">%1$s%% margin</string>
+    <string name="stats_by_category">Sales by category</string>
+    <string name="stats_by_item">Sales by item</string>
+    <string name="stats_uncategorized">Uncategorized</string>
+    <string name="stats_other">Other</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
