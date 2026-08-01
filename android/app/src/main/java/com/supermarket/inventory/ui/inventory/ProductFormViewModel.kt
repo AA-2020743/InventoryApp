@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
+enum class ThresholdMode { UNITS, PACKAGES }
+
 data class ProductFormUiState(
     val productId: String? = null,
     val barcode: String = "",
@@ -23,16 +25,24 @@ data class ProductFormUiState(
     val imageUrl: String? = null,
     val category: String = "",
     val unit: String = "pcs",
-    val purchaseCost: String = "",
-    val sellingPrice: String = "",
-    val quantity: String = "",
-    val lowStockThreshold: String = "",
+    // Packaging: blank packageLabel means "sold as individual units", no
+    // package math involved at all - existing simple behavior preserved.
+    val packageLabel: String = "",
+    val unitsPerPackage: String = "1",
+    val packagesOnHand: String = "", // only used to compute initial quantity when creating
+    val quantity: String = "", // raw units; used directly when packageLabel is blank
+    val thresholdMode: ThresholdMode = ThresholdMode.UNITS,
+    val thresholdPackages: String = "",
+    val lowStockThreshold: String = "", // raw units; source of truth sent to server
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isUploadingImage: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
-)
+) {
+    val isPackaged: Boolean get() = packageLabel.isNotBlank()
+    val unitsPerPackageValue: Double get() = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
+}
 
 @HiltViewModel
 class ProductFormViewModel @Inject constructor(
@@ -67,27 +77,56 @@ class ProductFormViewModel @Inject constructor(
         }
     }
 
-    private fun ProductDto.toUiState() = ProductFormUiState(
-        productId = id,
-        barcode = barcode.orEmpty(),
-        name = name,
-        imageUrl = imageUrl,
-        category = category.orEmpty(),
-        unit = unit,
-        purchaseCost = purchaseCost,
-        sellingPrice = sellingPrice,
-        quantity = quantity,
-        lowStockThreshold = lowStockThreshold,
-        isLoading = false,
-    )
+    private fun ProductDto.toUiState(): ProductFormUiState {
+        val perPackage = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
+        val thresholdUnits = lowStockThreshold.toDoubleOrNull() ?: 0.0
+        return ProductFormUiState(
+            productId = id,
+            barcode = barcode.orEmpty(),
+            name = name,
+            imageUrl = imageUrl,
+            category = category.orEmpty(),
+            unit = unit,
+            packageLabel = packageLabel.orEmpty(),
+            unitsPerPackage = unitsPerPackage,
+            quantity = quantity,
+            lowStockThreshold = lowStockThreshold,
+            thresholdPackages = if (perPackage > 1.0) (thresholdUnits / perPackage).toCleanString() else "",
+            isLoading = false,
+        )
+    }
 
     fun onBarcodeChange(v: String) { uiState = uiState.copy(barcode = v, error = null) }
     fun onNameChange(v: String) { uiState = uiState.copy(name = v, error = null) }
     fun onCategoryChange(v: String) { uiState = uiState.copy(category = v) }
     fun onUnitChange(v: String) { uiState = uiState.copy(unit = v) }
+    fun onPackageLabelChange(v: String) {
+        uiState = uiState.copy(packageLabel = v, error = null)
+        recomputeQuantityPreview()
+    }
+    fun onUnitsPerPackageChange(v: String) {
+        uiState = uiState.copy(unitsPerPackage = v, error = null)
+        recomputeQuantityPreview()
+    }
+    fun onPackagesOnHandChange(v: String) {
+        uiState = uiState.copy(packagesOnHand = v, error = null)
+        recomputeQuantityPreview()
+    }
+
+    // Keeps the (disabled, preview-only) quantity field in sync while
+    // creating a packaged product, since the real value is packages x
+    // units-per-package rather than something typed directly.
+    private fun recomputeQuantityPreview() {
+        if (uiState.productId == null && uiState.isPackaged) {
+            val packages = uiState.packagesOnHand.toDoubleOrNull() ?: 0.0
+            uiState = uiState.copy(quantity = (packages * uiState.unitsPerPackageValue).toCleanString())
+        }
+    }
     fun onPurchaseCostChange(v: String) { uiState = uiState.copy(purchaseCost = v, error = null) }
     fun onSellingPriceChange(v: String) { uiState = uiState.copy(sellingPrice = v, error = null) }
     fun onQuantityChange(v: String) { uiState = uiState.copy(quantity = v, error = null) }
+    fun onThresholdModeChange(mode: ThresholdMode) { uiState = uiState.copy(thresholdMode = mode) }
+    fun onThresholdPackagesChange(v: String) { uiState = uiState.copy(thresholdPackages = v) }
     fun onLowStockThresholdChange(v: String) { uiState = uiState.copy(lowStockThreshold = v) }
     fun onBarcodeScanned(v: String) { uiState = uiState.copy(barcode = v, error = null) }
 
@@ -101,11 +140,19 @@ class ProductFormViewModel @Inject constructor(
         }
     }
 
+    /** Prefills name/photo/category from a best-effort external lookup (e.g. Open Food Facts). */
+    fun applyAutoFill(name: String?, imageUrl: String?, category: String?) {
+        uiState = uiState.copy(
+            name = name?.takeIf { uiState.name.isBlank() } ?: uiState.name,
+            imageUrl = imageUrl ?: uiState.imageUrl,
+            category = category?.takeIf { uiState.category.isBlank() } ?: uiState.category,
+        )
+    }
+
     fun save() {
         val cost = uiState.purchaseCost.toDoubleOrNull()
         val price = uiState.sellingPrice.toDoubleOrNull()
-        val qty = uiState.quantity.toDoubleOrNull() ?: 0.0
-        val threshold = uiState.lowStockThreshold.toDoubleOrNull() ?: 0.0
+        val perPackage = uiState.unitsPerPackageValue
 
         if (uiState.name.isBlank()) {
             uiState = uiState.copy(error = "Name is required"); return
@@ -113,8 +160,17 @@ class ProductFormViewModel @Inject constructor(
         if (cost == null || price == null) {
             uiState = uiState.copy(error = "Purchase cost and selling price must be numbers"); return
         }
-        if (uiState.barcode.isBlank() && uiState.imageUrl.isNullOrBlank()) {
-            uiState = uiState.copy(error = null) // surfaced by server too, but check client-side:
+
+        val qty = if (uiState.productId == null && uiState.isPackaged) {
+            (uiState.packagesOnHand.toDoubleOrNull() ?: 0.0) * perPackage
+        } else {
+            uiState.quantity.toDoubleOrNull() ?: 0.0
+        }
+
+        val threshold = if (uiState.isPackaged && uiState.thresholdMode == ThresholdMode.PACKAGES) {
+            (uiState.thresholdPackages.toDoubleOrNull() ?: 0.0) * perPackage
+        } else {
+            uiState.lowStockThreshold.toDoubleOrNull() ?: 0.0
         }
 
         viewModelScope.launch {
@@ -125,6 +181,8 @@ class ProductFormViewModel @Inject constructor(
                 imageUrl = uiState.imageUrl,
                 category = uiState.category.ifBlank { null },
                 unit = uiState.unit.ifBlank { "pcs" },
+                packageLabel = uiState.packageLabel.ifBlank { null },
+                unitsPerPackage = perPackage,
                 purchaseCost = cost,
                 sellingPrice = price,
                 quantity = qty,
@@ -142,6 +200,7 @@ class ProductFormViewModel @Inject constructor(
         }
     }
 
+    /** [packagesReceived] is already resolved to base units by the caller (Screen) if packaged. */
     fun restock(quantity: Double, unitCost: Double?) {
         val id = uiState.productId ?: return
         viewModelScope.launch {
@@ -164,3 +223,6 @@ class ProductFormViewModel @Inject constructor(
         }
     }
 }
+
+private fun Double.toCleanString(): String =
+    if (this == this.toLong().toDouble()) this.toLong().toString() else this.toString()

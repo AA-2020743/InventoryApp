@@ -64,8 +64,15 @@
     <string name="product_pick_photo">اختيار صورة</string>
     <string name="product_scan_barcode">مسح الباركود</string>
     <string name="product_save_error_barcode_or_image">أضف باركودًا، أو صورة للمنتجات التي لا تحمل باركود</string>
+    <string name="product_package_label">التعبئة (اختياري، مثال: كرتونة، طبلية، صندوق)</string>
+    <string name="product_units_per_package">عدد الوحدات في كل عبوة</string>
+    <string name="product_packages_on_hand">عدد العبوات المتوفرة</string>
+    <string name="product_threshold_by">حد التنبيه حسب</string>
+    <string name="product_threshold_units">الوحدات</string>
+    <string name="product_threshold_packages">العبوات</string>
     <string name="restock_title">إعادة التخزين</string>
     <string name="restock_quantity">الكمية المستلمة</string>
+    <string name="restock_packages_received">عدد العبوات المستلمة</string>
     <string name="restock_unit_cost">تكلفة الوحدة الجديدة (اختياري)</string>
     <string name="adjust_title">تعديل المخزون</string>
     <string name="adjust_quantity">التغيير في الكمية (+/-)</string>

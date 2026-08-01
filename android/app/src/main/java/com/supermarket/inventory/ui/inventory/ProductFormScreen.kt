@@ -175,6 +175,38 @@ fun ProductFormScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            OutlinedTextField(
+                value = state.packageLabel,
+                onValueChange = viewModel::onPackageLabelChange,
+                label = { Text(stringResource(R.string.product_package_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+
+            if (state.isPackaged) {
+                Row(modifier = Modifier.padding(top = 8.dp)) {
+                    OutlinedTextField(
+                        value = state.unitsPerPackage,
+                        onValueChange = viewModel::onUnitsPerPackageChange,
+                        label = { Text(stringResource(R.string.product_units_per_package)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (state.productId == null) {
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = state.packagesOnHand,
+                            onValueChange = viewModel::onPackagesOnHandChange,
+                            label = { Text(stringResource(R.string.product_packages_on_hand)) },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+
             Row(modifier = Modifier.padding(top = 8.dp)) {
                 OutlinedTextField(
                     value = state.quantity,
@@ -182,18 +214,48 @@ fun ProductFormScreen(
                     label = { Text(stringResource(R.string.product_quantity)) },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
-                    enabled = state.productId == null,
+                    enabled = state.productId == null && !state.isPackaged,
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = state.lowStockThreshold,
-                    onValueChange = viewModel::onLowStockThresholdChange,
-                    label = { Text(stringResource(R.string.product_low_stock_threshold)) },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
+                if (state.isPackaged && state.thresholdMode == ThresholdMode.PACKAGES) {
+                    OutlinedTextField(
+                        value = state.thresholdPackages,
+                        onValueChange = viewModel::onThresholdPackagesChange,
+                        label = { Text(stringResource(R.string.product_low_stock_threshold)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = state.lowStockThreshold,
+                        onValueChange = viewModel::onLowStockThresholdChange,
+                        label = { Text(stringResource(R.string.product_low_stock_threshold)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            if (state.isPackaged) {
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(stringResource(R.string.product_threshold_by), modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                    androidx.compose.material3.FilterChip(
+                        selected = state.thresholdMode == ThresholdMode.UNITS,
+                        onClick = { viewModel.onThresholdModeChange(ThresholdMode.UNITS) },
+                        label = { Text(stringResource(R.string.product_threshold_units)) },
+                    )
+                    androidx.compose.material3.FilterChip(
+                        selected = state.thresholdMode == ThresholdMode.PACKAGES,
+                        onClick = { viewModel.onThresholdModeChange(ThresholdMode.PACKAGES) },
+                        label = { Text(stringResource(R.string.product_threshold_packages)) },
+                    )
+                }
             }
 
             state.error?.let {
@@ -221,6 +283,8 @@ fun ProductFormScreen(
 
     if (showRestockDialog) {
         RestockDialog(
+            isPackaged = state.isPackaged,
+            unitsPerPackage = state.unitsPerPackageValue,
             onDismiss = { showRestockDialog = false },
             onConfirm = { qty, cost ->
                 viewModel.restock(qty, cost)
@@ -240,7 +304,12 @@ fun ProductFormScreen(
 }
 
 @Composable
-private fun RestockDialog(onDismiss: () -> Unit, onConfirm: (Double, Double?) -> Unit) {
+private fun RestockDialog(
+    isPackaged: Boolean,
+    unitsPerPackage: Double,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Double?) -> Unit,
+) {
     var quantity by remember { mutableStateOf("") }
     var unitCost by remember { mutableStateOf("") }
     androidx.compose.material3.AlertDialog(
@@ -251,7 +320,7 @@ private fun RestockDialog(onDismiss: () -> Unit, onConfirm: (Double, Double?) ->
                 OutlinedTextField(
                     value = quantity,
                     onValueChange = { quantity = it },
-                    label = { Text(stringResource(R.string.restock_quantity)) },
+                    label = { Text(stringResource(if (isPackaged) R.string.restock_packages_received else R.string.restock_quantity)) },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                 )
@@ -267,8 +336,11 @@ private fun RestockDialog(onDismiss: () -> Unit, onConfirm: (Double, Double?) ->
         },
         confirmButton = {
             TextButton(onClick = {
-                val q = quantity.toDoubleOrNull()
-                if (q != null && q > 0) onConfirm(q, unitCost.toDoubleOrNull())
+                val entered = quantity.toDoubleOrNull()
+                if (entered != null && entered > 0) {
+                    val units = if (isPackaged) entered * unitsPerPackage else entered
+                    onConfirm(units, unitCost.toDoubleOrNull())
+                }
             }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
