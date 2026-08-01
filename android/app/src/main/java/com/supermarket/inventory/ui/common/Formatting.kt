@@ -7,12 +7,17 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+// Egyptian Pound abbreviation, used as a plain suffix rather than a locale
+// currency symbol since this app targets one specific currency, not a
+// locale-derived one.
+private const val CURRENCY_SUFFIX = "LE"
+
 fun formatAmount(value: String, locale: Locale = Locale.getDefault()): String = try {
     val format = NumberFormat.getNumberInstance(locale).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
     }
-    format.format(BigDecimal(value))
+    "${format.format(BigDecimal(value))} $CURRENCY_SUFFIX"
 } catch (_: Exception) {
     value
 }

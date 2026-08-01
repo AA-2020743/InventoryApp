@@ -20,6 +20,7 @@ suspend fun <T> apiCall(block: suspend () -> T): ApiResult<T> = try {
     ApiResult.Error(e.message ?: "Unknown error")
 }
 
+@OptIn(kotlin.ExperimentalStdlibApi::class)
 private fun extractErrorMessage(e: HttpException): String {
     return try {
         val body = e.response()?.errorBody()?.string()
