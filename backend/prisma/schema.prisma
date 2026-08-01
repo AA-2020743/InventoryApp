@@ -27,11 +27,11 @@ model Product {
   imageUrl          String?
   category          String?
   unit              String   @default("pcs") // pcs, kg, g, l, ml ...
-  // Packaging metadata so the client can offer "how many pallets/cartons"
-  // data entry instead of a raw unit count. quantity/lowStockThreshold
-  // below remain the source of truth in base units regardless - these two
-  // fields are purely for converting package counts <-> units on entry.
-  packageLabel      String?  // e.g. "Pallet", "Carton", "Box"; null = sold as individual units only
+  // How many base units are in one package (pallet/carton/box/etc.) of
+  // this product; 1 means sold as individual units. Lets the client offer
+  // "how many packages" data entry instead of a raw unit count.
+  // quantity/lowStockThreshold below remain the source of truth in base
+  // units regardless - this is purely for converting on entry.
   unitsPerPackage   Decimal  @default(1) @db.Decimal(12, 3)
   purchaseCost      Decimal  @db.Decimal(12, 2) // latest known cost from supplier
   sellingPrice      Decimal  @db.Decimal(12, 2)

@@ -12,7 +12,6 @@ const productInput = z.object({
   imageUrl: z.string().trim().optional().nullable(),
   category: z.string().trim().optional().nullable(),
   unit: z.string().trim().min(1).default("pcs"),
-  packageLabel: z.string().trim().min(1).optional().nullable(),
   unitsPerPackage: z.number().positive().default(1),
   purchaseCost: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
@@ -58,6 +57,23 @@ productsRouter.get(
     const product = await prisma.product.findUnique({ where: { barcode: req.params.barcode } });
     if (!product) throw new HttpError(404, "Product not found for this barcode");
     res.json(product);
+  })
+);
+
+// Distinct categories already in use, so the app can suggest them while
+// adding a product instead of the owner having to remember/retype exact
+// spelling - typing a new one just creates it implicitly (category is a
+// plain field on Product, not a separate managed entity).
+productsRouter.get(
+  "/categories",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.product.findMany({
+      where: { category: { not: null } },
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" },
+    });
+    res.json(rows.map((r) => r.category).filter((c): c is string => c !== null));
   })
 );
 
