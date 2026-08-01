@@ -38,7 +38,7 @@ import com.supermarket.inventory.ui.theme.ProfitGreen
 import com.supermarket.inventory.ui.theme.WarningAmber
 import kotlinx.coroutines.delay
 
-private const val AUTO_REFRESH_INTERVAL_MS = 30_000L
+private const val AUTO_REFRESH_INTERVAL_MS = 8_000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,10 +50,14 @@ fun DashboardScreen(
 ) {
     val state = viewModel.uiState
 
+    // Refreshes immediately whenever this screen (re-)enters composition -
+    // e.g. switching back to the Dashboard tab after completing a sale -
+    // not just on the ViewModel's first creation, then keeps polling while
+    // the screen stays visible so figures stay live without a manual pull.
     LaunchedEffect(Unit) {
         while (true) {
-            delay(AUTO_REFRESH_INTERVAL_MS)
             viewModel.refresh()
+            delay(AUTO_REFRESH_INTERVAL_MS)
         }
     }
 
