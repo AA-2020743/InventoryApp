@@ -12,6 +12,8 @@ const productInput = z.object({
   imageUrl: z.string().trim().optional().nullable(),
   category: z.string().trim().optional().nullable(),
   unit: z.string().trim().min(1).default("pcs"),
+  packageLabel: z.string().trim().min(1).optional().nullable(),
+  unitsPerPackage: z.number().positive().default(1),
   purchaseCost: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
   quantity: z.number().nonnegative().default(0),

@@ -53,6 +53,12 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 
 - A product needs a **barcode or an image** (fallback for loose/unlabeled
   goods) — enforced server-side.
+- `quantity`/`lowStockThreshold` are always stored in base units (pcs, kg,
+  etc.) — the source of truth for valuation and stock logic. `packageLabel`
+  (e.g. "Carton", "Pallet") and `unitsPerPackage` are just metadata so a
+  client can offer "how many cartons, of how many units each" data entry
+  and convert to/from base units on its own; the server never does that
+  conversion itself.
 - Every stock change (restock, sale, manual adjustment) writes an
   `InventoryTransaction` row, so stock levels are always auditable.
 - Selling price and purchase cost are **snapshotted onto each `SaleItem`** at
