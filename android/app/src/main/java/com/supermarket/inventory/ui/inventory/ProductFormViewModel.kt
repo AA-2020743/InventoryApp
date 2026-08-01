@@ -25,25 +25,29 @@ data class ProductFormUiState(
     val name: String = "",
     val imageUrl: String? = null,
     val category: String = "",
+    val availableCategories: List<String> = emptyList(),
     val unit: String = "pcs",
     val purchaseCost: String = "",
     val sellingPrice: String = "",
-    // Packaging: blank packageLabel means "sold as individual units", no
-    // package math involved at all - existing simple behavior preserved.
-    val packageLabel: String = "",
+    // Packaging is just "how many units come in one package" - no name/type
+    // is asked for, only whether it applies and the count.
+    val isPackaged: Boolean = false,
     val unitsPerPackage: String = "1",
-    val packagesOnHand: String = "", // only used to compute initial quantity when creating
-    val quantity: String = "", // raw units; used directly when packageLabel is blank
+    val packagesOnHand: String = "", // used to seed the computed quantity while creating
+    // Always user-editable (e.g. to correct for a partially-full pallet),
+    // auto-filled from packages x unitsPerPackage as a starting point only
+    // while creating a packaged product.
+    val quantity: String = "",
+    val originalQuantity: String = "", // snapshot at load time, to compute a delta on save when editing
     val thresholdMode: ThresholdMode = ThresholdMode.UNITS,
     val thresholdPackages: String = "",
-    val lowStockThreshold: String = "", // raw units; source of truth sent to server
+    val lowStockThreshold: String = "",
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isUploadingImage: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
 ) {
-    val isPackaged: Boolean get() = packageLabel.isNotBlank()
     val unitsPerPackageValue: Double get() = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
 }
 
@@ -59,6 +63,7 @@ class ProductFormViewModel @Inject constructor(
         private set
 
     init {
+        loadCategories()
         val productId = savedStateHandle.get<String>("productId")
         val initialBarcode = savedStateHandle.get<String>("barcode")
         if (productId != null) {
@@ -67,6 +72,15 @@ class ProductFormViewModel @Inject constructor(
         } else if (!initialBarcode.isNullOrBlank()) {
             uiState = uiState.copy(barcode = initialBarcode)
             tryAutoFill(initialBarcode)
+        }
+    }
+
+    private fun loadCategories() {
+        viewModelScope.launch {
+            when (val result = repository.getCategories()) {
+                is ApiResult.Success -> uiState = uiState.copy(availableCategories = result.data)
+                is ApiResult.Error -> Unit // non-essential; category field still works as free text
+            }
         }
     }
 
@@ -86,29 +100,32 @@ class ProductFormViewModel @Inject constructor(
     private fun loadProduct(id: String) {
         viewModelScope.launch {
             when (val result = repository.getProduct(id)) {
-                is ApiResult.Success -> uiState = result.data.toUiState()
+                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
             }
         }
     }
 
-    private fun ProductDto.toUiState(): ProductFormUiState {
+    private fun ProductDto.toUiState(availableCategories: List<String>): ProductFormUiState {
         val perPackage = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
         val thresholdUnits = lowStockThreshold.toDoubleOrNull() ?: 0.0
+        val isPackaged = perPackage > 1.0
         return ProductFormUiState(
             productId = id,
             barcode = barcode.orEmpty(),
             name = name,
             imageUrl = imageUrl,
             category = category.orEmpty(),
+            availableCategories = availableCategories,
             unit = unit,
             purchaseCost = purchaseCost,
             sellingPrice = sellingPrice,
-            packageLabel = packageLabel.orEmpty(),
+            isPackaged = isPackaged,
             unitsPerPackage = unitsPerPackage,
             quantity = quantity,
+            originalQuantity = quantity,
             lowStockThreshold = lowStockThreshold,
-            thresholdPackages = if (perPackage > 1.0) (thresholdUnits / perPackage).toCleanString() else "",
+            thresholdPackages = if (isPackaged) (thresholdUnits / perPackage).toCleanString() else "",
             isLoading = false,
         )
     }
@@ -117,8 +134,8 @@ class ProductFormViewModel @Inject constructor(
     fun onNameChange(v: String) { uiState = uiState.copy(name = v, error = null) }
     fun onCategoryChange(v: String) { uiState = uiState.copy(category = v) }
     fun onUnitChange(v: String) { uiState = uiState.copy(unit = v) }
-    fun onPackageLabelChange(v: String) {
-        uiState = uiState.copy(packageLabel = v, error = null)
+    fun onIsPackagedChange(v: Boolean) {
+        uiState = uiState.copy(isPackaged = v, error = null)
         recomputeQuantityPreview()
     }
     fun onUnitsPerPackageChange(v: String) {
@@ -130,9 +147,9 @@ class ProductFormViewModel @Inject constructor(
         recomputeQuantityPreview()
     }
 
-    // Keeps the (disabled, preview-only) quantity field in sync while
-    // creating a packaged product, since the real value is packages x
-    // units-per-package rather than something typed directly.
+    // Only a starting-point convenience while creating a new packaged
+    // product; the quantity field always stays directly editable so the
+    // owner can correct for a partially-full last pallet, etc.
     private fun recomputeQuantityPreview() {
         if (uiState.productId == null && uiState.isPackaged) {
             val packages = uiState.packagesOnHand.toDoubleOrNull() ?: 0.0
@@ -173,6 +190,7 @@ class ProductFormViewModel @Inject constructor(
         val cost = uiState.purchaseCost.toDoubleOrNull()
         val price = uiState.sellingPrice.toDoubleOrNull()
         val perPackage = uiState.unitsPerPackageValue
+        val isEditing = uiState.productId != null
 
         if (uiState.name.isBlank()) {
             uiState = uiState.copy(error = "Name is required"); return
@@ -181,11 +199,12 @@ class ProductFormViewModel @Inject constructor(
             uiState = uiState.copy(error = "Purchase cost and selling price must be numbers"); return
         }
 
-        val qty = if (uiState.productId == null && uiState.isPackaged) {
-            (uiState.packagesOnHand.toDoubleOrNull() ?: 0.0) * perPackage
-        } else {
-            uiState.quantity.toDoubleOrNull() ?: 0.0
-        }
+        val enteredQuantity = uiState.quantity.toDoubleOrNull() ?: 0.0
+        val originalQuantity = uiState.originalQuantity.toDoubleOrNull() ?: 0.0
+        // While editing, the plain update never changes quantity directly -
+        // any difference is applied afterwards via adjust() so it lands in
+        // the inventory audit trail instead of silently overwriting stock.
+        val quantityForUpdate = if (isEditing) originalQuantity else enteredQuantity
 
         val threshold = if (uiState.isPackaged && uiState.thresholdMode == ThresholdMode.PACKAGES) {
             (uiState.thresholdPackages.toDoubleOrNull() ?: 0.0) * perPackage
@@ -201,32 +220,40 @@ class ProductFormViewModel @Inject constructor(
                 imageUrl = uiState.imageUrl,
                 category = uiState.category.ifBlank { null },
                 unit = uiState.unit.ifBlank { "pcs" },
-                packageLabel = uiState.packageLabel.ifBlank { null },
                 unitsPerPackage = perPackage,
                 purchaseCost = cost,
                 sellingPrice = price,
-                quantity = qty,
+                quantity = quantityForUpdate,
                 lowStockThreshold = threshold,
             )
-            val result = if (uiState.productId != null) {
+            val result = if (isEditing) {
                 repository.update(uiState.productId!!, input)
             } else {
                 repository.create(input)
             }
             when (result) {
-                is ApiResult.Success -> uiState = uiState.copy(isSaving = false, saved = true)
+                is ApiResult.Success -> {
+                    val delta = enteredQuantity - originalQuantity
+                    if (isEditing && delta != 0.0) {
+                        when (val adjustResult = repository.adjust(uiState.productId!!, delta, "Manual correction via edit form")) {
+                            is ApiResult.Success -> uiState = uiState.copy(isSaving = false, saved = true)
+                            is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = adjustResult.message)
+                        }
+                    } else {
+                        uiState = uiState.copy(isSaving = false, saved = true)
+                    }
+                }
                 is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = result.message)
             }
         }
     }
 
-    /** [packagesReceived] is already resolved to base units by the caller (Screen) if packaged. */
     fun restock(quantity: Double, unitCost: Double?) {
         val id = uiState.productId ?: return
         viewModelScope.launch {
             uiState = uiState.copy(isSaving = true)
             when (val result = repository.restock(id, quantity, unitCost, "Restock")) {
-                is ApiResult.Success -> uiState = result.data.toUiState()
+                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories)
                 is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = result.message)
             }
         }
@@ -237,7 +264,7 @@ class ProductFormViewModel @Inject constructor(
         viewModelScope.launch {
             uiState = uiState.copy(isSaving = true)
             when (val result = repository.adjust(id, quantityChange, reason)) {
-                is ApiResult.Success -> uiState = result.data.toUiState()
+                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories)
                 is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = result.message)
             }
         }

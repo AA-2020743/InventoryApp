@@ -64,7 +64,7 @@
     <string name="product_pick_photo">Choose photo</string>
     <string name="product_scan_barcode">Scan barcode</string>
     <string name="product_save_error_barcode_or_image">Add a barcode, or a photo for products without one</string>
-    <string name="product_package_label">Packaging (optional, e.g. Carton, Pallet, Box)</string>
+    <string name="product_is_packaged">Sold in packages (e.g. cartons, pallets)?</string>
     <string name="product_units_per_package">Units per package</string>
     <string name="product_packages_on_hand">Packages on hand</string>
     <string name="product_threshold_by">Alert threshold by</string>

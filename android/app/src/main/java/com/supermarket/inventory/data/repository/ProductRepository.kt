@@ -20,6 +20,8 @@ class ProductRepository @Inject constructor(private val api: ApiService) {
     suspend fun getByBarcode(barcode: String): ApiResult<ProductDto> =
         apiCall { api.getProductByBarcode(barcode) }
 
+    suspend fun getCategories(): ApiResult<List<String>> = apiCall { api.getCategories() }
+
     suspend fun getProduct(id: String): ApiResult<ProductDto> = apiCall { api.getProduct(id) }
 
     suspend fun create(input: ProductInput): ApiResult<ProductDto> = apiCall { api.createProduct(input) }

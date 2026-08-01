@@ -23,6 +23,9 @@ interface ApiService {
     @GET("api/products/barcode/{barcode}")
     suspend fun getProductByBarcode(@Path("barcode") barcode: String): ProductDto
 
+    @GET("api/products/categories")
+    suspend fun getCategories(): List<String>
+
     @GET("api/products/{id}")
     suspend fun getProduct(@Path("id") id: String): ProductDto
 

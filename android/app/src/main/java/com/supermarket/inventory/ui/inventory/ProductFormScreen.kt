@@ -142,13 +142,40 @@ fun ProductFormScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
-            OutlinedTextField(
-                value = state.category,
-                onValueChange = viewModel::onCategoryChange,
-                label = { Text(stringResource(R.string.product_category)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            )
+            var categoryExpanded by remember { mutableStateOf(false) }
+            val filteredCategories = state.availableCategories.filter {
+                state.category.isBlank() || it.contains(state.category, ignoreCase = true)
+            }
+            androidx.compose.material3.ExposedDropdownMenuBox(
+                expanded = categoryExpanded && filteredCategories.isNotEmpty(),
+                onExpandedChange = { categoryExpanded = it },
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                OutlinedTextField(
+                    value = state.category,
+                    onValueChange = {
+                        viewModel.onCategoryChange(it)
+                        categoryExpanded = true
+                    },
+                    label = { Text(stringResource(R.string.product_category)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                )
+                androidx.compose.material3.DropdownMenu(
+                    expanded = categoryExpanded && filteredCategories.isNotEmpty(),
+                    onDismissRequest = { categoryExpanded = false },
+                ) {
+                    filteredCategories.forEach { existingCategory ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(existingCategory) },
+                            onClick = {
+                                viewModel.onCategoryChange(existingCategory)
+                                categoryExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
             OutlinedTextField(
                 value = state.unit,
                 onValueChange = viewModel::onUnitChange,
@@ -175,13 +202,13 @@ fun ProductFormScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
-            OutlinedTextField(
-                value = state.packageLabel,
-                onValueChange = viewModel::onPackageLabelChange,
-                label = { Text(stringResource(R.string.product_package_label)) },
-                singleLine = true,
+            Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            )
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.product_is_packaged), modifier = Modifier.weight(1f))
+                androidx.compose.material3.Switch(checked = state.isPackaged, onCheckedChange = viewModel::onIsPackagedChange)
+            }
 
             if (state.isPackaged) {
                 Row(modifier = Modifier.padding(top = 8.dp)) {
@@ -214,7 +241,6 @@ fun ProductFormScreen(
                     label = { Text(stringResource(R.string.product_quantity)) },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
-                    enabled = state.productId == null && !state.isPackaged,
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp))
