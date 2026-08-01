@@ -1,5 +1,6 @@
 package com.supermarket.inventory.ui.sales
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,6 +94,20 @@ fun SalesScreen(
                 )
                 IconButton(onClick = onScan) {
                     Icon(Icons.Filled.QrCodeScanner, contentDescription = stringResource(R.string.action_scan))
+                }
+            }
+
+            if (state.searchResults.isNotEmpty()) {
+                Card(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Column {
+                        state.searchResults.take(6).forEach { product ->
+                            androidx.compose.material3.ListItem(
+                                headlineContent = { Text(product.name) },
+                                supportingContent = { Text(formatAmount(product.sellingPrice)) },
+                                modifier = Modifier.fillMaxWidth().clickable { viewModel.selectSearchResult(product) },
+                            )
+                        }
+                    }
                 }
             }
 

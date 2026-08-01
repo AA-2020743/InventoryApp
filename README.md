@@ -41,7 +41,7 @@ npm run dev            # http://localhost:4000
   computed live, so it can go negative (a loss) whenever expenses outweigh
   sales, and reflects reality at any point in the day, not just at close.
 - **Reminders**: low stock and upcoming/overdue supplier invoices are
-  exposed via `GET /api/alerts`; the Android app polls this hourly in the
+  exposed via `GET /api/alerts`; the Android app polls this daily in the
   background (WorkManager) and raises local notifications — no push
   server (FCM) required since this is a single self-hosted backend.
 - **Barcode scanning**: the Android app uses the camera (CameraX + on-device

@@ -14,8 +14,12 @@ import javax.inject.Singleton
 @Singleton
 class ProductRepository @Inject constructor(private val api: ApiService) {
 
-    suspend fun getProducts(search: String? = null, lowStockOnly: Boolean = false): ApiResult<List<ProductDto>> =
-        apiCall { api.getProducts(search = search, lowStockOnly = if (lowStockOnly) true else null) }
+    suspend fun getProducts(
+        search: String? = null,
+        category: String? = null,
+        lowStockOnly: Boolean = false,
+    ): ApiResult<List<ProductDto>> =
+        apiCall { api.getProducts(search = search, category = category, lowStockOnly = if (lowStockOnly) true else null) }
 
     suspend fun getByBarcode(barcode: String): ApiResult<ProductDto> =
         apiCall { api.getProductByBarcode(barcode) }

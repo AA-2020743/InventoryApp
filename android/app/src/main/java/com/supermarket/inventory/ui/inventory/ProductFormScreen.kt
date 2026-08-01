@@ -74,6 +74,7 @@ fun ProductFormScreen(
 
     var showRestockDialog by remember { mutableStateOf(false) }
     var showAdjustDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -303,6 +304,14 @@ fun ProductFormScreen(
                         Text(stringResource(R.string.adjust_title))
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = true },
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.product_delete))
+                }
             }
         }
     }
@@ -324,6 +333,22 @@ fun ProductFormScreen(
             onConfirm = { change, reason ->
                 viewModel.adjust(change, reason)
                 showAdjustDialog = false
+            },
+        )
+    }
+    if (showDeleteConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.product_delete)) },
+            text = { Text(stringResource(R.string.product_delete_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    viewModel.delete()
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }

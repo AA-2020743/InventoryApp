@@ -64,7 +64,7 @@ time from Settings.
 - **Localization**: English and Arabic (with RTL layout), switchable from
   Settings without reinstalling.
 - **Theme**: light, dark, or follow system, switchable from Settings.
-- **Reminders**: a background WorkManager job polls `/api/alerts` hourly
+- **Reminders**: a background WorkManager job polls `/api/alerts` daily
   and raises local notifications for low stock and invoices due soon or
   overdue (no push/FCM server needed).
 

@@ -17,6 +17,8 @@ data class InventoryUiState(
     val isLoading: Boolean = true,
     val products: List<ProductDto> = emptyList(),
     val search: String = "",
+    val availableCategories: List<String> = emptyList(),
+    val selectedCategory: String? = null,
     val lowStockOnly: Boolean = false,
     val error: String? = null,
 )
@@ -40,10 +42,25 @@ class InventoryViewModel @Inject constructor(
 
     init {
         load()
+        loadCategories()
+    }
+
+    fun loadCategories() {
+        viewModelScope.launch {
+            when (val result = repository.getCategories()) {
+                is ApiResult.Success -> uiState = uiState.copy(availableCategories = result.data)
+                is ApiResult.Error -> Unit
+            }
+        }
     }
 
     fun onSearchChange(value: String) {
         uiState = uiState.copy(search = value)
+        load()
+    }
+
+    fun onCategorySelected(category: String?) {
+        uiState = uiState.copy(selectedCategory = category)
         load()
     }
 
@@ -59,7 +76,13 @@ class InventoryViewModel @Inject constructor(
             // saving a product) shouldn't hide the list that's already there.
             uiState = uiState.copy(isLoading = uiState.products.isEmpty(), error = null)
             val search = uiState.search.ifBlank { null }
-            when (val result = repository.getProducts(search = search, lowStockOnly = uiState.lowStockOnly)) {
+            when (
+                val result = repository.getProducts(
+                    search = search,
+                    category = uiState.selectedCategory,
+                    lowStockOnly = uiState.lowStockOnly,
+                )
+            ) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, products = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
             }

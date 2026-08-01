@@ -269,6 +269,21 @@ class ProductFormViewModel @Inject constructor(
             }
         }
     }
+
+    // Soft-deletes (marks inactive) rather than a hard delete - past sales
+    // and inventory-transaction records still reference this product, and
+    // removing the row outright would corrupt that history. From the
+    // owner's point of view it disappears from inventory/search either way.
+    fun delete() {
+        val id = uiState.productId ?: return
+        viewModelScope.launch {
+            uiState = uiState.copy(isSaving = true, error = null)
+            when (val result = repository.delete(id)) {
+                is ApiResult.Success -> uiState = uiState.copy(isSaving = false, saved = true)
+                is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = result.message)
+            }
+        }
+    }
 }
 
 private fun Double.toCleanString(): String =

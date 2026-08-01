@@ -17,6 +17,7 @@ data class DashboardUiState(
     val summary: DashboardSummaryDto? = null,
     val error: String? = null,
     val showWorkingDayPrompt: Boolean = false,
+    val todayIsWorkingDay: Boolean? = null, // null = not yet known
 )
 
 @HiltViewModel
@@ -48,15 +49,23 @@ class DashboardViewModel @Inject constructor(
     private fun checkWorkingDay() {
         viewModelScope.launch {
             when (val result = repository.getTodayWorkingDay()) {
-                is ApiResult.Success -> uiState = uiState.copy(showWorkingDayPrompt = !result.data.answered)
+                is ApiResult.Success -> uiState = uiState.copy(
+                    showWorkingDayPrompt = !result.data.answered,
+                    todayIsWorkingDay = result.data.isWorking,
+                )
                 is ApiResult.Error -> Unit
             }
         }
     }
 
+    /** Re-opens the prompt so the owner can change today's answer if they tapped the wrong one. */
+    fun reopenWorkingDayPrompt() {
+        uiState = uiState.copy(showWorkingDayPrompt = true)
+    }
+
     fun answerWorkingDay(isWorking: Boolean) {
         viewModelScope.launch {
-            uiState = uiState.copy(showWorkingDayPrompt = false)
+            uiState = uiState.copy(showWorkingDayPrompt = false, todayIsWorkingDay = isWorking)
             repository.setTodayWorkingDay(isWorking)
             refresh()
         }

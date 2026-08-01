@@ -10,6 +10,8 @@ import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.repository.ProductRepository
 import com.supermarket.inventory.data.repository.SalesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import javax.inject.Inject
@@ -20,6 +22,7 @@ data class CartItem(val product: ProductDto, val quantity: Double) {
 
 data class SalesUiState(
     val barcodeInput: String = "",
+    val searchResults: List<ProductDto> = emptyList(),
     val cart: List<CartItem> = emptyList(),
     val isLookingUp: Boolean = false,
     val isCheckingOut: Boolean = false,
@@ -28,6 +31,8 @@ data class SalesUiState(
 ) {
     val total: BigDecimal get() = cart.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.subtotal) }
 }
+
+private const val SEARCH_DEBOUNCE_MS = 300L
 
 @HiltViewModel
 class SalesViewModel @Inject constructor(
@@ -38,19 +43,44 @@ class SalesViewModel @Inject constructor(
     var uiState by mutableStateOf(SalesUiState())
         private set
 
+    private var searchJob: Job? = null
+
+    // The same field doubles as barcode entry (scanner or manual, submitted
+    // with Enter) and a live name search - typing a product name shows
+    // tappable suggestions below, while a fast HID scanner burst followed
+    // by Enter never lingers long enough for the debounced search to fire.
     fun onBarcodeInputChange(value: String) {
         uiState = uiState.copy(barcodeInput = value, error = null)
+        searchJob?.cancel()
+        if (value.isBlank()) {
+            uiState = uiState.copy(searchResults = emptyList())
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            when (val result = productRepository.getProducts(search = value)) {
+                is ApiResult.Success -> uiState = uiState.copy(searchResults = result.data)
+                is ApiResult.Error -> Unit
+            }
+        }
     }
 
     fun submitBarcode(barcode: String = uiState.barcodeInput) {
         if (barcode.isBlank()) return
+        searchJob?.cancel()
         viewModelScope.launch {
-            uiState = uiState.copy(isLookingUp = true, error = null, barcodeInput = "")
+            uiState = uiState.copy(isLookingUp = true, error = null, barcodeInput = "", searchResults = emptyList())
             when (val result = productRepository.getByBarcode(barcode)) {
                 is ApiResult.Success -> addToCart(result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLookingUp = false, error = "NOT_FOUND:$barcode")
             }
         }
+    }
+
+    fun selectSearchResult(product: ProductDto) {
+        searchJob?.cancel()
+        addToCart(product)
+        uiState = uiState.copy(barcodeInput = "", searchResults = emptyList())
     }
 
     private fun addToCart(product: ProductDto) {

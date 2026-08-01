@@ -64,6 +64,7 @@ fun InventoryListScreen(
     // saved nav state) across tab switches without refetching on its own.
     LaunchedEffect(Unit) {
         viewModel.load()
+        viewModel.loadCategories()
     }
 
     LaunchedEffect(scannedBarcode) {
@@ -107,6 +108,28 @@ fun InventoryListScreen(
                     onClick = viewModel::onToggleLowStockOnly,
                     label = { Text(stringResource(R.string.inventory_low_stock_badge)) },
                 )
+            }
+            if (state.availableCategories.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        FilterChip(
+                            selected = state.selectedCategory == null,
+                            onClick = { viewModel.onCategorySelected(null) },
+                            label = { Text(stringResource(R.string.inventory_all_categories)) },
+                        )
+                    }
+                    items(state.availableCategories) { category ->
+                        FilterChip(
+                            selected = state.selectedCategory == category,
+                            onClick = { viewModel.onCategorySelected(category) },
+                            label = { Text(category) },
+                        )
+                    }
+                }
             }
             Spacer(Modifier.padding(4.dp))
 

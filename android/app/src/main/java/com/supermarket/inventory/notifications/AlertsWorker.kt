@@ -80,7 +80,7 @@ class AlertsWorker @AssistedInject constructor(
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
-            val request = PeriodicWorkRequestBuilder<AlertsWorker>(1, TimeUnit.HOURS)
+            val request = PeriodicWorkRequestBuilder<AlertsWorker>(1, TimeUnit.DAYS)
                 .setConstraints(constraints)
                 .build()
             WorkManager.getInstance(context)

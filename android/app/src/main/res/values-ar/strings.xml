@@ -39,8 +39,13 @@
     <string name="dashboard_today">اليوم</string>
     <string name="dashboard_this_month">هذا الشهر</string>
     <string name="dashboard_revenue">الإيرادات</string>
+    <string name="dashboard_cost">التكلفة</string>
     <string name="dashboard_profit">الأرباح</string>
+    <string name="dashboard_loss">الخسارة</string>
     <string name="dashboard_daily_expenses">المصروفات المتكررة (المعدل اليومي)</string>
+    <string name="dashboard_needs_attention">يتطلب انتباهك</string>
+    <string name="dashboard_status_open">مفتوح اليوم</string>
+    <string name="dashboard_status_closed">مغلق اليوم</string>
     <string name="dashboard_low_stock_alert">‏%1$d صنف منخفض المخزون</string>
     <string name="dashboard_invoices_due_alert">‏%1$d فاتورة مستحقة قريبًا</string>
     <string name="dashboard_invoices_overdue_alert">‏%1$d فاتورة متأخرة السداد</string>
@@ -51,6 +56,7 @@
     <string name="inventory_search_hint">ابحث بالاسم أو الباركود</string>
     <string name="inventory_add_product">إضافة منتج</string>
     <string name="inventory_low_stock_badge">مخزون منخفض</string>
+    <string name="inventory_all_categories">الكل</string>
     <string name="inventory_empty">لا توجد منتجات بعد. اضغط + للإضافة.</string>
     <string name="product_name">الاسم</string>
     <string name="product_barcode">الباركود</string>
@@ -70,6 +76,8 @@
     <string name="product_threshold_by">حد التنبيه حسب</string>
     <string name="product_threshold_units">الوحدات</string>
     <string name="product_threshold_packages">العبوات</string>
+    <string name="product_delete">حذف المنتج</string>
+    <string name="product_delete_confirm">سيتم إزالة المنتج من المخزون ونتائج البحث. ستبقى سجلات المبيعات والمخزون السابقة الخاصة به محفوظة.</string>
     <string name="restock_title">إعادة التخزين</string>
     <string name="restock_quantity">الكمية المستلمة</string>
     <string name="restock_packages_received">عدد العبوات المستلمة</string>

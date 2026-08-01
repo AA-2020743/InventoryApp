@@ -39,8 +39,13 @@
     <string name="dashboard_today">Today</string>
     <string name="dashboard_this_month">This month</string>
     <string name="dashboard_revenue">Revenue</string>
+    <string name="dashboard_cost">Cost</string>
     <string name="dashboard_profit">Profit</string>
+    <string name="dashboard_loss">Loss</string>
     <string name="dashboard_daily_expenses">Recurring expenses (daily rate)</string>
+    <string name="dashboard_needs_attention">Needs attention</string>
+    <string name="dashboard_status_open">Open today</string>
+    <string name="dashboard_status_closed">Closed today</string>
     <string name="dashboard_low_stock_alert">%1$d item(s) low on stock</string>
     <string name="dashboard_invoices_due_alert">%1$d invoice(s) due soon</string>
     <string name="dashboard_invoices_overdue_alert">%1$d invoice(s) overdue</string>
@@ -51,6 +56,7 @@
     <string name="inventory_search_hint">Search by name or barcode</string>
     <string name="inventory_add_product">Add product</string>
     <string name="inventory_low_stock_badge">Low stock</string>
+    <string name="inventory_all_categories">All</string>
     <string name="inventory_empty">No products yet. Tap + to add one.</string>
     <string name="product_name">Name</string>
     <string name="product_barcode">Barcode</string>
@@ -70,6 +76,8 @@
     <string name="product_threshold_by">Alert threshold by</string>
     <string name="product_threshold_units">Units</string>
     <string name="product_threshold_packages">Packages</string>
+    <string name="product_delete">Delete product</string>
+    <string name="product_delete_confirm">This removes the product from your inventory and search results. Past sales and stock history involving it are kept for your records.</string>
     <string name="restock_title">Restock</string>
     <string name="restock_quantity">Quantity received</string>
     <string name="restock_packages_received">Packages received</string>
