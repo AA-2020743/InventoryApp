@@ -22,13 +22,16 @@ function rangeFor(period: string, dateStr?: string): { from: Date; to: Date } {
   throw new HttpError(400, "period must be 'day' or 'month'");
 }
 
-// Most sold items in a given day or month, ranked by quantity sold.
+// Most sold items in a given day or month. sortBy=quantity (default) ranks by
+// units sold; sortBy=profit ranks by actual profit contributed (useful
+// alongside /margins, since a high-volume item can still be low-margin).
 statsRouter.get(
   "/top-products",
   asyncHandler(async (req, res) => {
     const period = typeof req.query.period === "string" ? req.query.period : "day";
     const date = typeof req.query.date === "string" ? req.query.date : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const sortBy = req.query.sortBy === "profit" ? "profit" : "quantity";
     const { from, to } = rangeFor(period, date);
 
     const items = await prisma.saleItem.findMany({
@@ -38,31 +41,74 @@ statsRouter.get(
 
     const byProduct = new Map<
       string,
-      { productId: string; name: string; quantitySold: number; revenue: Prisma.Decimal }
+      {
+        productId: string;
+        name: string;
+        quantitySold: number;
+        revenue: Prisma.Decimal;
+        cost: Prisma.Decimal;
+      }
     >();
 
     for (const item of items) {
       const key = item.productId;
+      const cost = item.unitCost.mul(item.quantity);
       const existing = byProduct.get(key);
       const qty = item.quantity.toNumber();
       if (existing) {
         existing.quantitySold += qty;
         existing.revenue = existing.revenue.add(item.subtotal);
+        existing.cost = existing.cost.add(cost);
       } else {
         byProduct.set(key, {
           productId: item.productId,
           name: item.product.name,
           quantitySold: qty,
           revenue: item.subtotal,
+          cost,
         });
       }
     }
 
     const ranked = Array.from(byProduct.values())
-      .sort((a, b) => b.quantitySold - a.quantitySold)
+      .map((p) => ({ ...p, profit: p.revenue.sub(p.cost) }))
+      .sort((a, b) =>
+        sortBy === "profit" ? b.profit.sub(a.profit).toNumber() : b.quantitySold - a.quantitySold
+      )
       .slice(0, limit);
 
-    res.json({ period, from, to, items: ranked });
+    res.json({ period, from, to, sortBy, items: ranked });
+  })
+);
+
+// Static per-product margin ranking (independent of sales volume) — which
+// items are the most profitable *per unit* to sell, e.g. to prioritize
+// promoting or restocking. marginPercent is relative to selling price.
+statsRouter.get(
+  "/margins",
+  asyncHandler(async (req, res) => {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+
+    const products = await prisma.product.findMany({ where: { active: true } });
+
+    const ranked = products
+      .filter((p) => p.sellingPrice.gt(0))
+      .map((p) => {
+        const marginAmount = p.sellingPrice.sub(p.purchaseCost);
+        const marginPercent = marginAmount.div(p.sellingPrice).mul(100);
+        return {
+          productId: p.id,
+          name: p.name,
+          purchaseCost: p.purchaseCost,
+          sellingPrice: p.sellingPrice,
+          marginAmount,
+          marginPercent,
+        };
+      })
+      .sort((a, b) => b.marginPercent.sub(a.marginPercent).toNumber())
+      .slice(0, limit);
+
+    res.json({ items: ranked });
   })
 );
 
