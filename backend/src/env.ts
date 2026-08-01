@@ -10,6 +10,7 @@ function required(name: string): string {
 
 export const env = {
   port: parseInt(process.env.PORT ?? "4000", 10),
+  host: process.env.HOST ?? "0.0.0.0",
   databaseUrl: required("DATABASE_URL"),
   jwtSecret: required("JWT_SECRET"),
   uploadsDir: process.env.UPLOADS_DIR ?? "uploads",

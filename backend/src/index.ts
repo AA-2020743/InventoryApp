@@ -40,6 +40,6 @@ app.use("/api/alerts", requireAuth, alertsRouter);
 
 app.use(errorHandler);
 
-app.listen(env.port, () => {
-  console.log(`Inventory app backend listening on port ${env.port}`);
+app.listen(env.port, env.host, () => {
+  console.log(`Inventory app backend listening on ${env.host}:${env.port}`);
 });
