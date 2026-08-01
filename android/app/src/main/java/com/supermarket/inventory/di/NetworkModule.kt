@@ -14,6 +14,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -31,6 +32,7 @@ object NetworkModule {
     // suspending is needed on the OkHttp dispatcher thread.
     @Provides
     @Singleton
+    @Named("baseUrl")
     fun provideBaseUrlInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
             val configured = sessionManager.serverUrl.value.toHttpUrlOrNull()
@@ -49,6 +51,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @Named("auth")
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
             val token = sessionManager.token.value
@@ -63,8 +66,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        baseUrlInterceptor: Interceptor,
-        authInterceptor: Interceptor,
+        @Named("baseUrl") baseUrlInterceptor: Interceptor,
+        @Named("auth") authInterceptor: Interceptor,
     ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         return OkHttpClient.Builder()
