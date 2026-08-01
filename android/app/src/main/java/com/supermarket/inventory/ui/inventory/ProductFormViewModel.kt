@@ -10,6 +10,7 @@ import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.remote.dto.ProductInput
+import com.supermarket.inventory.data.repository.OpenFoodFactsRepository
 import com.supermarket.inventory.data.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -48,6 +49,7 @@ data class ProductFormUiState(
 class ProductFormViewModel @Inject constructor(
     private val repository: ProductRepository,
     private val sessionManager: SessionManager,
+    private val openFoodFactsRepository: OpenFoodFactsRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -62,6 +64,17 @@ class ProductFormViewModel @Inject constructor(
             loadProduct(productId)
         } else if (!initialBarcode.isNullOrBlank()) {
             uiState = uiState.copy(barcode = initialBarcode)
+            tryAutoFill(initialBarcode)
+        }
+    }
+
+    // Best-effort prefill from Open Food Facts for a brand-new product;
+    // silently does nothing if the barcode isn't found there (common for
+    // local/loose goods) - manual entry remains the primary path.
+    private fun tryAutoFill(barcode: String) {
+        viewModelScope.launch {
+            val product = openFoodFactsRepository.lookup(barcode) ?: return@launch
+            applyAutoFill(product.productName, product.imageFrontUrl, product.categories)
         }
     }
 
@@ -128,7 +141,10 @@ class ProductFormViewModel @Inject constructor(
     fun onThresholdModeChange(mode: ThresholdMode) { uiState = uiState.copy(thresholdMode = mode) }
     fun onThresholdPackagesChange(v: String) { uiState = uiState.copy(thresholdPackages = v) }
     fun onLowStockThresholdChange(v: String) { uiState = uiState.copy(lowStockThreshold = v) }
-    fun onBarcodeScanned(v: String) { uiState = uiState.copy(barcode = v, error = null) }
+    fun onBarcodeScanned(v: String) {
+        uiState = uiState.copy(barcode = v, error = null)
+        if (uiState.productId == null) tryAutoFill(v)
+    }
 
     fun uploadImage(file: File) {
         viewModelScope.launch {
