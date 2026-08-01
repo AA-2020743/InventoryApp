@@ -15,7 +15,7 @@ class SalesRepository @Inject constructor(private val api: ApiService) {
     suspend fun getSales(from: String? = null, to: String? = null, limit: Int? = null): ApiResult<List<SaleDto>> =
         apiCall { api.getSales(from, to, limit) }
 
-    suspend fun createSale(items: List<Pair<String, Double>>): ApiResult<SaleDto> = apiCall {
-        api.createSale(SaleInput(items.map { (productId, quantity) -> SaleItemInput(productId, quantity) }))
+    suspend fun createSale(items: List<Pair<String, Double>>, clientId: String? = null): ApiResult<SaleDto> = apiCall {
+        api.createSale(SaleInput(clientId, items.map { (productId, quantity) -> SaleItemInput(productId, quantity) }))
     }
 }

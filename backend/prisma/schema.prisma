@@ -106,6 +106,10 @@ model SupplierInvoice {
 
 model Sale {
   id          String     @id @default(uuid())
+  // Set by the Android app's offline sales queue so a retried sync (after a
+  // dropped response, not just a dropped request) can be recognized as the
+  // same sale instead of double-selling; null for sales made while online.
+  clientId    String?    @unique
   totalAmount Decimal    @db.Decimal(12, 2)
   totalCost   Decimal    @db.Decimal(12, 2) // snapshot COGS, for profit stats
   createdAt   DateTime   @default(now())

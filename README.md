@@ -48,6 +48,10 @@ npm run dev            # http://localhost:4000
   ML Kit) for scanning, and also works with external Bluetooth/USB barcode
   scanners for free — those emulate a keyboard, so any barcode text field
   in the app accepts them without special code.
+- **Offline selling**: a lost connection mid-sale doesn't lose the sale —
+  it's queued locally (backed by a local product cache for lookup) and
+  synced automatically once the connection returns, with a client-generated
+  ID so a retried sync can't double-sell — see `android/README.md`.
 - **Statistics**: top-selling and highest-margin items, sortable by
   quantity or profit, with a calendar/month picker in the app to inspect
   any specific day or month's sales.

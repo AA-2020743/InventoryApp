@@ -7,6 +7,11 @@ import { asyncHandler, HttpError } from "../middleware/errorHandler";
 export const salesRouter = Router();
 
 const saleInput = z.object({
+  // Set by the Android app's offline sales queue: a sale first created while
+  // offline carries the same clientId on every retry, so a retry after a
+  // dropped *response* (the first attempt actually succeeded server-side)
+  // returns the original sale instead of selling the stock twice.
+  clientId: z.string().uuid().optional(),
   items: z
     .array(
       z.object({
@@ -58,7 +63,18 @@ salesRouter.get(
 salesRouter.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { items } = saleInput.parse(req.body);
+    const { clientId, items } = saleInput.parse(req.body);
+
+    if (clientId) {
+      const existing = await prisma.sale.findUnique({
+        where: { clientId },
+        include: { items: { include: { product: true } } },
+      });
+      if (existing) {
+        res.status(200).json(existing);
+        return;
+      }
+    }
 
     const sale = await prisma.$transaction(async (tx) => {
       const productIds = items.map((i) => i.productId);
@@ -97,6 +113,7 @@ salesRouter.post(
 
       const created = await tx.sale.create({
         data: {
+          clientId,
           totalAmount,
           totalCost,
           items: { create: itemsData },

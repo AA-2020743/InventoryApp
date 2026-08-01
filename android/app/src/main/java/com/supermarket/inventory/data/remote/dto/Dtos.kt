@@ -112,7 +112,7 @@ data class UpcomingInvoicesResponse(
 data class SaleItemInput(val productId: String, val quantity: Double)
 
 @JsonClass(generateAdapter = true)
-data class SaleInput(val items: List<SaleItemInput>)
+data class SaleInput(val clientId: String?, val items: List<SaleItemInput>)
 
 @JsonClass(generateAdapter = true)
 data class SaleItemDto(

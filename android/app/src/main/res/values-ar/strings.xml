@@ -99,6 +99,8 @@
     <string name="sales_checkout">إتمام البيع</string>
     <string name="sales_total">الإجمالي</string>
     <string name="sales_success">تمت عملية البيع بنجاح</string>
+    <string name="sales_offline_queued">لا يوجد اتصال — تم حفظ عملية البيع وستتم مزامنتها تلقائيًا عند عودة الاتصال</string>
+    <string name="sales_pending_sync_badge">‏%1$d بانتظار المزامنة</string>
     <string name="sales_insufficient_stock">الكمية المتوفرة غير كافية لهذا الصنف</string>
     <string name="sales_remove_item">إزالة</string>
 
@@ -175,6 +177,8 @@
     <string name="notif_invoice_overdue_body">‏%1$s متأخرة السداد: %2$s</string>
     <string name="notif_backup_saved_title">تم حفظ النسخة الاحتياطية الأسبوعية</string>
     <string name="notif_backup_saved_body">‏تم الحفظ باسم %1$s. افتح الإعدادات لإرسال نسخة خارج هذا الهاتف.</string>
+    <string name="notif_sales_sync_issue_title">تعذرت مزامنة بعض المبيعات غير المتصلة</string>
+    <string name="notif_sales_sync_issue_body">‏تعذر إرسال %1$d عملية بيع محفوظة أثناء عدم الاتصال إلى الخادم وتم تجاهلها. يرجى مراجعة مستويات المخزون الأخيرة.</string>
 
     <!-- Working day prompt -->
     <string name="workday_prompt_title">هل اليوم يوم عمل؟</string>

@@ -49,7 +49,13 @@ time from Settings.
   for loose/unlabeled goods (e.g. produce); restock and manual stock
   adjustments are tracked separately so quantities stay auditable.
 - **Sell**: scan (or type) items into a running cart, then checkout; stock
-  is decremented server-side.
+  is decremented server-side. If checkout can't reach the server, the sale
+  is saved to a local offline queue instead of being lost, and a background
+  job syncs it automatically once connectivity returns (each queued sale
+  carries a client-generated ID so a retry after a dropped response can't
+  double-sell). Barcode/name lookup also falls back to a local product
+  cache when offline, so you can keep ringing up sales through a dropped
+  connection — see "Offline selling" below for the tradeoffs this implies.
 - **Supplier invoices**: track pending/paid invoices per supplier with due
   dates; the Dashboard surfaces overdue and due-soon counts.
 - **Recurring expenses**: salaries and other daily/monthly costs feed into
@@ -77,6 +83,31 @@ time from Settings.
   automatically in the background (belt-and-suspenders alongside the
   server's own daily backups, in case the server's disk is ever lost
   entirely) and posts a notification when it saves a new one.
+
+### Offline selling
+
+The Sell screen keeps working through a dropped connection:
+
+- Every successful product lookup (barcode scan or name search) refreshes a
+  local Room cache. If a later lookup can't reach the server, it's answered
+  from that cache instead of failing outright.
+- If checkout itself can't reach the server, the finished sale is queued
+  locally (with a client-generated ID) instead of being lost, and a
+  WorkManager job — triggered immediately when the queue gains an entry,
+  and again on every app startup in case the app was killed first — syncs
+  it once connectivity returns. The Sell screen's title bar shows a "N
+  pending sync" badge whenever sales are queued.
+- The client-generated ID means a retried sync after a dropped *response*
+  (the sale actually went through, but the phone never heard back) is
+  recognized by the server as the same sale rather than sold twice.
+- The one thing this can't fully protect against: two sales of the same
+  low-stock item made offline, on the same phone, before either syncs. The
+  local cache's quantity is decremented optimistically as each offline sale
+  is queued so this is unlikely, but it can still drift from the server
+  until connectivity returns. If a queued sale is ultimately rejected by the
+  server for a real reason (e.g. the product was deleted in the meantime),
+  it's dropped rather than retried forever, and a notification tells you to
+  review recent stock levels.
 
 ## Known limitation of this build environment
 

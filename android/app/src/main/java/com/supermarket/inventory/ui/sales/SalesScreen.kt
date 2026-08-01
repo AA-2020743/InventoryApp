@@ -66,9 +66,16 @@ fun SalesScreen(
     }
 
     val notFoundMessage = stringResource(R.string.scan_not_found)
+    val saleCompletedMessage = stringResource(R.string.sales_success)
+    val offlineQueuedMessage = stringResource(R.string.sales_offline_queued)
     LaunchedEffect(state.error, state.successMessage) {
-        val message = state.successMessage
-            ?: state.error?.let { if (it.startsWith("NOT_FOUND:")) notFoundMessage else it }
+        val message = state.successMessage?.let {
+            when (it) {
+                "SALE_COMPLETED" -> saleCompletedMessage
+                "OFFLINE_QUEUED" -> offlineQueuedMessage
+                else -> it
+            }
+        } ?: state.error?.let { if (it.startsWith("NOT_FOUND:")) notFoundMessage else it }
         if (message != null) {
             snackbarHostState.showSnackbar(message)
             viewModel.dismissMessages()
@@ -76,7 +83,23 @@ fun SalesScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.sales_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.sales_title))
+                        if (state.pendingSyncCount > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(R.string.sales_pending_sync_badge, state.pendingSyncCount),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(12.dp)) {

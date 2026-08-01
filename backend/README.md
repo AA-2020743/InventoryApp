@@ -68,6 +68,11 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
   `InventoryTransaction` row, so stock levels are always auditable.
 - Selling price and purchase cost are **snapshotted onto each `SaleItem`** at
   sale time, so later cost changes don't rewrite historical profit.
+- `POST /api/sales` accepts an optional `clientId` (a UUID set by the Android
+  app's offline sales queue). If a sale with that `clientId` already exists,
+  the existing sale is returned (`200`) instead of creating a duplicate —
+  this makes retrying the same offline sale after a dropped response safe
+  to do blindly, without risking a double sell.
 - Inventory valuation = `Σ(quantity × purchaseCost)` for active products,
   minus the total of all **pending** supplier invoices.
 - Recurring expenses (`DAILY`/`MONTHLY`/`ONE_TIME`) feed a daily/monthly burn

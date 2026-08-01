@@ -84,6 +84,12 @@ dependencies {
     // Local settings (server URL, JWT token, language)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Local product cache (offline barcode/name lookup) + pending sales
+    // queue (offline checkout, synced once connectivity returns)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
     // Barcode scanning: camera + on-device ML Kit
     implementation("androidx.camera:camera-core:1.3.4")
     implementation("androidx.camera:camera-camera2:1.3.4")

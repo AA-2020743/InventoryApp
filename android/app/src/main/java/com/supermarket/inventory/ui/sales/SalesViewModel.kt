@@ -1,5 +1,6 @@
 package com.supermarket.inventory.ui.sales
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -7,14 +8,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.ProductDto
+import com.supermarket.inventory.data.repository.PendingSaleRepository
 import com.supermarket.inventory.data.repository.ProductRepository
 import com.supermarket.inventory.data.repository.SalesRepository
+import com.supermarket.inventory.notifications.SalesSyncWorker
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.util.UUID
 import javax.inject.Inject
+
+
 
 data class CartItem(val product: ProductDto, val quantity: Double) {
     val subtotal: BigDecimal get() = BigDecimal(product.sellingPrice).multiply(BigDecimal(quantity))
@@ -28,6 +35,7 @@ data class SalesUiState(
     val isCheckingOut: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
+    val pendingSyncCount: Int = 0,
 ) {
     val total: BigDecimal get() = cart.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.subtotal) }
 }
@@ -38,12 +46,25 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 class SalesViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val salesRepository: SalesRepository,
+    private val pendingSaleRepository: PendingSaleRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     var uiState by mutableStateOf(SalesUiState())
         private set
 
     private var searchJob: Job? = null
+
+    init {
+        // Room's Flow emits on every write to pending_sales, whether it's
+        // this ViewModel queuing a sale or the background SalesSyncWorker
+        // draining the queue, so this badge stays live without polling.
+        viewModelScope.launch {
+            pendingSaleRepository.pendingCount.collect { count ->
+                uiState = uiState.copy(pendingSyncCount = count)
+            }
+        }
+    }
 
     // The same field doubles as barcode entry (scanner or manual, submitted
     // with Enter) and a live name search - typing a product name shows
@@ -114,9 +135,18 @@ class SalesViewModel @Inject constructor(
         viewModelScope.launch {
             uiState = uiState.copy(isCheckingOut = true, error = null)
             val items = uiState.cart.map { it.product.id to it.quantity }
-            when (val result = salesRepository.createSale(items)) {
-                is ApiResult.Success -> uiState = SalesUiState(successMessage = "Sale completed")
-                is ApiResult.Error -> uiState = uiState.copy(isCheckingOut = false, error = result.message)
+            val clientId = UUID.randomUUID().toString()
+            when (val result = salesRepository.createSale(items, clientId)) {
+                is ApiResult.Success -> uiState = SalesUiState(pendingSyncCount = uiState.pendingSyncCount, successMessage = "SALE_COMPLETED")
+                is ApiResult.Error -> {
+                    if (result.isNetworkError) {
+                        pendingSaleRepository.queue(clientId, items)
+                        SalesSyncWorker.enqueue(context)
+                        uiState = SalesUiState(pendingSyncCount = uiState.pendingSyncCount, successMessage = "OFFLINE_QUEUED")
+                    } else {
+                        uiState = uiState.copy(isCheckingOut = false, error = result.message)
+                    }
+                }
             }
         }
     }

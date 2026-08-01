@@ -7,7 +7,11 @@ import java.io.IOException
 
 sealed class ApiResult<out T> {
     data class Success<T>(val data: T) : ApiResult<T>()
-    data class Error(val message: String) : ApiResult<Nothing>()
+
+    // isNetworkError distinguishes "never reached the server" (IOException -
+    // safe to retry, or fall back to a local cache) from a real server-side
+    // rejection (validation failure, 404, etc. - retrying won't help).
+    data class Error(val message: String, val isNetworkError: Boolean = false) : ApiResult<Nothing>()
 }
 
 suspend fun <T> apiCall(block: suspend () -> T): ApiResult<T> = try {
@@ -15,7 +19,7 @@ suspend fun <T> apiCall(block: suspend () -> T): ApiResult<T> = try {
 } catch (e: HttpException) {
     ApiResult.Error(extractErrorMessage(e))
 } catch (e: IOException) {
-    ApiResult.Error("Could not reach the server. Check your connection and server URL.")
+    ApiResult.Error("Could not reach the server. Check your connection and server URL.", isNetworkError = true)
 } catch (e: Exception) {
     ApiResult.Error(e.message ?: "Unknown error")
 }
