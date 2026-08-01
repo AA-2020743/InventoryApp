@@ -148,3 +148,16 @@ model Expense {
   notes     String?
   createdAt DateTime         @default(now())
 }
+
+// One row per calendar day the owner has answered "was the shop open
+// today?". A day with no row is assumed to be a working day (isWorking
+// defaults to true elsewhere) - this table only needs to record the
+// exceptions (closed days), so DAILY-frequency expenses like a cashier's
+// wage can be excluded from that day's cost. MONTHLY-frequency expenses
+// (rent, etc.) are unaffected and always accrue regardless of this table.
+model WorkingDay {
+  id        String   @id @default(uuid())
+  date      DateTime @unique @db.Date
+  isWorking Boolean  @default(true)
+  createdAt DateTime @default(now())
+}

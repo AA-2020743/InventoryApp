@@ -3,27 +3,42 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler } from "../middleware/errorHandler";
+import { dateOnlyKey, startOfDay, startOfMonth } from "../utils/dates";
 
 export const dashboardRouter = Router();
 
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+type ExpenseLike = { amount: Prisma.Decimal; frequency: string };
+
+// DAILY-frequency expenses (e.g. a cashier's daily wage) only apply on
+// days actually worked - see WorkingDay. MONTHLY-frequency expenses
+// (rent, etc.) accrue regardless of whether the shop opened that day.
+function dailyOnlyRate(expenses: ExpenseLike[]) {
+  return expenses
+    .filter((e) => e.frequency === "DAILY")
+    .reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
 }
 
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
+function monthlyProratedRate(expenses: ExpenseLike[]) {
+  return expenses
+    .filter((e) => e.frequency === "MONTHLY")
+    .reduce((acc, e) => acc.add(e.amount.div(30)), new Prisma.Decimal(0));
 }
 
-// Recurring expenses converted to a daily rate: DAILY counts as-is,
-// MONTHLY is spread over 30 days, ONE_TIME is excluded (it's not recurring).
-function dailyRate(expenses: { amount: Prisma.Decimal; frequency: string }[]) {
-  return expenses.reduce((acc, e) => {
-    if (e.frequency === "DAILY") return acc.add(e.amount);
-    if (e.frequency === "MONTHLY") return acc.add(e.amount.div(30));
-    return acc;
-  }, new Prisma.Decimal(0));
+function monthlyFlatRate(expenses: ExpenseLike[]) {
+  return expenses
+    .filter((e) => e.frequency === "MONTHLY")
+    .reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
+}
+
+// Working days between [from, to) (calendar-day keys, `to` exclusive).
+// A day with no WorkingDay row is assumed worked - only explicit
+// isWorking=false rows are subtracted from the plain calendar-day count.
+async function countWorkingDays(from: Date, to: Date): Promise<number> {
+  const totalDays = Math.round((to.getTime() - from.getTime()) / 86400000);
+  const nonWorkingDays = await prisma.workingDay.count({
+    where: { date: { gte: from, lt: to }, isWorking: false },
+  });
+  return Math.max(0, totalDays - nonWorkingDays);
 }
 
 // The core "how much is my supermarket worth right now" figure the owner
@@ -34,8 +49,11 @@ dashboardRouter.get(
     const now = new Date();
     const todayStart = startOfDay(now);
     const monthStart = startOfMonth(now);
+    const todayKey = dateOnlyKey(now);
+    const tomorrowKey = dateOnlyKey(new Date(now.getTime() + 86400000));
+    const monthStartKey = dateOnlyKey(monthStart);
 
-    const [products, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming] =
+    const [products, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar] =
       await Promise.all([
         prisma.product.findMany({ where: { active: true } }),
         prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
@@ -48,6 +66,8 @@ dashboardRouter.get(
             dueDate: { lte: new Date(now.getTime() + env.invoiceReminderDays * 86400000) },
           },
         }),
+        prisma.workingDay.findUnique({ where: { date: todayKey } }),
+        countWorkingDays(monthStartKey, tomorrowKey),
       ]);
 
     const inventoryValue = products.reduce(
@@ -70,12 +90,13 @@ dashboardRouter.get(
     const monthRevenue = sumRevenue(monthSales);
     const monthCost = sumCost(monthSales);
 
-    const dailyExpenses = dailyRate(activeExpenses);
-    const monthlyExpenses = activeExpenses.reduce((acc, e) => {
-      if (e.frequency === "MONTHLY") return acc.add(e.amount);
-      if (e.frequency === "DAILY") return acc.add(e.amount.mul(30));
-      return acc;
-    }, new Prisma.Decimal(0));
+    const isTodayWorking = todayWorkingDay?.isWorking ?? true;
+    const dailyExpenses = (isTodayWorking ? dailyOnlyRate(activeExpenses) : new Prisma.Decimal(0)).add(
+      monthlyProratedRate(activeExpenses)
+    );
+    const monthlyExpenses = dailyOnlyRate(activeExpenses)
+      .mul(workingDaysSoFar)
+      .add(monthlyFlatRate(activeExpenses));
 
     const todayProfit = todayRevenue.sub(todayCost).sub(dailyExpenses);
     const monthProfit = monthRevenue.sub(monthCost).sub(monthlyExpenses);

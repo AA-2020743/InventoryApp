@@ -47,6 +47,7 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 | Dashboard | `GET /api/dashboard/summary` — inventory valuation, net worth after pending invoices, today/month revenue & profit, recurring expense burn rate, alert counts |
 | Stats | `GET /api/stats/top-products?period=day\|month&date=&sortBy=quantity\|profit`, `GET /api/stats/margins?limit=` (highest-margin items), `GET /api/stats/revenue?period=day\|month&from=&to=` |
 | Alerts | `GET /api/alerts?days=` — low-stock items + due-soon/overdue supplier invoices (polled by the Android app for reminders) |
+| Working days | `GET /api/workdays/today`, `POST /api/workdays/today` (`{ isWorking }`) — see below |
 | Uploads | `POST /api/uploads/image` (multipart `image` field) — used for barcode-less "fallback" products |
 
 ### Key business rules
@@ -70,3 +71,9 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
   minus the total of all **pending** supplier invoices.
 - Recurring expenses (`DAILY`/`MONTHLY`/`ONE_TIME`) feed a daily/monthly burn
   rate used to compute a realistic profit figure, not just revenue.
+- **Working days**: a day with no `WorkingDay` row is assumed worked. Marking
+  a day as *not* worked (`POST /api/workdays/today {"isWorking": false}`)
+  excludes that day's `DAILY`-frequency expenses (e.g. a cashier's daily
+  wage) from that day's and the month-to-date's profit calculation —
+  `MONTHLY`-frequency expenses (rent, etc.) still accrue regardless, since
+  those are owed whether or not the shop opened that particular day.

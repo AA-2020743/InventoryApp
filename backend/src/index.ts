@@ -13,6 +13,7 @@ import { dashboardRouter } from "./routes/dashboard.routes";
 import { statsRouter } from "./routes/stats.routes";
 import { alertsRouter } from "./routes/alerts.routes";
 import { uploadsRouter } from "./routes/uploads.routes";
+import { workdaysRouter } from "./routes/workdays.routes";
 import { requireAuth } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -37,6 +38,7 @@ app.use("/api/expenses", requireAuth, expensesRouter);
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/stats", requireAuth, statsRouter);
 app.use("/api/alerts", requireAuth, alertsRouter);
+app.use("/api/workdays", requireAuth, workdaysRouter);
 
 app.use(errorHandler);
 
