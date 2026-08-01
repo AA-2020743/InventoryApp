@@ -119,4 +119,10 @@ interface ApiService {
 
     @GET("api/alerts")
     suspend fun getAlerts(@Query("days") days: Int? = null): AlertsResponse
+
+    @GET("api/workdays/today")
+    suspend fun getTodayWorkingDay(): WorkingDayDto
+
+    @POST("api/workdays/today")
+    suspend fun setTodayWorkingDay(@Body request: SetWorkingDayRequest): WorkingDayDto
 }

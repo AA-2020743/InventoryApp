@@ -101,6 +101,20 @@ fun DashboardScreen(
             }
         }
     }
+
+    if (state.showWorkingDayPrompt) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {}, // must be answered - re-shows next refresh otherwise
+            title = { Text(stringResource(R.string.workday_prompt_title)) },
+            text = { Text(stringResource(R.string.workday_prompt_message)) },
+            confirmButton = {
+                Button(onClick = { viewModel.answerWorkingDay(true) }) { Text(stringResource(R.string.workday_yes)) }
+            },
+            dismissButton = {
+                Button(onClick = { viewModel.answerWorkingDay(false) }) { Text(stringResource(R.string.workday_no)) }
+            },
+        )
+    }
 }
 
 @Composable

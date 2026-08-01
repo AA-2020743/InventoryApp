@@ -155,4 +155,10 @@
     <string name="notif_invoice_due_body">%1$s owes %2$s, due %3$s</string>
     <string name="notif_invoice_overdue_title">Invoice overdue</string>
     <string name="notif_invoice_overdue_body">%1$s is overdue: %2$s</string>
+
+    <!-- Working day prompt -->
+    <string name="workday_prompt_title">Is today a working day?</string>
+    <string name="workday_prompt_message">This decides whether today\'s recurring daily expenses (e.g. cashier wage) count toward today\'s profit calculation.</string>
+    <string name="workday_yes">Yes, open today</string>
+    <string name="workday_no">No, closed today</string>
 </resources>

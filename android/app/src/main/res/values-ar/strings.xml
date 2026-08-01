@@ -155,4 +155,10 @@
     <string name="notif_invoice_due_body">‏%1$s مستحق على %2$s، تاريخ الاستحقاق %3$s</string>
     <string name="notif_invoice_overdue_title">فاتورة متأخرة السداد</string>
     <string name="notif_invoice_overdue_body">‏%1$s متأخرة السداد: %2$s</string>
+
+    <!-- Working day prompt -->
+    <string name="workday_prompt_title">هل اليوم يوم عمل؟</string>
+    <string name="workday_prompt_message">يحدد هذا ما إذا كانت المصروفات المتكررة اليومية (مثل راتب الكاشير) ستُحتسب ضمن أرباح اليوم أم لا.</string>
+    <string name="workday_yes">نعم، مفتوح اليوم</string>
+    <string name="workday_no">لا، مغلق اليوم</string>
 </resources>

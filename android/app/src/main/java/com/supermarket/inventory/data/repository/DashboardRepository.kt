@@ -11,6 +11,9 @@ import javax.inject.Singleton
 class DashboardRepository @Inject constructor(private val api: ApiService) {
     suspend fun getSummary(): ApiResult<DashboardSummaryDto> = apiCall { api.getDashboardSummary() }
     suspend fun getAlerts(days: Int? = null): ApiResult<AlertsResponse> = apiCall { api.getAlerts(days) }
+    suspend fun getTodayWorkingDay(): ApiResult<WorkingDayDto> = apiCall { api.getTodayWorkingDay() }
+    suspend fun setTodayWorkingDay(isWorking: Boolean): ApiResult<WorkingDayDto> =
+        apiCall { api.setTodayWorkingDay(SetWorkingDayRequest(isWorking)) }
 }
 
 @Singleton

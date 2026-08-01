@@ -16,6 +16,7 @@ data class DashboardUiState(
     val isLoading: Boolean = true,
     val summary: DashboardSummaryDto? = null,
     val error: String? = null,
+    val showWorkingDayPrompt: Boolean = false,
 )
 
 @HiltViewModel
@@ -28,6 +29,7 @@ class DashboardViewModel @Inject constructor(
 
     init {
         refresh()
+        checkWorkingDay()
     }
 
     fun refresh() {
@@ -37,6 +39,26 @@ class DashboardViewModel @Inject constructor(
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, summary = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
             }
+        }
+    }
+
+    // Only checked once per app session (not on every periodic refresh) -
+    // whether the shop was open today only needs answering once a day, and
+    // the server remembers the answer once given.
+    private fun checkWorkingDay() {
+        viewModelScope.launch {
+            when (val result = repository.getTodayWorkingDay()) {
+                is ApiResult.Success -> uiState = uiState.copy(showWorkingDayPrompt = !result.data.answered)
+                is ApiResult.Error -> Unit
+            }
+        }
+    }
+
+    fun answerWorkingDay(isWorking: Boolean) {
+        viewModelScope.launch {
+            uiState = uiState.copy(showWorkingDayPrompt = false)
+            repository.setTodayWorkingDay(isWorking)
+            refresh()
         }
     }
 }

@@ -234,3 +234,9 @@ data class AlertsResponse(
     val overdueInvoices: List<SupplierInvoiceDto>,
     val dueSoonInvoices: List<SupplierInvoiceDto>,
 )
+
+@JsonClass(generateAdapter = true)
+data class WorkingDayDto(val date: String, val isWorking: Boolean, val answered: Boolean)
+
+@JsonClass(generateAdapter = true)
+data class SetWorkingDayRequest(val isWorking: Boolean)
