@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">مخزون السوبر ماركت</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">الرئيسية</string>
+    <string name="nav_inventory">المخزون</string>
+    <string name="nav_sell">البيع</string>
+    <string name="nav_invoices">الفواتير</string>
+    <string name="nav_stats">الإحصائيات</string>
+    <string name="nav_settings">الإعدادات</string>
+
+    <!-- Common -->
+    <string name="action_save">حفظ</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_delete">حذف</string>
+    <string name="action_edit">تعديل</string>
+    <string name="action_add">إضافة</string>
+    <string name="action_retry">إعادة المحاولة</string>
+    <string name="action_logout">تسجيل الخروج</string>
+    <string name="action_scan">مسح</string>
+    <string name="error_generic">حدث خطأ ما. الرجاء المحاولة مرة أخرى.</string>
+    <string name="loading">جارٍ التحميل…</string>
+    <string name="currency_placeholder">%1$s</string>
+
+    <!-- Login -->
+    <string name="login_title">تسجيل الدخول</string>
+    <string name="login_server_url">رابط الخادم</string>
+    <string name="login_email">البريد الإلكتروني</string>
+    <string name="login_password">كلمة المرور</string>
+    <string name="login_button">تسجيل الدخول</string>
+    <string name="login_error">البريد الإلكتروني أو كلمة المرور غير صحيحة</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">الرئيسية</string>
+    <string name="dashboard_inventory_value">قيمة المخزون</string>
+    <string name="dashboard_pending_invoices">فواتير الموردين المستحقة</string>
+    <string name="dashboard_net_valuation">صافي القيمة</string>
+    <string name="dashboard_today">اليوم</string>
+    <string name="dashboard_this_month">هذا الشهر</string>
+    <string name="dashboard_revenue">الإيرادات</string>
+    <string name="dashboard_profit">الأرباح</string>
+    <string name="dashboard_daily_expenses">المصروفات المتكررة (المعدل اليومي)</string>
+    <string name="dashboard_low_stock_alert">‏%1$d صنف منخفض المخزون</string>
+    <string name="dashboard_invoices_due_alert">‏%1$d فاتورة مستحقة قريبًا</string>
+    <string name="dashboard_invoices_overdue_alert">‏%1$d فاتورة متأخرة السداد</string>
+    <string name="dashboard_view_all">عرض الكل</string>
+
+    <!-- Inventory -->
+    <string name="inventory_title">المخزون</string>
+    <string name="inventory_search_hint">ابحث بالاسم أو الباركود</string>
+    <string name="inventory_add_product">إضافة منتج</string>
+    <string name="inventory_low_stock_badge">مخزون منخفض</string>
+    <string name="inventory_empty">لا توجد منتجات بعد. اضغط + للإضافة.</string>
+    <string name="product_name">الاسم</string>
+    <string name="product_barcode">الباركود</string>
+    <string name="product_category">الفئة</string>
+    <string name="product_unit">الوحدة (مثال: قطعة، كجم)</string>
+    <string name="product_purchase_cost">تكلفة الشراء</string>
+    <string name="product_selling_price">سعر البيع</string>
+    <string name="product_quantity">الكمية المتوفرة</string>
+    <string name="product_low_stock_threshold">حد المخزون المنخفض</string>
+    <string name="product_image">صورة المنتج</string>
+    <string name="product_pick_photo">اختيار صورة</string>
+    <string name="product_scan_barcode">مسح الباركود</string>
+    <string name="product_save_error_barcode_or_image">أضف باركودًا، أو صورة للمنتجات التي لا تحمل باركود</string>
+    <string name="restock_title">إعادة التخزين</string>
+    <string name="restock_quantity">الكمية المستلمة</string>
+    <string name="restock_unit_cost">تكلفة الوحدة الجديدة (اختياري)</string>
+    <string name="adjust_title">تعديل المخزون</string>
+    <string name="adjust_quantity">التغيير في الكمية (+/-)</string>
+    <string name="adjust_reason">السبب</string>
+
+    <!-- Barcode scanning -->
+    <string name="scan_title">مسح الباركود</string>
+    <string name="scan_instructions">وجّه الكاميرا نحو الباركود، أو استخدم جهاز مسح متصل</string>
+    <string name="scan_manual_entry_hint">امسح الباركود أو أدخله يدويًا</string>
+    <string name="scan_not_found">لا يوجد منتج مطابق لهذا الباركود</string>
+    <string name="scan_camera_permission_required">يلزم إذن الكاميرا لمسح الباركود</string>
+
+    <!-- Sales -->
+    <string name="sales_title">البيع</string>
+    <string name="sales_cart_empty">امسح صنفًا لبدء عملية بيع</string>
+    <string name="sales_checkout">إتمام البيع</string>
+    <string name="sales_total">الإجمالي</string>
+    <string name="sales_success">تمت عملية البيع بنجاح</string>
+    <string name="sales_insufficient_stock">الكمية المتوفرة غير كافية لهذا الصنف</string>
+    <string name="sales_remove_item">إزالة</string>
+
+    <!-- Suppliers &amp; Invoices -->
+    <string name="suppliers_title">الموردون</string>
+    <string name="supplier_add">إضافة مورد</string>
+    <string name="supplier_name">اسم المورد</string>
+    <string name="supplier_contact">بيانات التواصل</string>
+    <string name="invoices_title">فواتير الموردين</string>
+    <string name="invoices_add">إضافة فاتورة</string>
+    <string name="invoice_supplier">المورد</string>
+    <string name="invoice_amount">المبلغ</string>
+    <string name="invoice_number">رقم الفاتورة (اختياري)</string>
+    <string name="invoice_due_date">تاريخ الاستحقاق</string>
+    <string name="invoice_status_pending">قيد الانتظار</string>
+    <string name="invoice_status_paid">مدفوعة</string>
+    <string name="invoice_mark_paid">تحديد كمدفوعة</string>
+    <string name="invoice_overdue">متأخرة</string>
+    <string name="invoice_due_soon">مستحقة قريبًا</string>
+
+    <!-- Expenses -->
+    <string name="expenses_title">المصروفات المتكررة</string>
+    <string name="expense_add">إضافة مصروف</string>
+    <string name="expense_name">الاسم (مثال: راتب الكاشير)</string>
+    <string name="expense_amount">المبلغ</string>
+    <string name="expense_frequency">التكرار</string>
+    <string name="expense_frequency_daily">يومي</string>
+    <string name="expense_frequency_monthly">شهري</string>
+    <string name="expense_frequency_one_time">مرة واحدة</string>
+
+    <!-- Stats -->
+    <string name="stats_title">الإحصائيات</string>
+    <string name="stats_top_products">الأصناف الأكثر مبيعًا</string>
+    <string name="stats_top_margins">الأصناف الأعلى ربحًا</string>
+    <string name="stats_period_day">يوم</string>
+    <string name="stats_period_month">شهر</string>
+    <string name="stats_sort_quantity">حسب الكمية</string>
+    <string name="stats_sort_profit">حسب الربح</string>
+    <string name="stats_quantity_sold">تم بيع %1$s</string>
+    <string name="stats_margin_percent">هامش ربح %1$s%%</string>
+
+    <!-- Settings -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_language">اللغة</string>
+    <string name="settings_language_system">لغة النظام</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_theme">المظهر</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
+    <string name="settings_server_url">رابط الخادم</string>
+    <string name="settings_change_password">تغيير كلمة المرور</string>
+    <string name="settings_current_password">كلمة المرور الحالية</string>
+    <string name="settings_new_password">كلمة المرور الجديدة</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_name">تذكيرات المخزون</string>
+    <string name="notif_channel_description">تذكيرات انخفاض المخزون ومواعيد استحقاق فواتير الموردين</string>
+    <string name="notif_low_stock_title">مخزون منخفض</string>
+    <string name="notif_low_stock_body">‏%1$d صنف على وشك النفاد</string>
+    <string name="notif_invoice_due_title">فاتورة مستحقة قريبًا</string>
+    <string name="notif_invoice_due_body">‏%1$s مستحق على %2$s، تاريخ الاستحقاق %3$s</string>
+    <string name="notif_invoice_overdue_title">فاتورة متأخرة السداد</string>
+    <string name="notif_invoice_overdue_body">‏%1$s متأخرة السداد: %2$s</string>
+</resources>

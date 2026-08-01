@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Supermarket Inventory</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_inventory">Inventory</string>
+    <string name="nav_sell">Sell</string>
+    <string name="nav_invoices">Invoices</string>
+    <string name="nav_stats">Stats</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Common -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_add">Add</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_logout">Log out</string>
+    <string name="action_scan">Scan</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="loading">Loading…</string>
+    <string name="currency_placeholder">%1$s</string>
+
+    <!-- Login -->
+    <string name="login_title">Sign in</string>
+    <string name="login_server_url">Server URL</string>
+    <string name="login_email">Email</string>
+    <string name="login_password">Password</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_error">Invalid email or password</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="dashboard_inventory_value">Inventory value</string>
+    <string name="dashboard_pending_invoices">Pending supplier invoices</string>
+    <string name="dashboard_net_valuation">Net valuation</string>
+    <string name="dashboard_today">Today</string>
+    <string name="dashboard_this_month">This month</string>
+    <string name="dashboard_revenue">Revenue</string>
+    <string name="dashboard_profit">Profit</string>
+    <string name="dashboard_daily_expenses">Recurring expenses (daily rate)</string>
+    <string name="dashboard_low_stock_alert">%1$d item(s) low on stock</string>
+    <string name="dashboard_invoices_due_alert">%1$d invoice(s) due soon</string>
+    <string name="dashboard_invoices_overdue_alert">%1$d invoice(s) overdue</string>
+    <string name="dashboard_view_all">View all</string>
+
+    <!-- Inventory -->
+    <string name="inventory_title">Inventory</string>
+    <string name="inventory_search_hint">Search by name or barcode</string>
+    <string name="inventory_add_product">Add product</string>
+    <string name="inventory_low_stock_badge">Low stock</string>
+    <string name="inventory_empty">No products yet. Tap + to add one.</string>
+    <string name="product_name">Name</string>
+    <string name="product_barcode">Barcode</string>
+    <string name="product_category">Category</string>
+    <string name="product_unit">Unit (e.g. pcs, kg)</string>
+    <string name="product_purchase_cost">Purchase cost</string>
+    <string name="product_selling_price">Selling price</string>
+    <string name="product_quantity">Quantity in stock</string>
+    <string name="product_low_stock_threshold">Low stock threshold</string>
+    <string name="product_image">Product photo</string>
+    <string name="product_pick_photo">Choose photo</string>
+    <string name="product_scan_barcode">Scan barcode</string>
+    <string name="product_save_error_barcode_or_image">Add a barcode, or a photo for products without one</string>
+    <string name="restock_title">Restock</string>
+    <string name="restock_quantity">Quantity received</string>
+    <string name="restock_unit_cost">New unit cost (optional)</string>
+    <string name="adjust_title">Adjust stock</string>
+    <string name="adjust_quantity">Quantity change (+/-)</string>
+    <string name="adjust_reason">Reason</string>
+
+    <!-- Barcode scanning -->
+    <string name="scan_title">Scan barcode</string>
+    <string name="scan_instructions">Point the camera at a barcode, or use a connected scanner</string>
+    <string name="scan_manual_entry_hint">Scan or type barcode</string>
+    <string name="scan_not_found">No product found for this barcode</string>
+    <string name="scan_camera_permission_required">Camera permission is required to scan barcodes</string>
+
+    <!-- Sales -->
+    <string name="sales_title">Sell</string>
+    <string name="sales_cart_empty">Scan an item to start a sale</string>
+    <string name="sales_checkout">Checkout</string>
+    <string name="sales_total">Total</string>
+    <string name="sales_success">Sale completed</string>
+    <string name="sales_insufficient_stock">Not enough stock for this item</string>
+    <string name="sales_remove_item">Remove</string>
+
+    <!-- Suppliers &amp; Invoices -->
+    <string name="suppliers_title">Suppliers</string>
+    <string name="supplier_add">Add supplier</string>
+    <string name="supplier_name">Supplier name</string>
+    <string name="supplier_contact">Contact info</string>
+    <string name="invoices_title">Supplier invoices</string>
+    <string name="invoices_add">Add invoice</string>
+    <string name="invoice_supplier">Supplier</string>
+    <string name="invoice_amount">Amount</string>
+    <string name="invoice_number">Invoice number (optional)</string>
+    <string name="invoice_due_date">Due date</string>
+    <string name="invoice_status_pending">Pending</string>
+    <string name="invoice_status_paid">Paid</string>
+    <string name="invoice_mark_paid">Mark as paid</string>
+    <string name="invoice_overdue">Overdue</string>
+    <string name="invoice_due_soon">Due soon</string>
+
+    <!-- Expenses -->
+    <string name="expenses_title">Recurring expenses</string>
+    <string name="expense_add">Add expense</string>
+    <string name="expense_name">Name (e.g. Cashier salary)</string>
+    <string name="expense_amount">Amount</string>
+    <string name="expense_frequency">Frequency</string>
+    <string name="expense_frequency_daily">Daily</string>
+    <string name="expense_frequency_monthly">Monthly</string>
+    <string name="expense_frequency_one_time">One-time</string>
+
+    <!-- Stats -->
+    <string name="stats_title">Statistics</string>
+    <string name="stats_top_products">Top-selling items</string>
+    <string name="stats_top_margins">Highest-margin items</string>
+    <string name="stats_period_day">Day</string>
+    <string name="stats_period_month">Month</string>
+    <string name="stats_sort_quantity">By quantity</string>
+    <string name="stats_sort_profit">By profit</string>
+    <string name="stats_quantity_sold">%1$s sold</string>
+    <string name="stats_margin_percent">%1$s%% margin</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System default</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_server_url">Server URL</string>
+    <string name="settings_change_password">Change password</string>
+    <string name="settings_current_password">Current password</string>
+    <string name="settings_new_password">New password</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_name">Inventory reminders</string>
+    <string name="notif_channel_description">Low stock and supplier invoice due-date reminders</string>
+    <string name="notif_low_stock_title">Low stock</string>
+    <string name="notif_low_stock_body">%1$d item(s) are running low</string>
+    <string name="notif_invoice_due_title">Invoice due soon</string>
+    <string name="notif_invoice_due_body">%1$s owes %2$s, due %3$s</string>
+    <string name="notif_invoice_overdue_title">Invoice overdue</string>
+    <string name="notif_invoice_overdue_body">%1$s is overdue: %2$s</string>
+</resources>
