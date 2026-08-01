@@ -26,6 +26,8 @@ data class ProductFormUiState(
     val imageUrl: String? = null,
     val category: String = "",
     val unit: String = "pcs",
+    val purchaseCost: String = "",
+    val sellingPrice: String = "",
     // Packaging: blank packageLabel means "sold as individual units", no
     // package math involved at all - existing simple behavior preserved.
     val packageLabel: String = "",
@@ -100,6 +102,8 @@ class ProductFormViewModel @Inject constructor(
             imageUrl = imageUrl,
             category = category.orEmpty(),
             unit = unit,
+            purchaseCost = purchaseCost,
+            sellingPrice = sellingPrice,
             packageLabel = packageLabel.orEmpty(),
             unitsPerPackage = unitsPerPackage,
             quantity = quantity,
