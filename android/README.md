@@ -67,6 +67,16 @@ time from Settings.
 - **Reminders**: a background WorkManager job polls `/api/alerts` daily
   and raises local notifications for low stock and invoices due soon or
   overdue (no push/FCM server needed).
+- **Backup & restore** (Settings screen): "Export now" pulls a full JSON
+  backup from the server, saves it to app-specific local storage, and opens
+  the share sheet so you can send it to Drive, email, etc. for real
+  off-device safety. "Restore from file" lets you pick any such JSON file
+  and, after a destructive-action confirmation, replaces **all** current
+  products/sales/invoices/suppliers/expenses with its contents — this
+  cannot be undone. A weekly WorkManager job also does this pull
+  automatically in the background (belt-and-suspenders alongside the
+  server's own daily backups, in case the server's disk is ever lost
+  entirely) and posts a notification when it saves a new one.
 
 ## Known limitation of this build environment
 

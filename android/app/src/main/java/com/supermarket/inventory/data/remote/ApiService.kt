@@ -2,6 +2,8 @@ package com.supermarket.inventory.data.remote
 
 import com.supermarket.inventory.data.remote.dto.*
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.*
 
 interface ApiService {
@@ -125,4 +127,12 @@ interface ApiService {
 
     @POST("api/workdays/today")
     suspend fun setTodayWorkingDay(@Body request: SetWorkingDayRequest): WorkingDayDto
+
+    // Backup / restore
+    @Streaming
+    @GET("api/backup/export")
+    suspend fun exportBackup(): ResponseBody
+
+    @POST("api/backup/restore")
+    suspend fun restoreBackup(@Body body: RequestBody): RestoreResponse
 }

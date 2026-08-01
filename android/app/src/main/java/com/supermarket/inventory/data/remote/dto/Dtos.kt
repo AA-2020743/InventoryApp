@@ -240,3 +240,6 @@ data class WorkingDayDto(val date: String, val isWorking: Boolean, val answered:
 
 @JsonClass(generateAdapter = true)
 data class SetWorkingDayRequest(val isWorking: Boolean)
+
+@JsonClass(generateAdapter = true)
+data class RestoreResponse(val success: Boolean, val restoredAt: String)

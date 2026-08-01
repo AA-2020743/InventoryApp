@@ -11,6 +11,7 @@ object NotificationHelper {
     const val CHANNEL_ID = "inventory_reminders"
     private const val LOW_STOCK_NOTIFICATION_ID = 1001
     private const val INVOICES_NOTIFICATION_ID = 1002
+    private const val BACKUP_NOTIFICATION_ID = 1003
 
     fun ensureChannel(context: Context) {
         val channel = NotificationChannel(
@@ -43,6 +44,16 @@ object NotificationHelper {
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notifySafely(notificationId, notification)
+    }
+
+    fun showBackupSaved(context: Context, title: String, body: String) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notifySafely(BACKUP_NOTIFICATION_ID, notification)
     }
 
     private fun NotificationManagerCompat.notifySafely(id: Int, notification: android.app.Notification) {

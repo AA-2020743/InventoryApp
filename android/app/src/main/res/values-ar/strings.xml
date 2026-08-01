@@ -153,6 +153,16 @@
     <string name="settings_change_password">تغيير كلمة المرور</string>
     <string name="settings_current_password">كلمة المرور الحالية</string>
     <string name="settings_new_password">كلمة المرور الجديدة</string>
+    <string name="settings_backup_title">النسخ الاحتياطي والاستعادة</string>
+    <string name="settings_backup_description">تُسحب نسخة كاملة من بياناتك تلقائيًا من الخادم مرة أسبوعيًا وتُحفظ على هذا الهاتف. يمكنك أيضًا التصدير أو الاستعادة يدويًا أدناه.</string>
+    <string name="settings_backup_export_now">تصدير الآن</string>
+    <string name="settings_backup_export_success">تم حفظ النسخة الاحتياطية. اختر وجهة لإرسال نسخة منها.</string>
+    <string name="settings_backup_restore">استعادة من ملف</string>
+    <string name="settings_backup_restore_confirm_title">استعادة من نسخة احتياطية؟</string>
+    <string name="settings_backup_restore_confirm_message">سيستبدل هذا جميع المنتجات والمبيعات والفواتير والموردين والمصروفات الحالية بمحتوى الملف المحدد. لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="settings_backup_restore_success">تمت الاستعادة بنجاح</string>
+    <string name="settings_backup_last_saved">آخر حفظ محلي: %1$s</string>
+    <string name="settings_backup_none_saved">لا توجد نسخة احتياطية محلية بعد</string>
 
     <!-- Notifications -->
     <string name="notif_channel_name">تذكيرات المخزون</string>
@@ -163,6 +173,8 @@
     <string name="notif_invoice_due_body">‏%1$s مستحق على %2$s، تاريخ الاستحقاق %3$s</string>
     <string name="notif_invoice_overdue_title">فاتورة متأخرة السداد</string>
     <string name="notif_invoice_overdue_body">‏%1$s متأخرة السداد: %2$s</string>
+    <string name="notif_backup_saved_title">تم حفظ النسخة الاحتياطية الأسبوعية</string>
+    <string name="notif_backup_saved_body">‏تم الحفظ باسم %1$s. افتح الإعدادات لإرسال نسخة خارج هذا الهاتف.</string>
 
     <!-- Working day prompt -->
     <string name="workday_prompt_title">هل اليوم يوم عمل؟</string>

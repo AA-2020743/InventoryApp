@@ -16,4 +16,6 @@ export const env = {
   uploadsDir: process.env.UPLOADS_DIR ?? "uploads",
   lowStockAlertOnly: process.env.LOW_STOCK_ALERT_ONLY === "true",
   invoiceReminderDays: parseInt(process.env.INVOICE_REMINDER_DAYS ?? "7", 10),
+  backupDir: process.env.BACKUP_DIR ?? "backups",
+  backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS ?? "14", 10),
 };

@@ -14,6 +14,8 @@ import { statsRouter } from "./routes/stats.routes";
 import { alertsRouter } from "./routes/alerts.routes";
 import { uploadsRouter } from "./routes/uploads.routes";
 import { workdaysRouter } from "./routes/workdays.routes";
+import { backupRouter } from "./routes/backup.routes";
+import { scheduleBackups } from "./services/backupScheduler";
 import { requireAuth } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -39,9 +41,12 @@ app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/stats", requireAuth, statsRouter);
 app.use("/api/alerts", requireAuth, alertsRouter);
 app.use("/api/workdays", requireAuth, workdaysRouter);
+app.use("/api/backup", requireAuth, backupRouter);
 
 app.use(errorHandler);
 
 app.listen(env.port, env.host, () => {
   console.log(`Inventory app backend listening on ${env.host}:${env.port}`);
 });
+
+scheduleBackups();

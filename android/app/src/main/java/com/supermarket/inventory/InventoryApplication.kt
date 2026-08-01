@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.notifications.AlertsWorker
+import com.supermarket.inventory.notifications.BackupWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ class InventoryApplication : Application(), Configuration.Provider {
             sessionManager.preload()
         }
         AlertsWorker.schedule(this)
+        BackupWorker.schedule(this)
     }
 
     override val workManagerConfiguration: Configuration

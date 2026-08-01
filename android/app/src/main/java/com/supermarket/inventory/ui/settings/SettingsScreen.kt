@@ -1,6 +1,9 @@
 package com.supermarket.inventory.ui.settings
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -41,17 +46,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
+import com.supermarket.inventory.data.BackupFiles
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.data.ThemeMode
+import com.supermarket.inventory.data.remote.dto.RestoreResponse
 import com.supermarket.inventory.data.repository.AuthRepository
+import com.supermarket.inventory.data.repository.BackupRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     val sessionManager: SessionManager,
     private val authRepository: AuthRepository,
+    private val backupRepository: BackupRepository,
 ) : ViewModel() {
 
     suspend fun setTheme(mode: ThemeMode) = sessionManager.setTheme(mode)
@@ -62,12 +73,17 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun changePassword(current: String, new: String): ApiResult<Unit> =
         authRepository.changePassword(current, new)
+
+    suspend fun exportBackup(): ApiResult<ByteArray> = backupRepository.exportBackup()
+
+    suspend fun restoreBackup(json: ByteArray): ApiResult<RestoreResponse> = backupRepository.restoreBackup(json)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val themeMode by viewModel.sessionManager.theme.collectAsState()
     val serverUrlState by viewModel.sessionManager.serverUrl.collectAsState()
 
@@ -78,6 +94,21 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var passwordMessage by remember { mutableStateOf<String?>(null) }
+
+    var lastBackupFile by remember { mutableStateOf(BackupFiles.list(context).firstOrNull()) }
+    var backupMessage by remember { mutableStateOf<String?>(null) }
+    var pendingRestoreBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var showRestoreConfirm by remember { mutableStateOf(false) }
+
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            if (bytes != null) {
+                pendingRestoreBytes = bytes
+                showRestoreConfirm = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -196,10 +227,76 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 
             Divider(Modifier.padding(vertical = 24.dp))
 
+            // Backup & restore
+            Text(stringResource(R.string.settings_backup_title), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.settings_backup_description), style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                lastBackupFile?.let {
+                    stringResource(R.string.settings_backup_last_saved, DateFormat.getDateTimeInstance().format(Date(it.lastModified())))
+                } ?: stringResource(R.string.settings_backup_none_saved),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            backupMessage?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row {
+                Button(onClick = {
+                    scope.launch {
+                        when (val result = viewModel.exportBackup()) {
+                            is ApiResult.Success -> {
+                                val file = BackupFiles.write(context, result.data)
+                                lastBackupFile = file
+                                backupMessage = context.getString(R.string.settings_backup_export_success)
+                                context.startActivity(Intent.createChooser(BackupFiles.shareIntentFor(context, file), null))
+                            }
+                            is ApiResult.Error -> backupMessage = result.message
+                        }
+                    }
+                }) { Text(stringResource(R.string.settings_backup_export_now)) }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = { restoreLauncher.launch("application/json") }) {
+                    Text(stringResource(R.string.settings_backup_restore))
+                }
+            }
+
+            Divider(Modifier.padding(vertical = 24.dp))
+
             OutlinedButton(onClick = { scope.launch { viewModel.logout() } }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_logout))
             }
         }
+    }
+
+    if (showRestoreConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showRestoreConfirm = false; pendingRestoreBytes = null },
+            title = { Text(stringResource(R.string.settings_backup_restore_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_backup_restore_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRestoreConfirm = false
+                    val bytes = pendingRestoreBytes
+                    pendingRestoreBytes = null
+                    if (bytes != null) {
+                        scope.launch {
+                            backupMessage = when (val result = viewModel.restoreBackup(bytes)) {
+                                is ApiResult.Success -> context.getString(R.string.settings_backup_restore_success)
+                                is ApiResult.Error -> result.message
+                            }
+                        }
+                    }
+                }) { Text(stringResource(R.string.settings_backup_restore), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreConfirm = false; pendingRestoreBytes = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 }
 

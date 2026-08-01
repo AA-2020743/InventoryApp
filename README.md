@@ -51,6 +51,11 @@ npm run dev            # http://localhost:4000
 - **Statistics**: top-selling and highest-margin items, sortable by
   quantity or profit, with a calendar/month picker in the app to inspect
   any specific day or month's sales.
+- **Backup & restore**: the server writes its own daily rotating backup to
+  disk, and the Android app additionally pulls a full weekly copy to the
+  phone (with an on-demand export/share and restore-from-file in Settings)
+  so data survives even a total loss of the server's disk — see
+  `backend/README.md` and `android/README.md` for details.
 
 ## Repository layout
 

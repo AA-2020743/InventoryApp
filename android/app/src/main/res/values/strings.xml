@@ -153,6 +153,16 @@
     <string name="settings_change_password">Change password</string>
     <string name="settings_current_password">Current password</string>
     <string name="settings_new_password">New password</string>
+    <string name="settings_backup_title">Backup &amp; restore</string>
+    <string name="settings_backup_description">A full copy of your data is pulled from the server automatically once a week and saved on this phone. You can also export or restore on demand below.</string>
+    <string name="settings_backup_export_now">Export now</string>
+    <string name="settings_backup_export_success">Backup saved. Choose where to send a copy.</string>
+    <string name="settings_backup_restore">Restore from file</string>
+    <string name="settings_backup_restore_confirm_title">Restore from backup?</string>
+    <string name="settings_backup_restore_confirm_message">This replaces all current products, sales, invoices, suppliers and expenses with the contents of the selected file. This cannot be undone.</string>
+    <string name="settings_backup_restore_success">Restore complete</string>
+    <string name="settings_backup_last_saved">Last saved locally: %1$s</string>
+    <string name="settings_backup_none_saved">No local backup saved yet</string>
 
     <!-- Notifications -->
     <string name="notif_channel_name">Inventory reminders</string>
@@ -163,6 +173,8 @@
     <string name="notif_invoice_due_body">%1$s owes %2$s, due %3$s</string>
     <string name="notif_invoice_overdue_title">Invoice overdue</string>
     <string name="notif_invoice_overdue_body">%1$s is overdue: %2$s</string>
+    <string name="notif_backup_saved_title">Weekly backup saved</string>
+    <string name="notif_backup_saved_body">Saved as %1$s. Open Settings to send a copy off this phone.</string>
 
     <!-- Working day prompt -->
     <string name="workday_prompt_title">Is today a working day?</string>
