@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Single owner account. Kept as a real table (instead of hardcoded
+// credentials) so a password change / future second device doesn't
+// require a code change.
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  // Nullable: fallback products (no printed barcode, e.g. loose produce)
+  // are identified by name + photo instead.
+  barcode           String?  @unique
+  name              String
+  imageUrl          String?
+  category          String?
+  unit              String   @default("pcs") // pcs, kg, g, l, ml ...
+  purchaseCost      Decimal  @db.Decimal(12, 2) // latest known cost from supplier
+  sellingPrice      Decimal  @db.Decimal(12, 2)
+  quantity          Decimal  @default(0) @db.Decimal(12, 3)
+  lowStockThreshold Decimal  @default(0) @db.Decimal(12, 3)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  saleItems               SaleItem[]
+  inventoryTransactions   InventoryTransaction[]
+
+  @@index([category])
+}
+
+enum InventoryTransactionType {
+  RESTOCK
+  SALE
+  ADJUSTMENT
+}
+
+// Audit trail of every stock movement, so current quantity is always
+// reconstructable / explainable.
+model InventoryTransaction {
+  id             String                   @id @default(uuid())
+  productId      String
+  product        Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type           InventoryTransactionType
+  quantityChange Decimal                  @db.Decimal(12, 3) // positive = added, negative = removed
+  unitCost       Decimal?                 @db.Decimal(12, 2) // cost at time of restock
+  note           String?
+  supplierInvoiceId String?
+  supplierInvoice   SupplierInvoice?      @relation(fields: [supplierInvoiceId], references: [id])
+  createdAt      DateTime                 @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  contactInfo String?
+  createdAt   DateTime @default(now())
+
+  invoices SupplierInvoice[]
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+}
+
+model SupplierInvoice {
+  id            String        @id @default(uuid())
+  supplierId    String
+  supplier      Supplier      @relation(fields: [supplierId], references: [id])
+  invoiceNumber String?
+  amount        Decimal       @db.Decimal(12, 2)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  status        InvoiceStatus @default(PENDING)
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  inventoryTransactions InventoryTransaction[]
+
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Sale {
+  id          String     @id @default(uuid())
+  totalAmount Decimal    @db.Decimal(12, 2)
+  totalCost   Decimal    @db.Decimal(12, 2) // snapshot COGS, for profit stats
+  createdAt   DateTime   @default(now())
+
+  items SaleItem[]
+
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Decimal @db.Decimal(12, 3)
+  unitPrice Decimal @db.Decimal(12, 2) // sellingPrice snapshot at sale time
+  unitCost  Decimal @db.Decimal(12, 2) // purchaseCost snapshot at sale time
+  subtotal  Decimal @db.Decimal(12, 2)
+
+  @@index([productId])
+}
+
+enum ExpenseFrequency {
+  DAILY
+  MONTHLY
+  ONE_TIME
+}
+
+// Recurring operating costs (e.g. staff salaries, rent) used to compute
+// a realistic daily/monthly burn rate alongside inventory valuation.
+model Expense {
+  id        String           @id @default(uuid())
+  name      String
+  amount    Decimal          @db.Decimal(12, 2)
+  frequency ExpenseFrequency
+  startDate DateTime         @default(now())
+  endDate   DateTime?
+  active    Boolean          @default(true)
+  notes     String?
+  createdAt DateTime         @default(now())
+}
