@@ -58,6 +58,14 @@ fun InventoryListScreen(
 ) {
     val state = viewModel.uiState
 
+    // Refresh whenever this screen (re-)enters composition - e.g. returning
+    // here after saving a new product on the form - since the ViewModel
+    // otherwise only loads once when first created and survives (via
+    // saved nav state) across tab switches without refetching on its own.
+    LaunchedEffect(Unit) {
+        viewModel.load()
+    }
+
     LaunchedEffect(scannedBarcode) {
         if (scannedBarcode != null) {
             when (val resolution = viewModel.resolveScannedBarcode(scannedBarcode)) {

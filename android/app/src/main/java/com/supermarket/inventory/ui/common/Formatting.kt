@@ -22,6 +22,16 @@ fun formatAmount(value: String, locale: Locale = Locale.getDefault()): String = 
     value
 }
 
+fun formatPercent(value: String, locale: Locale = Locale.getDefault()): String = try {
+    val format = NumberFormat.getNumberInstance(locale).apply {
+        minimumFractionDigits = 0
+        maximumFractionDigits = 1
+    }
+    format.format(BigDecimal(value))
+} catch (_: Exception) {
+    value
+}
+
 fun formatQuantity(value: String, locale: Locale = Locale.getDefault()): String = try {
     val decimal = BigDecimal(value)
     val format = NumberFormat.getNumberInstance(locale).apply {

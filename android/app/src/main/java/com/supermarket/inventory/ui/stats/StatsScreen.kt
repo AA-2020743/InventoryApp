@@ -41,6 +41,7 @@ import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
+import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.theme.LossRed
 import com.supermarket.inventory.ui.theme.ProfitGreen
@@ -168,7 +169,7 @@ private fun SortRow(state: StatsUiState, viewModel: StatsViewModel) {
 @Composable
 private fun TopProductRow(item: TopProductItemDto) {
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text(item.name, style = MaterialTheme.typography.bodyLarge)
                 Text(stringResource(R.string.stats_quantity_sold, formatQuantity(item.quantitySold.toString())), style = MaterialTheme.typography.bodySmall)
@@ -181,10 +182,10 @@ private fun TopProductRow(item: TopProductItemDto) {
 @Composable
 private fun MarginRow(item: MarginItemDto) {
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(item.name, style = MaterialTheme.typography.bodyLarge)
             Text(
-                stringResource(R.string.stats_margin_percent, formatQuantity(item.marginPercent)),
+                stringResource(R.string.stats_margin_percent, formatPercent(item.marginPercent)),
                 style = MaterialTheme.typography.bodyLarge,
             )
         }

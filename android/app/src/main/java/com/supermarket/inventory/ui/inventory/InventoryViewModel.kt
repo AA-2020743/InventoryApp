@@ -54,7 +54,10 @@ class InventoryViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            uiState = uiState.copy(isLoading = true, error = null)
+            // Only show the full-screen spinner on a genuine first load;
+            // a background refresh (e.g. returning to this tab after
+            // saving a product) shouldn't hide the list that's already there.
+            uiState = uiState.copy(isLoading = uiState.products.isEmpty(), error = null)
             val search = uiState.search.ifBlank { null }
             when (val result = repository.getProducts(search = search, lowStockOnly = uiState.lowStockOnly)) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, products = result.data)

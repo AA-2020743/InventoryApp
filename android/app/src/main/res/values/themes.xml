@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.InventoryApp" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Must be an AppCompat-derived theme: MainActivity is an
+         AppCompatActivity (required for per-app locale switching), and it
+         throws at runtime if given a plain platform theme instead. -->
+    <style name="Theme.InventoryApp" parent="Theme.AppCompat.Light.NoActionBar" />
 </resources>
