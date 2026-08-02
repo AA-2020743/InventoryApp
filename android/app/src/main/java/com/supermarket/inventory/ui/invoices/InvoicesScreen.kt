@@ -63,6 +63,7 @@ import java.time.ZoneOffset
 fun InvoicesScreen(
     onOpenSuppliers: () -> Unit,
     onOpenExpenses: () -> Unit,
+    onOpenAssets: () -> Unit,
     viewModel: InvoicesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.uiState
@@ -75,6 +76,7 @@ fun InvoicesScreen(
                 actions = {
                     TextButton(onClick = onOpenSuppliers) { Text(stringResource(R.string.suppliers_title)) }
                     TextButton(onClick = onOpenExpenses) { Text(stringResource(R.string.expenses_title)) }
+                    TextButton(onClick = onOpenAssets) { Text(stringResource(R.string.assets_title)) }
                 },
             )
         },

@@ -44,6 +44,7 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 | Supplier invoices | `GET/POST /api/invoices`, `GET /api/invoices/upcoming?days=`, `PUT /api/invoices/:id`, `POST /api/invoices/:id/pay`, `DELETE /api/invoices/:id` |
 | Sales | `GET/POST /api/sales`, `GET /api/sales/:id` |
 | Expenses (recurring, e.g. salaries) | `GET/POST /api/expenses`, `PUT/DELETE /api/expenses/:id` |
+| Assets (non-inventory business property) | `GET/POST /api/assets`, `PUT/DELETE /api/assets/:id` |
 | Dashboard | `GET /api/dashboard/summary` — inventory valuation, net worth after pending invoices, today/month revenue & profit, recurring expense burn rate, alert counts |
 | Stats | `GET /api/stats/top-products?period=day\|month&date=&sortBy=quantity\|profit` (each item includes `category`, so a client can chart sales by category without a separate endpoint), `GET /api/stats/margins?limit=` (highest-margin items), `GET /api/stats/revenue?period=day\|month&from=&to=` |
 | Alerts | `GET /api/alerts?days=` — low-stock items + due-soon/overdue supplier invoices (polled by the Android app for reminders) |
@@ -74,7 +75,18 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
   this makes retrying the same offline sale after a dropped response safe
   to do blindly, without risking a double sell.
 - Inventory valuation = `Σ(quantity × purchaseCost)` for active products,
-  minus the total of all **pending** supplier invoices.
+  **plus** the total value of all `Asset` rows (non-inventory business
+  property like equipment/fixtures — a simple name+value+category record),
+  minus the total of all **pending** supplier invoices. `Asset` has no
+  effect on stock or sales, it only feeds `assetsValue`/`netValuation` on
+  the dashboard summary.
+- `Product.soldByWeight` marks an item as sold loose by weight (e.g. rice,
+  produce) rather than as discrete units. It doesn't change any
+  server-side math — `purchaseCost`/`sellingPrice` are just interpreted as
+  price-per-kg by convention, and `quantity` is still stored in the same
+  base-unit column (kg, in this case) as any other product — it exists so
+  the Android client knows to prompt for grams sold instead of a whole-unit
+  count on the Sell screen.
 - Recurring expenses (`DAILY`/`MONTHLY`/`ONE_TIME`) feed a daily/monthly burn
   rate used to compute a realistic profit figure, not just revenue.
 - **Working days**: a day with no `WorkingDay` row is assumed worked. Marking
@@ -89,7 +101,7 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 - `GET /api/backup/export` returns a **zip archive** (`Content-Type:
   application/zip`) containing `data.json` — one JSON document with every
   business table (products, suppliers, supplier invoices, sales, sale
-  items, expenses, working days, inventory transactions) — plus an
+  items, expenses, working days, inventory transactions, assets) — plus an
   `uploads/` folder holding every file currently in the server's uploads
   directory, so product photos are backed up too, not just the row that
   references them. The `User` table is **deliberately excluded** from

@@ -47,23 +47,32 @@ time from Settings.
   integration code is required.
 - **Inventory**: add products by scanning a barcode, or with just a photo
   for loose/unlabeled goods (e.g. produce); restock and manual stock
-  adjustments are tracked separately so quantities stay auditable.
+  adjustments are tracked separately so quantities stay auditable. A
+  product can be marked "sold by weight" (rice, produce, etc.) — its
+  purchase/selling price are then per-kg, and the unit is locked to kg.
 - **Sell**: scan (or type) items into a running cart, then checkout; stock
-  is decremented server-side. If checkout can't reach the server, the sale
-  is saved to a local offline queue instead of being lost, and a background
-  job syncs it automatically once connectivity returns (each queued sale
-  carries a client-generated ID so a retry after a dropped response can't
-  double-sell). Barcode/name lookup also falls back to a local product
-  cache when offline, so you can keep ringing up sales through a dropped
-  connection — see "Offline selling" below for the tradeoffs this implies.
+  is decremented server-side. Adding a weight-based product to the cart
+  prompts for grams sold instead of a whole-unit count (tap the row's edit
+  icon to change it later); everything else uses the usual +/- stepper. If
+  checkout can't reach the server, the sale is saved to a local offline
+  queue instead of being lost, and a background job syncs it automatically
+  once connectivity returns (each queued sale carries a client-generated ID
+  so a retry after a dropped response can't double-sell). Barcode/name
+  lookup also falls back to a local product cache when offline, so you can
+  keep ringing up sales through a dropped connection — see "Offline
+  selling" below for the tradeoffs this implies.
 - **Supplier invoices**: track pending/paid invoices per supplier with due
   dates; the Dashboard surfaces overdue and due-soon counts.
 - **Recurring expenses**: salaries and other daily/monthly costs feed into
   the profit calculation, not just revenue.
-- **Dashboard**: net valuation (inventory at cost minus pending invoices),
-  today/this-month revenue and profit-or-loss (auto-refreshes every 30s so
-  the running total stays live through the day), low-stock and invoice
-  alerts.
+- **Assets**: a simple name/value/category list for non-inventory business
+  property (equipment, fixtures, etc.) — reachable from the Invoices tab —
+  whose total value feeds into the Dashboard's net valuation alongside
+  inventory.
+- **Dashboard**: net valuation (inventory + assets at value, minus pending
+  invoices), today/this-month revenue and profit-or-loss (auto-refreshes
+  every 30s so the running total stays live through the day), low-stock
+  and invoice alerts.
 - **Statistics**: top-selling items and highest-margin items, sortable by
   quantity or profit, plus a calendar/month picker to browse sales and
   stats for any specific day or month. Pie charts break the selected

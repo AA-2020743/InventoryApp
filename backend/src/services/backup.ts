@@ -20,13 +20,14 @@ export interface BackupPayload {
   expenses: any[];
   workingDays: any[];
   inventoryTransactions: any[];
+  assets: any[];
 }
 
 // The owner's login (User) is deliberately excluded: it isn't "business
 // data" the way the rest of this is, and restoring an old password hash
 // over the current one could lock the owner out of their own backend.
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, workingDays, inventoryTransactions] =
+  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, workingDays, inventoryTransactions, assets] =
     await Promise.all([
       prisma.supplier.findMany(),
       prisma.product.findMany(),
@@ -36,6 +37,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
       prisma.expense.findMany(),
       prisma.workingDay.findMany(),
       prisma.inventoryTransaction.findMany(),
+      prisma.asset.findMany(),
     ]);
 
   return {
@@ -49,6 +51,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     expenses,
     workingDays,
     inventoryTransactions,
+    assets,
   };
 }
 
@@ -71,6 +74,7 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       await tx.supplier.deleteMany();
       await tx.expense.deleteMany();
       await tx.workingDay.deleteMany();
+      await tx.asset.deleteMany();
 
       // Parents before children, mirroring the delete order above.
       if (payload.suppliers.length) {
@@ -127,6 +131,15 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
             ...r,
             date: toDate(r.date),
             createdAt: toDate(r.createdAt),
+          })),
+        });
+      }
+      if (payload.assets.length) {
+        await tx.asset.createMany({
+          data: payload.assets.map((r) => ({
+            ...r,
+            createdAt: toDate(r.createdAt),
+            updatedAt: toDate(r.updatedAt),
           })),
         });
       }

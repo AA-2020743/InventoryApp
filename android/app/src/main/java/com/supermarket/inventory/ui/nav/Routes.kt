@@ -10,6 +10,7 @@ object Routes {
     const val INVOICES = "invoices"
     const val SUPPLIERS = "suppliers"
     const val EXPENSES = "expenses"
+    const val ASSETS = "assets"
     const val STATS = "stats"
     const val SETTINGS = "settings"
 

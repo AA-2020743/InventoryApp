@@ -34,6 +34,7 @@
     <!-- Dashboard -->
     <string name="dashboard_title">Dashboard</string>
     <string name="dashboard_inventory_value">Inventory value</string>
+    <string name="dashboard_assets_value">Assets value</string>
     <string name="dashboard_pending_invoices">Pending supplier invoices</string>
     <string name="dashboard_net_valuation">Net valuation</string>
     <string name="dashboard_today">Today</string>
@@ -70,6 +71,9 @@
     <string name="product_pick_photo">Choose photo</string>
     <string name="product_scan_barcode">Scan barcode</string>
     <string name="product_save_error_barcode_or_image">Add a barcode, or a photo for products without one</string>
+    <string name="product_sold_by_weight">Sold by weight (e.g. rice, produce)?</string>
+    <string name="product_purchase_cost_per_kg">Purchase cost (per kg)</string>
+    <string name="product_selling_price_per_kg">Selling price (per kg)</string>
     <string name="product_is_packaged">Sold in packages (e.g. cartons, pallets)?</string>
     <string name="product_units_per_package">Units per package</string>
     <string name="product_packages_on_hand">Packages on hand</string>
@@ -101,6 +105,9 @@
     <string name="sales_success">Sale completed</string>
     <string name="sales_offline_queued">No connection — sale saved and will sync automatically once you\'re back online</string>
     <string name="sales_pending_sync_badge">%1$d pending sync</string>
+    <string name="sales_weight_dialog_title">%1$s — grams sold</string>
+    <string name="sales_grams_label">Grams</string>
+    <string name="sales_grams_display">%1$sg</string>
     <string name="sales_insufficient_stock">Not enough stock for this item</string>
     <string name="sales_remove_item">Remove</string>
 
@@ -123,6 +130,11 @@
 
     <!-- Expenses -->
     <string name="expenses_title">Recurring expenses</string>
+    <string name="assets_title">Assets</string>
+    <string name="asset_add">Add asset</string>
+    <string name="asset_name">Asset name (e.g. Refrigerator)</string>
+    <string name="asset_value">Value</string>
+    <string name="asset_category">Category (optional)</string>
     <string name="expense_add">Add expense</string>
     <string name="expense_name">Name (e.g. Cashier salary)</string>
     <string name="expense_amount">Amount</string>

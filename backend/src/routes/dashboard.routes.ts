@@ -53,9 +53,10 @@ dashboardRouter.get(
     const tomorrowKey = dateOnlyKey(new Date(now.getTime() + 86400000));
     const monthStartKey = dateOnlyKey(monthStart);
 
-    const [products, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar] =
+    const [products, assets, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar] =
       await Promise.all([
         prisma.product.findMany({ where: { active: true } }),
+        prisma.asset.findMany(),
         prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
         prisma.expense.findMany({ where: { active: true } }),
         prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
@@ -74,11 +75,12 @@ dashboardRouter.get(
       (acc, p) => acc.add(p.purchaseCost.mul(p.quantity)),
       new Prisma.Decimal(0)
     );
+    const assetsValue = assets.reduce((acc, a) => acc.add(a.value), new Prisma.Decimal(0));
     const pendingInvoicesTotal = pendingInvoices.reduce(
       (acc, i) => acc.add(i.amount),
       new Prisma.Decimal(0)
     );
-    const netValuation = inventoryValue.sub(pendingInvoicesTotal);
+    const netValuation = inventoryValue.add(assetsValue).sub(pendingInvoicesTotal);
 
     const sumRevenue = (sales: { totalAmount: Prisma.Decimal }[]) =>
       sales.reduce((acc, s) => acc.add(s.totalAmount), new Prisma.Decimal(0));
@@ -107,6 +109,7 @@ dashboardRouter.get(
 
     res.json({
       inventoryValue,
+      assetsValue,
       pendingInvoicesTotal,
       netValuation,
       today: { revenue: todayRevenue, cost: todayCost, profit: todayProfit },

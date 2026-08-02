@@ -97,6 +97,19 @@ interface ApiService {
     @DELETE("api/expenses/{id}")
     suspend fun deleteExpense(@Path("id") id: String)
 
+    // Assets
+    @GET("api/assets")
+    suspend fun getAssets(): List<AssetDto>
+
+    @POST("api/assets")
+    suspend fun createAsset(@Body input: AssetInput): AssetDto
+
+    @PUT("api/assets/{id}")
+    suspend fun updateAsset(@Path("id") id: String, @Body input: AssetInput): AssetDto
+
+    @DELETE("api/assets/{id}")
+    suspend fun deleteAsset(@Path("id") id: String)
+
     // Dashboard / stats / alerts
     @GET("api/dashboard/summary")
     suspend fun getDashboardSummary(): DashboardSummaryDto

@@ -13,6 +13,7 @@ const productInput = z.object({
   category: z.string().trim().optional().nullable(),
   unit: z.string().trim().min(1).default("pcs"),
   unitsPerPackage: z.number().positive().default(1),
+  soldByWeight: z.boolean().default(false),
   purchaseCost: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
   quantity: z.number().nonnegative().default(0),

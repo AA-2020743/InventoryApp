@@ -36,6 +36,10 @@ data class SalesUiState(
     val error: String? = null,
     val successMessage: String? = null,
     val pendingSyncCount: Int = 0,
+    // Set instead of adding directly to cart whenever a soldByWeight
+    // product is scanned/selected (or an existing weight-based cart row is
+    // tapped to edit), so the Composable can show a "how many grams" dialog.
+    val pendingWeightProduct: ProductDto? = null,
 ) {
     val total: BigDecimal get() = cart.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.subtotal) }
 }
@@ -105,6 +109,10 @@ class SalesViewModel @Inject constructor(
     }
 
     private fun addToCart(product: ProductDto) {
+        if (product.soldByWeight) {
+            uiState = uiState.copy(pendingWeightProduct = product, isLookingUp = false)
+            return
+        }
         val existing = uiState.cart.find { it.product.id == product.id }
         val newCart = if (existing != null) {
             uiState.cart.map { if (it.product.id == product.id) it.copy(quantity = it.quantity + 1) else it }
@@ -120,6 +128,31 @@ class SalesViewModel @Inject constructor(
             return
         }
         uiState = uiState.copy(cart = uiState.cart.map { if (it.product.id == productId) it.copy(quantity = quantity) else it })
+    }
+
+    /** Reopens the grams dialog for a weight-based item already in the cart, prefilled by the Composable. */
+    fun requestWeightEdit(product: ProductDto) {
+        uiState = uiState.copy(pendingWeightProduct = product)
+    }
+
+    fun confirmWeightEntry(grams: Double) {
+        val product = uiState.pendingWeightProduct ?: return
+        if (grams <= 0) {
+            uiState = uiState.copy(pendingWeightProduct = null)
+            return
+        }
+        val kilograms = grams / 1000.0
+        val existing = uiState.cart.find { it.product.id == product.id }
+        val newCart = if (existing != null) {
+            uiState.cart.map { if (it.product.id == product.id) it.copy(quantity = kilograms) else it }
+        } else {
+            uiState.cart + CartItem(product, kilograms)
+        }
+        uiState = uiState.copy(cart = newCart, pendingWeightProduct = null, isLookingUp = false, barcodeInput = "", searchResults = emptyList())
+    }
+
+    fun cancelWeightEntry() {
+        uiState = uiState.copy(pendingWeightProduct = null)
     }
 
     fun removeItem(productId: String) {

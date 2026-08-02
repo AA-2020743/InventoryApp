@@ -24,6 +24,7 @@ data class ProductDto(
     val category: String?,
     val unit: String,
     val unitsPerPackage: String,
+    val soldByWeight: Boolean,
     val purchaseCost: String,
     val sellingPrice: String,
     val quantity: String,
@@ -41,6 +42,7 @@ data class ProductInput(
     val category: String?,
     val unit: String,
     val unitsPerPackage: Double,
+    val soldByWeight: Boolean,
     val purchaseCost: Double,
     val sellingPrice: Double,
     val quantity: Double,
@@ -174,6 +176,7 @@ data class DashboardAlertsDto(
 @JsonClass(generateAdapter = true)
 data class DashboardSummaryDto(
     val inventoryValue: String,
+    val assetsValue: String,
     val pendingInvoicesTotal: String,
     val netValuation: String,
     val today: DashboardPeriodDto,
@@ -241,6 +244,25 @@ data class WorkingDayDto(val date: String, val isWorking: Boolean, val answered:
 
 @JsonClass(generateAdapter = true)
 data class SetWorkingDayRequest(val isWorking: Boolean)
+
+@JsonClass(generateAdapter = true)
+data class AssetDto(
+    val id: String,
+    val name: String,
+    val value: String,
+    val category: String?,
+    val notes: String?,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class AssetInput(
+    val name: String,
+    val value: Double,
+    val category: String?,
+    val notes: String?,
+)
 
 @JsonClass(generateAdapter = true)
 data class RestoreResponse(val success: Boolean, val restoredAt: String)

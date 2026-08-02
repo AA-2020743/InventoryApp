@@ -16,8 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,10 +32,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -147,6 +153,7 @@ fun SalesScreen(
                             item = item,
                             onIncrement = { viewModel.updateQuantity(item.product.id, item.quantity + 1) },
                             onDecrement = { viewModel.updateQuantity(item.product.id, item.quantity - 1) },
+                            onEditWeight = { viewModel.requestWeightEdit(item.product) },
                             onRemove = { viewModel.removeItem(item.product.id) },
                         )
                         Spacer(Modifier.height(4.dp))
@@ -176,21 +183,69 @@ fun SalesScreen(
             }
         }
     }
+
+    state.pendingWeightProduct?.let { product ->
+        val existingGrams = state.cart.find { it.product.id == product.id }?.quantity?.times(1000)
+        WeightEntryDialog(
+            product = product,
+            initialGrams = existingGrams,
+            onConfirm = { grams -> viewModel.confirmWeightEntry(grams) },
+            onDismiss = viewModel::cancelWeightEntry,
+        )
+    }
 }
 
 @Composable
-private fun CartRow(item: CartItem, onIncrement: () -> Unit, onDecrement: () -> Unit, onRemove: () -> Unit) {
+private fun CartRow(item: CartItem, onIncrement: () -> Unit, onDecrement: () -> Unit, onEditWeight: () -> Unit, onRemove: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(item.product.name, style = MaterialTheme.typography.titleMedium)
                 Text(formatAmount(item.product.sellingPrice), style = MaterialTheme.typography.bodySmall)
             }
-            IconButton(onClick = onDecrement) { Icon(Icons.Filled.Remove, contentDescription = null) }
-            Text(formatQuantity(item.quantity.toString()), modifier = Modifier.width(32.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            IconButton(onClick = onIncrement) { Icon(Icons.Filled.Add, contentDescription = null) }
+            if (item.product.soldByWeight) {
+                Text(
+                    stringResource(R.string.sales_grams_display, formatQuantity((item.quantity * 1000).toString())),
+                    modifier = Modifier.width(64.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                IconButton(onClick = onEditWeight) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
+            } else {
+                IconButton(onClick = onDecrement) { Icon(Icons.Filled.Remove, contentDescription = null) }
+                Text(formatQuantity(item.quantity.toString()), modifier = Modifier.width(32.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                IconButton(onClick = onIncrement) { Icon(Icons.Filled.Add, contentDescription = null) }
+            }
             Text(formatAmount(item.subtotal.toPlainString()), modifier = Modifier.width(72.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
             IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.sales_remove_item)) }
         }
     }
+}
+
+@Composable
+private fun WeightEntryDialog(
+    product: com.supermarket.inventory.data.remote.dto.ProductDto,
+    initialGrams: Double?,
+    onConfirm: (Double) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var grams by remember { mutableStateOf(initialGrams?.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() } ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sales_weight_dialog_title, product.name)) },
+        text = {
+            OutlinedTextField(
+                value = grams,
+                onValueChange = { grams = it },
+                label = { Text(stringResource(R.string.sales_grams_label)) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                grams.toDoubleOrNull()?.let { onConfirm(it) }
+            }) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }

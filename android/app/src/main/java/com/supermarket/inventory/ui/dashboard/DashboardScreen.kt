@@ -326,6 +326,7 @@ private fun ValuationCard(summary: DashboardSummaryDto) {
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 HeroStat(stringResource(R.string.dashboard_inventory_value), formatAmount(summary.inventoryValue))
+                HeroStat(stringResource(R.string.dashboard_assets_value), formatAmount(summary.assetsValue))
                 HeroStat(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal))
             }
         }

@@ -32,6 +32,7 @@ import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.ui.dashboard.DashboardScreen
 import com.supermarket.inventory.ui.inventory.InventoryListScreen
 import com.supermarket.inventory.ui.inventory.ProductFormScreen
+import com.supermarket.inventory.ui.invoices.AssetsScreen
 import com.supermarket.inventory.ui.invoices.ExpensesScreen
 import com.supermarket.inventory.ui.invoices.InvoicesScreen
 import com.supermarket.inventory.ui.invoices.SuppliersScreen
@@ -159,10 +160,12 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                 InvoicesScreen(
                     onOpenSuppliers = { navController.navigate(Routes.SUPPLIERS) },
                     onOpenExpenses = { navController.navigate(Routes.EXPENSES) },
+                    onOpenAssets = { navController.navigate(Routes.ASSETS) },
                 )
             }
             composable(Routes.SUPPLIERS) { SuppliersScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.EXPENSES) { ExpensesScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.ASSETS) { AssetsScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.STATS) { StatsScreen() }
             composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
         }

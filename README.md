@@ -34,8 +34,9 @@ npm run dev            # http://localhost:4000
 ## How the pieces fit together
 
 - **Inventory valuation** = `Σ(quantity × purchase cost)` across active
-  products, **minus** total pending supplier invoices — computed live by
-  `GET /api/dashboard/summary`, not a stored/cached snapshot.
+  products, **plus** the total value of tracked business assets (equipment,
+  fixtures, etc.), **minus** total pending supplier invoices — computed
+  live by `GET /api/dashboard/summary`, not a stored/cached snapshot.
 - **Daily profit/loss** = today's revenue minus today's cost of goods sold
   minus the daily rate of recurring expenses (salaries, etc.) — also
   computed live, so it can go negative (a loss) whenever expenses outweigh

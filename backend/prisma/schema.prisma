@@ -33,6 +33,10 @@ model Product {
   // quantity/lowStockThreshold below remain the source of truth in base
   // units regardless - this is purely for converting on entry.
   unitsPerPackage   Decimal  @default(1) @db.Decimal(12, 3)
+  // When true, unit is locked to "kg" and purchaseCost/sellingPrice are
+  // interpreted as price-per-kg; the Sell screen prompts for grams instead
+  // of a whole-unit count and converts grams/1000 into the quantity below.
+  soldByWeight      Boolean  @default(false)
   purchaseCost      Decimal  @db.Decimal(12, 2) // latest known cost from supplier
   sellingPrice      Decimal  @db.Decimal(12, 2)
   quantity          Decimal  @default(0) @db.Decimal(12, 3)
@@ -164,4 +168,18 @@ model WorkingDay {
   date      DateTime @unique @db.Date
   isWorking Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// Non-inventory business property (equipment, fixtures, etc.) that still
+// counts toward "what is this business worth" - its value is summed into
+// the dashboard's net valuation alongside inventory, separately from
+// products since it isn't stock that gets sold.
+model Asset {
+  id        String   @id @default(uuid())
+  name      String
+  value     Decimal  @db.Decimal(12, 2)
+  category  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -34,6 +34,7 @@
     <!-- Dashboard -->
     <string name="dashboard_title">الرئيسية</string>
     <string name="dashboard_inventory_value">قيمة المخزون</string>
+    <string name="dashboard_assets_value">قيمة الأصول</string>
     <string name="dashboard_pending_invoices">فواتير الموردين المستحقة</string>
     <string name="dashboard_net_valuation">صافي القيمة</string>
     <string name="dashboard_today">اليوم</string>
@@ -70,6 +71,9 @@
     <string name="product_pick_photo">اختيار صورة</string>
     <string name="product_scan_barcode">مسح الباركود</string>
     <string name="product_save_error_barcode_or_image">أضف باركودًا، أو صورة للمنتجات التي لا تحمل باركود</string>
+    <string name="product_sold_by_weight">يُباع بالوزن (مثل الأرز أو الخضروات)؟</string>
+    <string name="product_purchase_cost_per_kg">تكلفة الشراء (لكل كجم)</string>
+    <string name="product_selling_price_per_kg">سعر البيع (لكل كجم)</string>
     <string name="product_is_packaged">يُباع في عبوات (مثل كراتين أو طبليات)؟</string>
     <string name="product_units_per_package">عدد الوحدات في كل عبوة</string>
     <string name="product_packages_on_hand">عدد العبوات المتوفرة</string>
@@ -101,6 +105,9 @@
     <string name="sales_success">تمت عملية البيع بنجاح</string>
     <string name="sales_offline_queued">لا يوجد اتصال — تم حفظ عملية البيع وستتم مزامنتها تلقائيًا عند عودة الاتصال</string>
     <string name="sales_pending_sync_badge">‏%1$d بانتظار المزامنة</string>
+    <string name="sales_weight_dialog_title">%1$s — الجرامات المباعة</string>
+    <string name="sales_grams_label">الجرامات</string>
+    <string name="sales_grams_display">%1$s جم</string>
     <string name="sales_insufficient_stock">الكمية المتوفرة غير كافية لهذا الصنف</string>
     <string name="sales_remove_item">إزالة</string>
 
@@ -123,6 +130,11 @@
 
     <!-- Expenses -->
     <string name="expenses_title">المصروفات المتكررة</string>
+    <string name="assets_title">الأصول</string>
+    <string name="asset_add">إضافة أصل</string>
+    <string name="asset_name">اسم الأصل (مثال: ثلاجة)</string>
+    <string name="asset_value">القيمة</string>
+    <string name="asset_category">الفئة (اختياري)</string>
     <string name="expense_add">إضافة مصروف</string>
     <string name="expense_name">الاسم (مثال: راتب الكاشير)</string>
     <string name="expense_amount">المبلغ</string>

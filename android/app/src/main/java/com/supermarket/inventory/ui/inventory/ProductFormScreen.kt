@@ -182,13 +182,14 @@ fun ProductFormScreen(
                 onValueChange = viewModel::onUnitChange,
                 label = { Text(stringResource(R.string.product_unit)) },
                 singleLine = true,
+                readOnly = state.soldByWeight,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
             Row(modifier = Modifier.padding(top = 8.dp)) {
                 OutlinedTextField(
                     value = state.purchaseCost,
                     onValueChange = viewModel::onPurchaseCostChange,
-                    label = { Text(stringResource(R.string.product_purchase_cost)) },
+                    label = { Text(stringResource(if (state.soldByWeight) R.string.product_purchase_cost_per_kg else R.string.product_purchase_cost)) },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
@@ -197,7 +198,7 @@ fun ProductFormScreen(
                 OutlinedTextField(
                     value = state.sellingPrice,
                     onValueChange = viewModel::onSellingPriceChange,
-                    label = { Text(stringResource(R.string.product_selling_price)) },
+                    label = { Text(stringResource(if (state.soldByWeight) R.string.product_selling_price_per_kg else R.string.product_selling_price)) },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
@@ -207,11 +208,21 @@ fun ProductFormScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.product_is_packaged), modifier = Modifier.weight(1f))
-                androidx.compose.material3.Switch(checked = state.isPackaged, onCheckedChange = viewModel::onIsPackagedChange)
+                Text(stringResource(R.string.product_sold_by_weight), modifier = Modifier.weight(1f))
+                androidx.compose.material3.Switch(checked = state.soldByWeight, onCheckedChange = viewModel::onSoldByWeightChange)
             }
 
-            if (state.isPackaged) {
+            if (!state.soldByWeight) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.product_is_packaged), modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Switch(checked = state.isPackaged, onCheckedChange = viewModel::onIsPackagedChange)
+                }
+            }
+
+            if (state.isPackaged && !state.soldByWeight) {
                 Row(modifier = Modifier.padding(top = 8.dp)) {
                     OutlinedTextField(
                         value = state.unitsPerPackage,

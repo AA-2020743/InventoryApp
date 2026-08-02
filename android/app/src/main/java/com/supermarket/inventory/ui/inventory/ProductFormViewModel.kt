@@ -29,6 +29,10 @@ data class ProductFormUiState(
     val unit: String = "pcs",
     val purchaseCost: String = "",
     val sellingPrice: String = "",
+    // Mutually exclusive with isPackaged: a weight-sold item (rice, produce)
+    // is loose bulk, not counted in discrete packages. When true, unit is
+    // locked to "kg" and purchaseCost/sellingPrice mean price-per-kg.
+    val soldByWeight: Boolean = false,
     // Packaging is just "how many units come in one package" - no name/type
     // is asked for, only whether it applies and the count.
     val isPackaged: Boolean = false,
@@ -120,6 +124,7 @@ class ProductFormViewModel @Inject constructor(
             unit = unit,
             purchaseCost = purchaseCost,
             sellingPrice = sellingPrice,
+            soldByWeight = soldByWeight,
             isPackaged = isPackaged,
             unitsPerPackage = unitsPerPackage,
             quantity = quantity,
@@ -134,8 +139,16 @@ class ProductFormViewModel @Inject constructor(
     fun onNameChange(v: String) { uiState = uiState.copy(name = v, error = null) }
     fun onCategoryChange(v: String) { uiState = uiState.copy(category = v) }
     fun onUnitChange(v: String) { uiState = uiState.copy(unit = v) }
+    fun onSoldByWeightChange(v: Boolean) {
+        uiState = uiState.copy(
+            soldByWeight = v,
+            unit = if (v) "kg" else uiState.unit,
+            isPackaged = if (v) false else uiState.isPackaged,
+            error = null,
+        )
+    }
     fun onIsPackagedChange(v: Boolean) {
-        uiState = uiState.copy(isPackaged = v, error = null)
+        uiState = uiState.copy(isPackaged = v, soldByWeight = if (v) false else uiState.soldByWeight, error = null)
         recomputeQuantityPreview()
     }
     fun onUnitsPerPackageChange(v: String) {
@@ -219,8 +232,9 @@ class ProductFormViewModel @Inject constructor(
                 name = uiState.name,
                 imageUrl = uiState.imageUrl,
                 category = uiState.category.ifBlank { null },
-                unit = uiState.unit.ifBlank { "pcs" },
+                unit = if (uiState.soldByWeight) "kg" else uiState.unit.ifBlank { "pcs" },
                 unitsPerPackage = perPackage,
+                soldByWeight = uiState.soldByWeight,
                 purchaseCost = cost,
                 sellingPrice = price,
                 quantity = quantityForUpdate,
