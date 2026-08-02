@@ -112,6 +112,57 @@ The Sell screen keeps working through a dropped connection:
   it's dropped rather than retried forever, and a notification tells you to
   review recent stock levels.
 
+## Building a release APK
+
+The debug build (the one you get from just pressing Run in Android Studio)
+works fine for testing, but for actual daily use you want a signed release
+build — smaller, faster, no debug logging. This only needs to be set up
+once; every rebuild after that is a single command.
+
+### 1. Create a keystore (one time only)
+
+```bash
+keytool -genkeypair -v -keystore release-key.jks -keyalg RSA -keysize 2048 \
+  -validity 10000 -alias inventory-app
+```
+
+You'll be prompted for a keystore password, a key password, and some
+identity fields (name/org — can be anything, it's not verified). **Keep
+`release-key.jks` and both passwords somewhere safe** — losing them means
+you can never sign an update to an already-installed copy of the app
+again; you'd have to uninstall and reinstall fresh.
+
+### 2. Point Gradle at it
+
+Copy `keystore.properties.example` (in `android/`) to `keystore.properties`
+(same folder) and fill in the real values:
+
+```
+storeFile=/absolute/path/to/release-key.jks
+storePassword=<the keystore password>
+keyAlias=inventory-app
+keyPassword=<the key password>
+```
+
+`keystore.properties` is gitignored on purpose — it and the `.jks` file
+never get committed. Without this file present, the release build type
+just falls back to unsigned (still builds, just isn't installable until
+signed), so a fresh clone or CI without your keystore doesn't break.
+
+### 3. Build
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+The signed APK lands at
+`android/app/build/outputs/apk/release/app-release.apk`. Copy it to your
+phone (e.g. `adb install app-release.apk` with the phone connected over
+USB and USB debugging on, or just transfer the file and open it — you'll
+need to allow "install unknown apps" for whichever app you transfer it
+through, since it's not coming from the Play Store).
+
 ## Known limitation of this build environment
 
 This project was written in a sandboxed environment whose network policy
