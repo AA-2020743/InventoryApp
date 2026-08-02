@@ -68,11 +68,14 @@ class StatsViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
-            val periodParam = if (uiState.period == StatsPeriod.DAY) "day" else "month"
             val sortParam = if (uiState.sortBy == StatsSort.QUANTITY) "quantity" else "profit"
             val dateIso = uiState.selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toString()
 
-            val topProductsDeferred = statsRepository.getTopProducts(periodParam, dateIso, sortParam, 20)
+            // Top products is always a monthly view (regardless of the
+            // Overview tab's day/month toggle) - it's the month containing
+            // whichever date is currently selected, since a single day's
+            // worth of sales is too thin a sample to be a useful ranking.
+            val topProductsDeferred = statsRepository.getTopProducts("month", dateIso, sortParam, 20)
             val marginsDeferred = statsRepository.getMargins(20)
 
             var salesForDay: List<SaleDto> = emptyList()

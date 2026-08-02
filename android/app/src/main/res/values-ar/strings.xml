@@ -185,6 +185,12 @@
     <string name="stats_title">الإحصائيات</string>
     <string name="stats_top_products">الأصناف الأكثر مبيعًا</string>
     <string name="stats_top_margins">الأصناف الأعلى ربحًا</string>
+    <string name="stats_tab_overview">نظرة عامة</string>
+    <string name="stats_tab_top_products">الأكثر مبيعًا</string>
+    <string name="stats_tab_margins">هامش الربح</string>
+    <string name="stats_top_products_month_label">يُعرض: %1$s</string>
+    <string name="stats_month_view_hint">بدّل إلى \"يوم\" لرؤية المبيعات والمصروفات الفردية ليوم محدد.</string>
+    <string name="stats_no_sales_this_day">لا توجد مبيعات في هذا اليوم</string>
     <string name="stats_period_day">يوم</string>
     <string name="stats_period_month">شهر</string>
     <string name="stats_sort_quantity">حسب الكمية</string>

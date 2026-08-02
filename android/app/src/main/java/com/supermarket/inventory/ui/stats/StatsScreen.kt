@@ -2,6 +2,7 @@ package com.supermarket.inventory.ui.stats
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +29,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -62,6 +65,11 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+// Top products and margins are their own sub-tabs (kept out of the main
+// scroll) so the day/month's sales and expenses - what the owner checks
+// most often - are visible right away instead of below two long rankings.
+private enum class StatsTab { OVERVIEW, TOP_PRODUCTS, MARGINS }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltViewModel()) {
@@ -70,6 +78,7 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
     var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
     var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
     var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
+    var selectedTab by remember { mutableStateOf(StatsTab.OVERVIEW) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val otherLabel = stringResource(R.string.stats_other)
 
@@ -99,60 +108,46 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
                 }
             }
 
+            Spacer(Modifier.height(8.dp))
+
+            TabRow(selectedTabIndex = selectedTab.ordinal) {
+                Tab(
+                    selected = selectedTab == StatsTab.OVERVIEW,
+                    onClick = { selectedTab = StatsTab.OVERVIEW },
+                    text = { Text(stringResource(R.string.stats_tab_overview)) },
+                )
+                Tab(
+                    selected = selectedTab == StatsTab.TOP_PRODUCTS,
+                    onClick = { selectedTab = StatsTab.TOP_PRODUCTS },
+                    text = { Text(stringResource(R.string.stats_tab_top_products)) },
+                )
+                Tab(
+                    selected = selectedTab == StatsTab.MARGINS,
+                    onClick = { selectedTab = StatsTab.MARGINS },
+                    text = { Text(stringResource(R.string.stats_tab_margins)) },
+                )
+            }
+
             if (state.isLoading) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     CircularProgressIndicator()
                 }
             } else {
-                LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
-                    item { PeriodSummaryCard(state) }
-                    item { Spacer(Modifier.height(16.dp)) }
-                    if (state.topProducts.isNotEmpty()) {
-                        item {
-                            Column {
-                                val categoryData = state.topProducts
-                                    .groupBy { it.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
-                                    .map { (category, items) -> category to items.sumOf { it.revenue.toDoubleOrNull() ?: 0.0 } }
-                                Text(stringResource(R.string.stats_by_category), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                PieChart(topSlicesWithOther(categoryData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
-                                Spacer(Modifier.height(20.dp))
-
-                                val itemData = state.topProducts.map { it.name to (it.revenue.toDoubleOrNull() ?: 0.0) }
-                                Text(stringResource(R.string.stats_by_item), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                PieChart(topSlicesWithOther(itemData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
-                                Spacer(Modifier.height(16.dp))
-                            }
-                        }
-                    }
-                    item { SortRow(state, viewModel) }
-                    item { Text(stringResource(R.string.stats_top_products), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
-                    items(state.topProducts) { TopProductRow(it) }
-                    item { Spacer(Modifier.height(16.dp)) }
-                    item { Text(stringResource(R.string.stats_top_margins), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
-                    items(state.margins) { MarginRow(it) }
-                    if (state.period == StatsPeriod.DAY) {
-                        item { Spacer(Modifier.height(16.dp)) }
-                        item { Text(stringResource(R.string.sales_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
-                        items(state.salesForDay, key = { it.id }) { sale ->
-                            SaleRow(sale, onEdit = { onEditSale(sale.id) }, onDelete = { saleToDelete = sale })
-                        }
-                        state.expensesForDay?.let { expensesForDay ->
-                            item { Spacer(Modifier.height(16.dp)) }
-                            item { Text(stringResource(R.string.stats_expenses_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
-                            item {
-                                val recurringShare = (expensesForDay.dailyShare.toDoubleOrNull() ?: 0.0) +
-                                    (expensesForDay.monthlyShare.toDoubleOrNull() ?: 0.0)
-                                Text(
-                                    stringResource(R.string.stats_recurring_expenses_today, formatAmount(recurringShare.toString())),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                )
-                            }
-                            items(expensesForDay.oneTime, key = { it.id }) { expense ->
-                                DayExpenseRow(expense, onEdit = { expenseToEdit = expense }, onDelete = { expenseToDelete = expense })
-                            }
-                        }
-                    }
+                when (selectedTab) {
+                    StatsTab.OVERVIEW -> OverviewTab(
+                        state = state,
+                        onEditSale = onEditSale,
+                        onDeleteSaleRequest = { saleToDelete = it },
+                        onEditExpenseRequest = { expenseToEdit = it },
+                        onDeleteExpenseRequest = { expenseToDelete = it },
+                    )
+                    StatsTab.TOP_PRODUCTS -> TopProductsTab(
+                        state = state,
+                        viewModel = viewModel,
+                        uncategorizedLabel = uncategorizedLabel,
+                        otherLabel = otherLabel,
+                    )
+                    StatsTab.MARGINS -> MarginsTab(state)
                 }
             }
         }
@@ -224,6 +219,95 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
             },
             dismissButton = { TextButton(onClick = { expenseToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
+    }
+}
+
+@Composable
+private fun OverviewTab(
+    state: StatsUiState,
+    onEditSale: (String) -> Unit,
+    onDeleteSaleRequest: (SaleDto) -> Unit,
+    onEditExpenseRequest: (ExpenseDto) -> Unit,
+    onDeleteExpenseRequest: (ExpenseDto) -> Unit,
+) {
+    LazyColumn(contentPadding = PaddingValues(12.dp)) {
+        item { PeriodSummaryCard(state) }
+        if (state.period == StatsPeriod.DAY) {
+            item { Spacer(Modifier.height(16.dp)) }
+            item { Text(stringResource(R.string.sales_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+            if (state.salesForDay.isEmpty()) {
+                item { Text(stringResource(R.string.stats_no_sales_this_day), style = MaterialTheme.typography.bodyMedium) }
+            }
+            items(state.salesForDay, key = { it.id }) { sale ->
+                SaleRow(sale, onEdit = { onEditSale(sale.id) }, onDelete = { onDeleteSaleRequest(sale) })
+            }
+            state.expensesForDay?.let { expensesForDay ->
+                item { Spacer(Modifier.height(16.dp)) }
+                item { Text(stringResource(R.string.stats_expenses_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+                item {
+                    val recurringShare = (expensesForDay.dailyShare.toDoubleOrNull() ?: 0.0) +
+                        (expensesForDay.monthlyShare.toDoubleOrNull() ?: 0.0)
+                    Text(
+                        stringResource(R.string.stats_recurring_expenses_today, formatAmount(recurringShare.toString())),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                items(expensesForDay.oneTime, key = { it.id }) { expense ->
+                    DayExpenseRow(expense, onEdit = { onEditExpenseRequest(expense) }, onDelete = { onDeleteExpenseRequest(expense) })
+                }
+            }
+        } else {
+            item { Spacer(Modifier.height(12.dp)) }
+            item { Text(stringResource(R.string.stats_month_view_hint), style = MaterialTheme.typography.bodyMedium) }
+        }
+    }
+}
+
+@Composable
+private fun TopProductsTab(
+    state: StatsUiState,
+    viewModel: StatsViewModel,
+    uncategorizedLabel: String,
+    otherLabel: String,
+) {
+    LazyColumn(contentPadding = PaddingValues(12.dp)) {
+        item {
+            val monthLabel = state.selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+            Text(
+                stringResource(R.string.stats_top_products_month_label, monthLabel),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+        }
+        if (state.topProducts.isNotEmpty()) {
+            item {
+                Column {
+                    val categoryData = state.topProducts
+                        .groupBy { it.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
+                        .map { (category, items) -> category to items.sumOf { it.revenue.toDoubleOrNull() ?: 0.0 } }
+                    Text(stringResource(R.string.stats_by_category), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                    PieChart(topSlicesWithOther(categoryData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(20.dp))
+
+                    val itemData = state.topProducts.map { it.name to (it.revenue.toDoubleOrNull() ?: 0.0) }
+                    Text(stringResource(R.string.stats_by_item), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                    PieChart(topSlicesWithOther(itemData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+        }
+        item { SortRow(state, viewModel) }
+        item { Text(stringResource(R.string.stats_top_products), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+        items(state.topProducts) { TopProductRow(it) }
+    }
+}
+
+@Composable
+private fun MarginsTab(state: StatsUiState) {
+    LazyColumn(contentPadding = PaddingValues(12.dp)) {
+        item { Text(stringResource(R.string.stats_top_margins), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+        items(state.margins) { MarginRow(it) }
     }
 }
 
