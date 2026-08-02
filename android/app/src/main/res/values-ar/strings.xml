@@ -6,7 +6,7 @@
     <string name="nav_dashboard">الرئيسية</string>
     <string name="nav_inventory">المخزون</string>
     <string name="nav_sell">البيع</string>
-    <string name="nav_invoices">الفواتير</string>
+    <string name="nav_others">أخرى</string>
     <string name="nav_stats">الإحصائيات</string>
     <string name="nav_settings">الإعدادات</string>
 
@@ -124,6 +124,7 @@
     <string name="suppliers_title">الموردون</string>
     <string name="supplier_add">إضافة مورد</string>
     <string name="supplier_edit">تعديل المورد</string>
+    <string name="supplier_quick_add">+ إضافة مورد جديد</string>
     <string name="supplier_name">اسم المورد</string>
     <string name="supplier_contact">بيانات التواصل</string>
     <string name="invoices_title">فواتير الموردين</string>

@@ -51,6 +51,8 @@ class InvoicesViewModel @Inject constructor(
 
     suspend fun loadSuppliers() = supplierRepository.getSuppliers()
 
+    suspend fun createSupplier(name: String, contactInfo: String?) = supplierRepository.createSupplier(name, contactInfo)
+
     suspend fun createInvoice(supplierId: String, invoiceNumber: String?, amount: Double, dueDateIso: String, notes: String?) =
         invoiceRepository.createInvoice(supplierId, invoiceNumber, amount, dueDateIso, notes)
 

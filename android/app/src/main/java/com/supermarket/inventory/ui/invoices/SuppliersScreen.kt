@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -39,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -91,9 +93,13 @@ class SuppliersViewModel @Inject constructor(private val repository: SupplierRep
     }
 }
 
+// Reached from the Invoices tab's "Suppliers" button as a full-screen
+// overlay (not a nav destination) so managing suppliers - the less
+// frequent operation - doesn't need its own back-stack entry; adding one
+// on the fly happens inline in the Add Invoice dialog instead.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SuppliersScreen(onBack: () -> Unit, viewModel: SuppliersViewModel = hiltViewModel()) {
+fun ManageSuppliersDialog(onDismiss: () -> Unit, viewModel: SuppliersViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
     var supplierToEdit by remember { mutableStateOf<SupplierDto?>(null) }
@@ -107,34 +113,36 @@ fun SuppliersScreen(onBack: () -> Unit, viewModel: SuppliersViewModel = hiltView
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.suppliers_title)) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.supplier_add)) }
-        },
-    ) { padding ->
-        if (state.isLoading) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            LazyColumn(modifier = Modifier.padding(padding).fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
-                items(state.suppliers, key = { it.id }) { supplier ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(supplier.name, style = MaterialTheme.typography.titleMedium)
-                                supplier.contactInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                            }
-                            IconButton(onClick = { supplierToEdit = supplier }) {
-                                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
-                            }
-                            IconButton(onClick = { supplierToDelete = supplier }) {
-                                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.suppliers_title)) },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_cancel)) } },
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            floatingActionButton = {
+                FloatingActionButton(onClick = { showAddDialog = true }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.supplier_add)) }
+            },
+        ) { padding ->
+            if (state.isLoading) {
+                Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
+                LazyColumn(modifier = Modifier.padding(padding).fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+                    items(state.suppliers, key = { it.id }) { supplier ->
+                        Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(supplier.name, style = MaterialTheme.typography.titleMedium)
+                                    supplier.contactInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                }
+                                IconButton(onClick = { supplierToEdit = supplier }) {
+                                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                                }
+                                IconButton(onClick = { supplierToDelete = supplier }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
+                                }
                             }
                         }
                     }

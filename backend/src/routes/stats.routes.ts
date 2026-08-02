@@ -2,22 +2,20 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
+import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
 
 export const statsRouter = Router();
 
+// Boundaries pinned to the business's timezone (see utils/dates.ts) rather
+// than the server process's own local time, so "day"/"month" here always
+// matches what the owner actually experiences as today/this month.
 function rangeFor(period: string, dateStr?: string): { from: Date; to: Date } {
   const date = dateStr ? new Date(dateStr) : new Date();
   if (period === "day") {
-    const from = new Date(date);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(from);
-    to.setDate(to.getDate() + 1);
-    return { from, to };
+    return { from: startOfDay(date), to: startOfNextDay(date) };
   }
   if (period === "month") {
-    const from = new Date(date.getFullYear(), date.getMonth(), 1);
-    const to = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-    return { from, to };
+    return { from: startOfMonth(date), to: startOfNextMonth(date) };
   }
   throw new HttpError(400, "period must be 'day' or 'month'");
 }
@@ -129,10 +127,10 @@ statsRouter.get(
 
     const buckets = new Map<string, { revenue: Prisma.Decimal; cost: Prisma.Decimal }>();
     for (const sale of sales) {
-      const key =
-        period === "month"
-          ? `${sale.createdAt.getFullYear()}-${String(sale.createdAt.getMonth() + 1).padStart(2, "0")}`
-          : sale.createdAt.toISOString().slice(0, 10);
+      // dateOnlyKey (not raw UTC/server-local fields) so bucketing lines up
+      // with the business's actual calendar day/month, same as everywhere else.
+      const dayIso = dateOnlyKey(sale.createdAt).toISOString().slice(0, 10);
+      const key = period === "month" ? dayIso.slice(0, 7) : dayIso;
       const bucket = buckets.get(key) ?? { revenue: new Prisma.Decimal(0), cost: new Prisma.Decimal(0) };
       bucket.revenue = bucket.revenue.add(sale.totalAmount);
       bucket.cost = bucket.cost.add(sale.totalCost);

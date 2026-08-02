@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler } from "../middleware/errorHandler";
-import { dateOnlyKey, startOfDay, startOfMonth } from "../utils/dates";
+import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
 import { getCashRegisterBalance } from "./cashRegister.routes";
 import { dailyOnlyRate, monthlyAccruedThroughDate, monthlyDueOnDate, oneTimeAmountInRange } from "../services/expenseCalc";
 
@@ -27,11 +27,11 @@ dashboardRouter.get(
   asyncHandler(async (_req, res) => {
     const now = new Date();
     const todayStart = startOfDay(now);
-    const todayEnd = new Date(todayStart.getTime() + 86400000);
+    const todayEnd = startOfNextDay(now);
     const monthStart = startOfMonth(now);
-    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+    const monthEnd = startOfNextMonth(now);
     const todayKey = dateOnlyKey(now);
-    const tomorrowKey = dateOnlyKey(new Date(now.getTime() + 86400000));
+    const tomorrowKey = dateOnlyKey(todayEnd);
     const monthStartKey = dateOnlyKey(monthStart);
 
     const [products, assets, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar, deferredSales, cashRegisterBalance] =

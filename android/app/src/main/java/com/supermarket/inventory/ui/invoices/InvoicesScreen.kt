@@ -14,14 +14,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,10 +32,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,65 +62,50 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvoicesScreen(
-    onOpenSuppliers: () -> Unit,
-    onOpenExpenses: () -> Unit,
-    onOpenAssets: () -> Unit,
-    onOpenDeferredSales: () -> Unit,
-    onOpenCashRegister: () -> Unit,
-    viewModel: InvoicesViewModel = hiltViewModel(),
-) {
+fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
+    var showManageSuppliers by remember { mutableStateOf(false) }
     var payInvoiceTarget by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceToEdit by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceToDelete by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.invoices_title)) },
-                actions = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = null)
-                    }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.suppliers_title)) }, onClick = { showMenu = false; onOpenSuppliers() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.expenses_title)) }, onClick = { showMenu = false; onOpenExpenses() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.assets_title)) }, onClick = { showMenu = false; onOpenAssets() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.deferred_sales_title)) }, onClick = { showMenu = false; onOpenDeferredSales() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.cash_register_title)) }, onClick = { showMenu = false; onOpenCashRegister() })
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.invoices_add))
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {
+                TextButton(onClick = { showManageSuppliers = true }) { Text(stringResource(R.string.suppliers_title)) }
             }
-        },
-    ) { padding ->
-        when {
-            state.isLoading -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.invoices.isEmpty() -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.inventory_empty))
-            }
-            else -> LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-            ) {
-                items(state.invoices.sortedBy { it.dueDate }, key = { it.id }) { invoice ->
-                    InvoiceRow(
-                        invoice = invoice,
-                        onMarkPaid = { payInvoiceTarget = invoice },
-                        onEdit = { invoiceToEdit = invoice },
-                        onDelete = { invoiceToDelete = invoice },
-                    )
-                    Spacer(Modifier.height(8.dp))
+            when {
+                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.invoices.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.inventory_empty))
+                }
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+                ) {
+                    items(state.invoices.sortedBy { it.dueDate }, key = { it.id }) { invoice ->
+                        InvoiceRow(
+                            invoice = invoice,
+                            onMarkPaid = { payInvoiceTarget = invoice },
+                            onEdit = { invoiceToEdit = invoice },
+                            onDelete = { invoiceToDelete = invoice },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
             }
         }
+        FloatingActionButton(
+            onClick = { showAddDialog = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.invoices_add))
+        }
+    }
+
+    if (showManageSuppliers) {
+        ManageSuppliersDialog(onDismiss = { showManageSuppliers = false })
     }
 
     if (showAddDialog) {
@@ -253,19 +235,24 @@ private fun InvoiceDialog(
     }
     var error by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    var showQuickAddSupplier by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    suspend fun reloadSuppliers(selectId: String? = null) {
         when (val result = viewModel.loadSuppliers()) {
             is com.supermarket.inventory.data.ApiResult.Success -> {
                 suppliers = result.data
-                if (invoiceToEdit != null && selectedSupplier == null) {
+                if (selectId != null) {
+                    selectedSupplier = result.data.find { it.id == selectId }
+                } else if (invoiceToEdit != null && selectedSupplier == null) {
                     selectedSupplier = result.data.find { it.id == invoiceToEdit.supplierId }
                 }
             }
             is com.supermarket.inventory.data.ApiResult.Error -> error = result.message
         }
     }
+
+    LaunchedEffect(Unit) { reloadSuppliers() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -285,6 +272,11 @@ private fun InvoiceDialog(
                         suppliers.forEach { supplier ->
                             DropdownMenuItem(text = { Text(supplier.name) }, onClick = { selectedSupplier = supplier; expanded = false })
                         }
+                        if (suppliers.isNotEmpty()) Divider()
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.supplier_quick_add)) },
+                            onClick = { expanded = false; showQuickAddSupplier = true },
+                        )
                     }
                 }
                 OutlinedTextField(
@@ -355,4 +347,49 @@ private fun InvoiceDialog(
             DatePicker(state = datePickerState)
         }
     }
+
+    if (showQuickAddSupplier) {
+        QuickAddSupplierDialog(
+            onDismiss = { showQuickAddSupplier = false },
+            onSave = { name, contact ->
+                scope.launch {
+                    when (val result = viewModel.createSupplier(name, contact)) {
+                        is com.supermarket.inventory.data.ApiResult.Success -> {
+                            reloadSuppliers(selectId = result.data.id)
+                            showQuickAddSupplier = false
+                        }
+                        is com.supermarket.inventory.data.ApiResult.Error -> error = result.message
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun QuickAddSupplierDialog(onDismiss: () -> Unit, onSave: (String, String?) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var contact by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.supplier_add)) },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.supplier_name)) }, singleLine = true)
+                OutlinedTextField(
+                    value = contact,
+                    onValueChange = { contact = it },
+                    label = { Text(stringResource(R.string.supplier_contact)) },
+                    singleLine = true,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (name.isNotBlank()) onSave(name, contact.ifBlank { null })
+            }) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }

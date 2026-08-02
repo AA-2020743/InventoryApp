@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
-import { startOfDay } from "../utils/dates";
+import { dateOnlyKey, startOfDay, startOfNextDay } from "../utils/dates";
 import { dailyOnlyRate, monthlyDueOnDate, oneTimeAmountInRange } from "../services/expenseCalc";
 
 export const expensesRouter = Router();
@@ -85,8 +85,8 @@ expensesRouter.get(
   asyncHandler(async (req, res) => {
     const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
     const dayStart = startOfDay(dateParam);
-    const dayEnd = new Date(dayStart.getTime() + 86400000);
-    const dayKey = new Date(Date.UTC(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate()));
+    const dayEnd = startOfNextDay(dateParam);
+    const dayKey = dateOnlyKey(dateParam);
 
     const [activeExpenses, workingDayRecord] = await Promise.all([
       prisma.expense.findMany({ where: { active: true } }),

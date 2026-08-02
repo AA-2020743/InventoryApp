@@ -6,7 +6,7 @@
     <string name="nav_dashboard">Dashboard</string>
     <string name="nav_inventory">Inventory</string>
     <string name="nav_sell">Sell</string>
-    <string name="nav_invoices">Invoices</string>
+    <string name="nav_others">Others</string>
     <string name="nav_stats">Stats</string>
     <string name="nav_settings">Settings</string>
 
@@ -124,6 +124,7 @@
     <string name="suppliers_title">Suppliers</string>
     <string name="supplier_add">Add supplier</string>
     <string name="supplier_edit">Edit supplier</string>
+    <string name="supplier_quick_add">+ Add new supplier</string>
     <string name="supplier_name">Supplier name</string>
     <string name="supplier_contact">Contact info</string>
     <string name="invoices_title">Supplier invoices</string>

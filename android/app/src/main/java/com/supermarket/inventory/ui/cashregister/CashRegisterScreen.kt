@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,13 +21,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,39 +45,17 @@ import com.supermarket.inventory.ui.theme.ProfitGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CashRegisterScreen(
-    onBack: () -> Unit,
-    viewModel: CashRegisterViewModel = hiltViewModel(),
-) {
+fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showSetBalanceDialog by remember { mutableStateOf(false) }
     var showAddEntryDialog by remember { mutableStateOf(false) }
     var showZeroConfirm by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.cash_register_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
-                },
-                actions = {
-                    IconButton(onClick = { showSetBalanceDialog = true }) {
-                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.cash_register_set_balance))
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddEntryDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.cash_register_add_entry))
-            }
-        },
-    ) { padding ->
+    Box(Modifier.fillMaxSize()) {
         if (state.isLoading) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { CircularProgressIndicator() }
+            Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { CircularProgressIndicator() }
         } else {
-            Column(Modifier.padding(padding).fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
                 Card(Modifier.fillMaxWidth().padding(12.dp)) {
                     Column(Modifier.padding(16.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -90,8 +63,13 @@ fun CashRegisterScreen(
                                 Text(stringResource(R.string.cash_register_balance), style = MaterialTheme.typography.labelLarge)
                                 Text(formatAmount(state.balance), style = MaterialTheme.typography.headlineMedium)
                             }
-                            TextButton(onClick = { showZeroConfirm = true }) {
-                                Text(stringResource(R.string.cash_register_reset_to_zero))
+                            Column(horizontalAlignment = Alignment.End) {
+                                TextButton(onClick = { showSetBalanceDialog = true }) {
+                                    Text(stringResource(R.string.cash_register_set_balance))
+                                }
+                                TextButton(onClick = { showZeroConfirm = true }) {
+                                    Text(stringResource(R.string.cash_register_reset_to_zero))
+                                }
                             }
                         }
                     }
@@ -114,6 +92,12 @@ fun CashRegisterScreen(
                     }
                 }
             }
+        }
+        FloatingActionButton(
+            onClick = { showAddEntryDialog = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.cash_register_add_entry))
         }
     }
 

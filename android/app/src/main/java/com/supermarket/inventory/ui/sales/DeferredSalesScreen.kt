@@ -12,18 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,35 +31,21 @@ import com.supermarket.inventory.ui.common.formatIsoDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeferredSalesScreen(
-    onBack: () -> Unit,
-    viewModel: DeferredSalesViewModel = hiltViewModel(),
-) {
+fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.deferred_sales_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
-                },
-            )
-        },
-    ) { padding ->
-        when {
-            state.isLoading -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.sales.isEmpty() -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.deferred_sales_empty))
-            }
-            else -> LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-            ) {
-                items(state.sales, key = { it.id }) { sale ->
-                    DeferredSaleRow(sale = sale, onCollect = { viewModel.collect(sale.id) })
-                    Spacer(Modifier.height(8.dp))
-                }
+    when {
+        state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        state.sales.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.deferred_sales_empty))
+        }
+        else -> LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+        ) {
+            items(state.sales, key = { it.id }) { sale ->
+                DeferredSaleRow(sale = sale, onCollect = { viewModel.collect(sale.id) })
+                Spacer(Modifier.height(8.dp))
             }
         }
     }

@@ -29,16 +29,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.SessionManager
-import com.supermarket.inventory.ui.cashregister.CashRegisterScreen
 import com.supermarket.inventory.ui.dashboard.DashboardScreen
 import com.supermarket.inventory.ui.inventory.InventoryListScreen
 import com.supermarket.inventory.ui.inventory.ProductFormScreen
-import com.supermarket.inventory.ui.invoices.AssetsScreen
-import com.supermarket.inventory.ui.invoices.ExpensesScreen
-import com.supermarket.inventory.ui.invoices.InvoicesScreen
-import com.supermarket.inventory.ui.invoices.SuppliersScreen
 import com.supermarket.inventory.ui.login.LoginScreen
-import com.supermarket.inventory.ui.sales.DeferredSalesScreen
+import com.supermarket.inventory.ui.others.OthersScreen
 import com.supermarket.inventory.ui.sales.EditSaleScreen
 import com.supermarket.inventory.ui.sales.SalesScreen
 import com.supermarket.inventory.ui.scan.BarcodeScannerScreen
@@ -72,7 +67,7 @@ fun InventoryNavHost(sessionManager: SessionManager) {
         BottomTab(Routes.DASHBOARD, R.string.nav_dashboard, Icons.Filled.Dashboard),
         BottomTab(Routes.INVENTORY, R.string.nav_inventory, Icons.Filled.Inventory2),
         BottomTab(Routes.SALES, R.string.nav_sell, Icons.Filled.AttachMoney),
-        BottomTab(Routes.INVOICES, R.string.nav_invoices, Icons.Filled.Receipt),
+        BottomTab(Routes.INVOICES, R.string.nav_others, Icons.Filled.Receipt),
         BottomTab(Routes.STATS, R.string.nav_stats, Icons.Filled.BarChart),
     )
 
@@ -159,20 +154,7 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
                 )
             }
-            composable(Routes.INVOICES) {
-                InvoicesScreen(
-                    onOpenSuppliers = { navController.navigate(Routes.SUPPLIERS) },
-                    onOpenExpenses = { navController.navigate(Routes.EXPENSES) },
-                    onOpenAssets = { navController.navigate(Routes.ASSETS) },
-                    onOpenDeferredSales = { navController.navigate(Routes.DEFERRED_SALES) },
-                    onOpenCashRegister = { navController.navigate(Routes.CASH_REGISTER) },
-                )
-            }
-            composable(Routes.SUPPLIERS) { SuppliersScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.EXPENSES) { ExpensesScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.ASSETS) { AssetsScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.DEFERRED_SALES) { DeferredSalesScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.CASH_REGISTER) { CashRegisterScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.INVOICES) { OthersScreen() }
             composable(
                 route = Routes.EDIT_SALE,
                 arguments = listOf(navArgument("saleId") { type = NavType.StringType }),
