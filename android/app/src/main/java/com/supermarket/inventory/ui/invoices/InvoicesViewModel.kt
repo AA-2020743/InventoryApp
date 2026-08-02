@@ -53,4 +53,16 @@ class InvoicesViewModel @Inject constructor(
 
     suspend fun createInvoice(supplierId: String, invoiceNumber: String?, amount: Double, dueDateIso: String, notes: String?) =
         invoiceRepository.createInvoice(supplierId, invoiceNumber, amount, dueDateIso, notes)
+
+    suspend fun updateInvoice(id: String, supplierId: String, invoiceNumber: String?, amount: Double, dueDateIso: String, notes: String?) =
+        invoiceRepository.updateInvoice(id, supplierId, invoiceNumber, amount, dueDateIso, notes)
+
+    fun deleteInvoice(id: String) {
+        viewModelScope.launch {
+            when (invoiceRepository.deleteInvoice(id)) {
+                is ApiResult.Success -> load()
+                is ApiResult.Error -> Unit
+            }
+        }
+    }
 }

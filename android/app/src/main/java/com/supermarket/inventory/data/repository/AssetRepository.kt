@@ -15,5 +15,8 @@ class AssetRepository @Inject constructor(private val api: ApiService) {
     suspend fun create(name: String, value: Double, category: String?): ApiResult<AssetDto> =
         apiCall { api.createAsset(AssetInput(name, value, category, null)) }
 
+    suspend fun update(id: String, name: String, value: Double, category: String?): ApiResult<AssetDto> =
+        apiCall { api.updateAsset(id, AssetInput(name, value, category, null)) }
+
     suspend fun delete(id: String): ApiResult<Unit> = apiCall { api.deleteAsset(id) }
 }

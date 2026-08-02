@@ -60,6 +60,12 @@ interface ApiService {
     @POST("api/suppliers")
     suspend fun createSupplier(@Body input: SupplierInput): SupplierDto
 
+    @PUT("api/suppliers/{id}")
+    suspend fun updateSupplier(@Path("id") id: String, @Body input: SupplierInput): SupplierDto
+
+    @DELETE("api/suppliers/{id}")
+    suspend fun deleteSupplier(@Path("id") id: String)
+
     // Invoices
     @GET("api/invoices")
     suspend fun getInvoices(@Query("status") status: String? = null): List<SupplierInvoiceDto>
@@ -70,8 +76,14 @@ interface ApiService {
     @POST("api/invoices")
     suspend fun createInvoice(@Body input: InvoiceInput): SupplierInvoiceDto
 
+    @PUT("api/invoices/{id}")
+    suspend fun updateInvoice(@Path("id") id: String, @Body input: InvoiceInput): SupplierInvoiceDto
+
     @POST("api/invoices/{id}/pay")
     suspend fun markInvoicePaid(@Path("id") id: String, @Body request: PayInvoiceRequest = PayInvoiceRequest()): SupplierInvoiceDto
+
+    @DELETE("api/invoices/{id}")
+    suspend fun deleteInvoice(@Path("id") id: String)
 
     // Sales
     @GET("api/sales")
@@ -100,6 +112,9 @@ interface ApiService {
     // Expenses
     @GET("api/expenses")
     suspend fun getExpenses(@Query("activeOnly") activeOnly: Boolean? = null): List<ExpenseDto>
+
+    @GET("api/expenses/for-day")
+    suspend fun getExpensesForDay(@Query("date") date: String? = null): ExpensesForDayResponse
 
     @POST("api/expenses")
     suspend fun createExpense(@Body input: ExpenseInput): ExpenseDto

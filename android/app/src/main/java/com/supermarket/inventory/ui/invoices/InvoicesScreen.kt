@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -75,6 +77,8 @@ fun InvoicesScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var payInvoiceTarget by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
+    var invoiceToEdit by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
+    var invoiceToDelete by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
 
     Scaffold(
         topBar = {
@@ -110,7 +114,12 @@ fun InvoicesScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
             ) {
                 items(state.invoices.sortedBy { it.dueDate }, key = { it.id }) { invoice ->
-                    InvoiceRow(invoice = invoice, onMarkPaid = { payInvoiceTarget = invoice })
+                    InvoiceRow(
+                        invoice = invoice,
+                        onMarkPaid = { payInvoiceTarget = invoice },
+                        onEdit = { invoiceToEdit = invoice },
+                        onDelete = { invoiceToDelete = invoice },
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -118,10 +127,36 @@ fun InvoicesScreen(
     }
 
     if (showAddDialog) {
-        AddInvoiceDialog(
+        InvoiceDialog(
             viewModel = viewModel,
+            title = stringResource(R.string.invoices_add),
+            invoiceToEdit = null,
             onDismiss = { showAddDialog = false },
-            onCreated = { showAddDialog = false; viewModel.load() },
+            onDone = { showAddDialog = false; viewModel.load() },
+        )
+    }
+
+    invoiceToEdit?.let { invoice ->
+        InvoiceDialog(
+            viewModel = viewModel,
+            title = stringResource(R.string.invoice_edit),
+            invoiceToEdit = invoice,
+            onDismiss = { invoiceToEdit = null },
+            onDone = { invoiceToEdit = null; viewModel.load() },
+        )
+    }
+
+    invoiceToDelete?.let { invoice ->
+        AlertDialog(
+            onDismissRequest = { invoiceToDelete = null },
+            title = { Text(stringResource(R.string.confirm_delete_named_title, invoice.supplier?.name ?: invoice.supplierId)) },
+            text = { Text(stringResource(R.string.confirm_delete_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteInvoice(invoice.id); invoiceToDelete = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = { TextButton(onClick = { invoiceToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
@@ -138,7 +173,7 @@ fun InvoicesScreen(
 }
 
 @Composable
-private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit) {
+private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val now = Instant.now()
     val dueInstant = try { Instant.parse(invoice.dueDate) } catch (_: Exception) { now }
     val isOverdue = invoice.status == "PENDING" && dueInstant.isBefore(now)
@@ -150,9 +185,13 @@ private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit) {
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
-                Text(invoice.supplier?.name ?: invoice.supplierId, style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(invoice.supplier?.name ?: invoice.supplierId, style = MaterialTheme.typography.titleMedium)
+                }
                 Text(formatAmount(invoice.amount), style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
+                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
             }
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -195,29 +234,42 @@ private fun PayInvoiceDialog(invoice: SupplierInvoiceDto, onDismiss: () -> Unit,
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddInvoiceDialog(viewModel: InvoicesViewModel, onDismiss: () -> Unit, onCreated: () -> Unit) {
+private fun InvoiceDialog(
+    viewModel: InvoicesViewModel,
+    title: String,
+    invoiceToEdit: SupplierInvoiceDto?,
+    onDismiss: () -> Unit,
+    onDone: () -> Unit,
+) {
     var suppliers by remember { mutableStateOf<List<SupplierDto>>(emptyList()) }
     var selectedSupplier by remember { mutableStateOf<SupplierDto?>(null) }
     var expanded by remember { mutableStateOf(false) }
-    var amount by remember { mutableStateOf("") }
-    var invoiceNumber by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf(invoiceToEdit?.amount ?: "") }
+    var invoiceNumber by remember { mutableStateOf(invoiceToEdit?.invoiceNumber ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
-    var dueDateMillis by remember { mutableStateOf<Long?>(null) }
+    var dueDateMillis by remember {
+        mutableStateOf(invoiceToEdit?.dueDate?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() })
+    }
     var error by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         when (val result = viewModel.loadSuppliers()) {
-            is com.supermarket.inventory.data.ApiResult.Success -> suppliers = result.data
+            is com.supermarket.inventory.data.ApiResult.Success -> {
+                suppliers = result.data
+                if (invoiceToEdit != null && selectedSupplier == null) {
+                    selectedSupplier = result.data.find { it.id == invoiceToEdit.supplierId }
+                }
+            }
             is com.supermarket.inventory.data.ApiResult.Error -> error = result.message
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.invoices_add)) },
+        title = { Text(title) },
         text = {
             Column {
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
@@ -273,9 +325,14 @@ private fun AddInvoiceDialog(viewModel: InvoicesViewModel, onDismiss: () -> Unit
                     isSaving = true
                     scope.launch {
                         val dueIso = Instant.ofEpochMilli(due).atZone(ZoneOffset.UTC).toInstant().toString()
-                        when (viewModel.createInvoice(supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null)) {
-                            is com.supermarket.inventory.data.ApiResult.Success -> onCreated()
-                            is com.supermarket.inventory.data.ApiResult.Error -> { isSaving = false; error = "Could not create invoice" }
+                        val result = if (invoiceToEdit != null) {
+                            viewModel.updateInvoice(invoiceToEdit.id, supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null)
+                        } else {
+                            viewModel.createInvoice(supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null)
+                        }
+                        when (result) {
+                            is com.supermarket.inventory.data.ApiResult.Success -> onDone()
+                            is com.supermarket.inventory.data.ApiResult.Error -> { isSaving = false; error = result.message }
                         }
                     }
                 },

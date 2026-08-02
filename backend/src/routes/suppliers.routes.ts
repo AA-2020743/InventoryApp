@@ -58,6 +58,10 @@ suppliersRouter.delete(
   asyncHandler(async (req, res) => {
     const existing = await prisma.supplier.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new HttpError(404, "Supplier not found");
+    const invoiceCount = await prisma.supplierInvoice.count({ where: { supplierId: req.params.id } });
+    if (invoiceCount > 0) {
+      throw new HttpError(400, "Cannot delete a supplier with existing invoices");
+    }
     await prisma.supplier.delete({ where: { id: req.params.id } });
     res.status(204).send();
   })

@@ -41,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.R
+import com.supermarket.inventory.data.remote.dto.ExpenseDto
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
@@ -51,8 +53,10 @@ import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.common.topSlicesWithOther
+import com.supermarket.inventory.ui.invoices.ExpenseDialog
 import com.supermarket.inventory.ui.theme.LossRed
 import com.supermarket.inventory.ui.theme.ProfitGreen
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -64,6 +68,8 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
     val state = viewModel.uiState
     var showDatePicker by remember { mutableStateOf(false) }
     var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
+    var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
+    var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val otherLabel = stringResource(R.string.stats_other)
 
@@ -130,6 +136,22 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
                         items(state.salesForDay, key = { it.id }) { sale ->
                             SaleRow(sale, onEdit = { onEditSale(sale.id) }, onDelete = { saleToDelete = sale })
                         }
+                        state.expensesForDay?.let { expensesForDay ->
+                            item { Spacer(Modifier.height(16.dp)) }
+                            item { Text(stringResource(R.string.stats_expenses_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+                            item {
+                                val recurringShare = (expensesForDay.dailyShare.toDoubleOrNull() ?: 0.0) +
+                                    (expensesForDay.monthlyShare.toDoubleOrNull() ?: 0.0)
+                                Text(
+                                    stringResource(R.string.stats_recurring_expenses_today, formatAmount(recurringShare.toString())),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                            items(expensesForDay.oneTime, key = { it.id }) { expense ->
+                                DayExpenseRow(expense, onEdit = { expenseToEdit = expense }, onDelete = { expenseToDelete = expense })
+                            }
+                        }
                     }
                 }
             }
@@ -167,6 +189,40 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
                 }
             },
             dismissButton = { TextButton(onClick = { saleToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+
+    expenseToEdit?.let { expense ->
+        ExpenseDialog(
+            title = stringResource(R.string.expense_edit),
+            initialName = expense.name,
+            initialAmount = expense.amount,
+            initialFrequency = expense.frequency,
+            initialStartDateIso = expense.startDate,
+            initialPaymentDayOfMonth = expense.paymentDayOfMonth ?: 1,
+            initialFromCashRegister = expense.fromCashRegister,
+            onDismiss = { expenseToEdit = null },
+            onSave = { name, amount, frequency, startDate, paymentDayOfMonth, fromCashRegister ->
+                viewModel.viewModelScope.launch {
+                    viewModel.updateExpense(expense.id, name, amount, frequency, startDate, paymentDayOfMonth, fromCashRegister)
+                    viewModel.load()
+                }
+                expenseToEdit = null
+            },
+        )
+    }
+
+    expenseToDelete?.let { expense ->
+        AlertDialog(
+            onDismissRequest = { expenseToDelete = null },
+            title = { Text(stringResource(R.string.confirm_delete_named_title, expense.name)) },
+            text = { Text(stringResource(R.string.confirm_delete_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteExpense(expense.id); expenseToDelete = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = { TextButton(onClick = { expenseToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -232,6 +288,27 @@ private fun MarginRow(item: MarginItemDto) {
                 stringResource(R.string.stats_margin_percent, formatPercent(item.marginPercent)),
                 style = MaterialTheme.typography.bodyLarge,
             )
+        }
+    }
+}
+
+@Composable
+private fun DayExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(expense.name, style = MaterialTheme.typography.bodyLarge)
+                if (expense.fromCashRegister) {
+                    Text(
+                        stringResource(R.string.expense_from_cash_register_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Text(formatAmount(expense.amount), style = MaterialTheme.typography.bodyLarge)
+            IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
+            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
         }
     }
 }

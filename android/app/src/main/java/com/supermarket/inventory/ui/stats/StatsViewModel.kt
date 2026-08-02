@@ -6,9 +6,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
+import com.supermarket.inventory.data.remote.dto.ExpensesForDayResponse
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
+import com.supermarket.inventory.data.repository.ExpenseRepository
 import com.supermarket.inventory.data.repository.SalesRepository
 import com.supermarket.inventory.data.repository.StatsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +31,7 @@ data class StatsUiState(
     val topProducts: List<TopProductItemDto> = emptyList(),
     val margins: List<MarginItemDto> = emptyList(),
     val salesForDay: List<SaleDto> = emptyList(),
+    val expensesForDay: ExpensesForDayResponse? = null,
     val periodRevenue: String = "0",
     val periodCost: String = "0",
     val periodProfit: String = "0",
@@ -39,6 +42,7 @@ data class StatsUiState(
 class StatsViewModel @Inject constructor(
     private val statsRepository: StatsRepository,
     private val salesRepository: SalesRepository,
+    private val expenseRepository: ExpenseRepository,
 ) : ViewModel() {
 
     var uiState by mutableStateOf(StatsUiState())
@@ -72,6 +76,7 @@ class StatsViewModel @Inject constructor(
             val marginsDeferred = statsRepository.getMargins(20)
 
             var salesForDay: List<SaleDto> = emptyList()
+            var expensesForDay: ExpensesForDayResponse? = null
             var revenue = "0"
             var cost = "0"
             var profit = "0"
@@ -88,6 +93,10 @@ class StatsViewModel @Inject constructor(
                         cost = totalCost.toString()
                         profit = (totalRevenue - totalCost).toString()
                     }
+                    is ApiResult.Error -> Unit
+                }
+                when (val expensesResult = expenseRepository.getExpensesForDay(dayStart)) {
+                    is ApiResult.Success -> expensesForDay = expensesResult.data
                     is ApiResult.Error -> Unit
                 }
             } else {
@@ -119,6 +128,7 @@ class StatsViewModel @Inject constructor(
                 topProducts = topProducts,
                 margins = margins,
                 salesForDay = salesForDay,
+                expensesForDay = expensesForDay,
                 periodRevenue = revenue,
                 periodCost = cost,
                 periodProfit = profit,
@@ -129,6 +139,25 @@ class StatsViewModel @Inject constructor(
     fun deleteSale(id: String) {
         viewModelScope.launch {
             when (salesRepository.deleteSale(id)) {
+                is ApiResult.Success -> load()
+                is ApiResult.Error -> Unit
+            }
+        }
+    }
+
+    suspend fun updateExpense(
+        id: String,
+        name: String,
+        amount: Double,
+        frequency: String,
+        startDate: String?,
+        paymentDayOfMonth: Int?,
+        fromCashRegister: Boolean,
+    ) = expenseRepository.updateExpense(id, name, amount, frequency, startDate, null, paymentDayOfMonth, fromCashRegister)
+
+    fun deleteExpense(id: String) {
+        viewModelScope.launch {
+            when (expenseRepository.deleteExpense(id)) {
                 is ApiResult.Success -> load()
                 is ApiResult.Error -> Unit
             }

@@ -5,31 +5,9 @@ import { env } from "../env";
 import { asyncHandler } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth } from "../utils/dates";
 import { getCashRegisterBalance } from "./cashRegister.routes";
+import { dailyOnlyRate, monthlyAccruedThroughDate, monthlyDueOnDate, oneTimeAmountInRange } from "../services/expenseCalc";
 
 export const dashboardRouter = Router();
-
-type ExpenseLike = { amount: Prisma.Decimal; frequency: string };
-
-// DAILY-frequency expenses (e.g. a cashier's daily wage) only apply on
-// days actually worked - see WorkingDay. MONTHLY-frequency expenses
-// (rent, etc.) accrue regardless of whether the shop opened that day.
-function dailyOnlyRate(expenses: ExpenseLike[]) {
-  return expenses
-    .filter((e) => e.frequency === "DAILY")
-    .reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
-}
-
-function monthlyProratedRate(expenses: ExpenseLike[]) {
-  return expenses
-    .filter((e) => e.frequency === "MONTHLY")
-    .reduce((acc, e) => acc.add(e.amount.div(30)), new Prisma.Decimal(0));
-}
-
-function monthlyFlatRate(expenses: ExpenseLike[]) {
-  return expenses
-    .filter((e) => e.frequency === "MONTHLY")
-    .reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
-}
 
 // Working days between [from, to) (calendar-day keys, `to` exclusive).
 // A day with no WorkingDay row is assumed worked - only explicit
@@ -49,7 +27,9 @@ dashboardRouter.get(
   asyncHandler(async (_req, res) => {
     const now = new Date();
     const todayStart = startOfDay(now);
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
     const monthStart = startOfMonth(now);
+    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
     const todayKey = dateOnlyKey(now);
     const tomorrowKey = dateOnlyKey(new Date(now.getTime() + 86400000));
     const monthStartKey = dateOnlyKey(monthStart);
@@ -107,12 +87,13 @@ dashboardRouter.get(
     const monthCost = sumCost(monthSales);
 
     const isTodayWorking = todayWorkingDay?.isWorking ?? true;
-    const dailyExpenses = (isTodayWorking ? dailyOnlyRate(activeExpenses) : new Prisma.Decimal(0)).add(
-      monthlyProratedRate(activeExpenses)
-    );
+    const dailyExpenses = (isTodayWorking ? dailyOnlyRate(activeExpenses) : new Prisma.Decimal(0))
+      .add(monthlyDueOnDate(activeExpenses, now))
+      .add(oneTimeAmountInRange(activeExpenses, todayStart, todayEnd));
     const monthlyExpenses = dailyOnlyRate(activeExpenses)
       .mul(workingDaysSoFar)
-      .add(monthlyFlatRate(activeExpenses));
+      .add(monthlyAccruedThroughDate(activeExpenses, now))
+      .add(oneTimeAmountInRange(activeExpenses, monthStart, monthEnd));
 
     const todayProfit = todayRevenue.sub(todayCost).sub(dailyExpenses);
     const monthProfit = monthRevenue.sub(monthCost).sub(monthlyExpenses);

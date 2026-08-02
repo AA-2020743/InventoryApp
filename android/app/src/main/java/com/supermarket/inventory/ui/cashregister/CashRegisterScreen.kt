@@ -57,6 +57,7 @@ fun CashRegisterScreen(
     val state = viewModel.uiState
     var showSetBalanceDialog by remember { mutableStateOf(false) }
     var showAddEntryDialog by remember { mutableStateOf(false) }
+    var showZeroConfirm by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -84,8 +85,15 @@ fun CashRegisterScreen(
             Column(Modifier.padding(padding).fillMaxSize()) {
                 Card(Modifier.fillMaxWidth().padding(12.dp)) {
                     Column(Modifier.padding(16.dp)) {
-                        Text(stringResource(R.string.cash_register_balance), style = MaterialTheme.typography.labelLarge)
-                        Text(formatAmount(state.balance), style = MaterialTheme.typography.headlineMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text(stringResource(R.string.cash_register_balance), style = MaterialTheme.typography.labelLarge)
+                                Text(formatAmount(state.balance), style = MaterialTheme.typography.headlineMedium)
+                            }
+                            TextButton(onClick = { showZeroConfirm = true }) {
+                                Text(stringResource(R.string.cash_register_reset_to_zero))
+                            }
+                        }
                     }
                 }
                 Text(
@@ -121,6 +129,21 @@ fun CashRegisterScreen(
         AddEntryDialog(
             onDismiss = { showAddEntryDialog = false },
             onConfirm = { amount, note -> viewModel.addEntry(amount, note); showAddEntryDialog = false },
+        )
+    }
+
+    if (showZeroConfirm) {
+        AlertDialog(
+            onDismissRequest = { showZeroConfirm = false },
+            title = { Text(stringResource(R.string.cash_register_reset_to_zero)) },
+            text = { Text(stringResource(R.string.cash_register_reset_to_zero_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.setBalance(0.0, null)
+                    showZeroConfirm = false
+                }) { Text(stringResource(R.string.action_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { showZeroConfirm = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

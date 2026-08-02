@@ -13,6 +13,11 @@ class SupplierRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun createSupplier(name: String, contactInfo: String?): ApiResult<SupplierDto> =
         apiCall { api.createSupplier(SupplierInput(name, contactInfo)) }
+
+    suspend fun updateSupplier(id: String, name: String, contactInfo: String?): ApiResult<SupplierDto> =
+        apiCall { api.updateSupplier(id, SupplierInput(name, contactInfo)) }
+
+    suspend fun deleteSupplier(id: String): ApiResult<Unit> = apiCall { api.deleteSupplier(id) }
 }
 
 @Singleton
@@ -32,6 +37,18 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
     ): ApiResult<SupplierInvoiceDto> =
         apiCall { api.createInvoice(InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes)) }
 
+    suspend fun updateInvoice(
+        id: String,
+        supplierId: String,
+        invoiceNumber: String?,
+        amount: Double,
+        dueDateIso: String,
+        notes: String?,
+    ): ApiResult<SupplierInvoiceDto> =
+        apiCall { api.updateInvoice(id, InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes)) }
+
     suspend fun markPaid(id: String, payFromCashRegister: Boolean = false): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id, PayInvoiceRequest(payFromCashRegister)) }
+
+    suspend fun deleteInvoice(id: String): ApiResult<Unit> = apiCall { api.deleteInvoice(id) }
 }

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,6 +75,8 @@ class AssetsViewModel @Inject constructor(private val repository: AssetRepositor
     }
 
     suspend fun create(name: String, value: Double, category: String?) = repository.create(name, value, category)
+
+    suspend fun update(id: String, name: String, value: Double, category: String?) = repository.update(id, name, value, category)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,6 +84,8 @@ class AssetsViewModel @Inject constructor(private val repository: AssetRepositor
 fun AssetsScreen(onBack: () -> Unit, viewModel: AssetsViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
+    var assetToEdit by remember { mutableStateOf<AssetDto?>(null) }
+    var assetToDelete by remember { mutableStateOf<AssetDto?>(null) }
 
     Scaffold(
         topBar = {
@@ -105,7 +110,10 @@ fun AssetsScreen(onBack: () -> Unit, viewModel: AssetsViewModel = hiltViewModel(
                                 asset.category?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                             }
                             Text(formatAmount(asset.value), style = MaterialTheme.typography.titleMedium)
-                            IconButton(onClick = { viewModel.delete(asset.id) }) {
+                            IconButton(onClick = { assetToEdit = asset }) {
+                                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                            }
+                            IconButton(onClick = { assetToDelete = asset }) {
                                 Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
                             }
                         }
@@ -116,7 +124,11 @@ fun AssetsScreen(onBack: () -> Unit, viewModel: AssetsViewModel = hiltViewModel(
     }
 
     if (showAddDialog) {
-        AddAssetDialog(
+        AssetDialog(
+            title = stringResource(R.string.asset_add),
+            initialName = "",
+            initialValue = "",
+            initialCategory = "",
             onDismiss = { showAddDialog = false },
             onSave = { name, value, category ->
                 viewModel.viewModelScope.launch {
@@ -127,17 +139,55 @@ fun AssetsScreen(onBack: () -> Unit, viewModel: AssetsViewModel = hiltViewModel(
             },
         )
     }
+
+    assetToEdit?.let { asset ->
+        AssetDialog(
+            title = stringResource(R.string.asset_edit),
+            initialName = asset.name,
+            initialValue = asset.value,
+            initialCategory = asset.category ?: "",
+            onDismiss = { assetToEdit = null },
+            onSave = { name, value, category ->
+                viewModel.viewModelScope.launch {
+                    viewModel.update(asset.id, name, value, category)
+                    viewModel.load()
+                }
+                assetToEdit = null
+            },
+        )
+    }
+
+    assetToDelete?.let { asset ->
+        AlertDialog(
+            onDismissRequest = { assetToDelete = null },
+            title = { Text(stringResource(R.string.confirm_delete_named_title, asset.name)) },
+            text = { Text(stringResource(R.string.confirm_delete_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.delete(asset.id); assetToDelete = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = { TextButton(onClick = { assetToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
 }
 
 @Composable
-private fun AddAssetDialog(onDismiss: () -> Unit, onSave: (String, Double, String?) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var value by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("") }
+private fun AssetDialog(
+    title: String,
+    initialName: String,
+    initialValue: String,
+    initialCategory: String,
+    onDismiss: () -> Unit,
+    onSave: (String, Double, String?) -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var value by remember { mutableStateOf(initialValue) }
+    var category by remember { mutableStateOf(initialCategory) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.asset_add)) },
+        title = { Text(title) },
         text = {
             Column {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.asset_name)) }, singleLine = true)

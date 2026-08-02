@@ -2,6 +2,7 @@ package com.supermarket.inventory.ui.invoices
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,6 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -20,6 +23,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,6 +53,7 @@ import javax.inject.Inject
 data class SuppliersUiState(
     val isLoading: Boolean = true,
     val suppliers: List<SupplierDto> = emptyList(),
+    val error: String? = null,
 )
 
 @HiltViewModel
@@ -59,7 +65,7 @@ class SuppliersViewModel @Inject constructor(private val repository: SupplierRep
 
     fun load() {
         viewModelScope.launch {
-            uiState = uiState.copy(isLoading = true)
+            uiState = uiState.copy(isLoading = true, error = null)
             when (val result = repository.getSuppliers()) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, suppliers = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false)
@@ -68,6 +74,21 @@ class SuppliersViewModel @Inject constructor(private val repository: SupplierRep
     }
 
     suspend fun create(name: String, contactInfo: String?) = repository.createSupplier(name, contactInfo)
+
+    suspend fun update(id: String, name: String, contactInfo: String?) = repository.updateSupplier(id, name, contactInfo)
+
+    fun delete(id: String) {
+        viewModelScope.launch {
+            when (val result = repository.deleteSupplier(id)) {
+                is ApiResult.Success -> load()
+                is ApiResult.Error -> uiState = uiState.copy(error = result.message)
+            }
+        }
+    }
+
+    fun dismissError() {
+        uiState = uiState.copy(error = null)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +96,16 @@ class SuppliersViewModel @Inject constructor(private val repository: SupplierRep
 fun SuppliersScreen(onBack: () -> Unit, viewModel: SuppliersViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
+    var supplierToEdit by remember { mutableStateOf<SupplierDto?>(null) }
+    var supplierToDelete by remember { mutableStateOf<SupplierDto?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.dismissError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -83,6 +114,7 @@ fun SuppliersScreen(onBack: () -> Unit, viewModel: SuppliersViewModel = hiltView
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.supplier_add)) }
         },
@@ -93,9 +125,17 @@ fun SuppliersScreen(onBack: () -> Unit, viewModel: SuppliersViewModel = hiltView
             LazyColumn(modifier = Modifier.padding(padding).fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
                 items(state.suppliers, key = { it.id }) { supplier ->
                     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(supplier.name, style = MaterialTheme.typography.titleMedium)
-                            supplier.contactInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(supplier.name, style = MaterialTheme.typography.titleMedium)
+                                supplier.contactInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            }
+                            IconButton(onClick = { supplierToEdit = supplier }) {
+                                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                            }
+                            IconButton(onClick = { supplierToDelete = supplier }) {
+                                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
+                            }
                         }
                     }
                 }
@@ -104,36 +144,82 @@ fun SuppliersScreen(onBack: () -> Unit, viewModel: SuppliersViewModel = hiltView
     }
 
     if (showAddDialog) {
-        var name by remember { mutableStateOf("") }
-        var contact by remember { mutableStateOf("") }
-        val scope = rememberCoroutineScope()
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text(stringResource(R.string.supplier_add)) },
-            text = {
-                Column {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.supplier_name)) }, singleLine = true)
-                    OutlinedTextField(
-                        value = contact,
-                        onValueChange = { contact = it },
-                        label = { Text(stringResource(R.string.supplier_contact)) },
-                        singleLine = true,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+        SupplierDialog(
+            title = stringResource(R.string.supplier_add),
+            initialName = "",
+            initialContact = "",
+            onDismiss = { showAddDialog = false },
+            onSave = { name, contact ->
+                viewModel.viewModelScope.launch {
+                    viewModel.create(name, contact)
+                    viewModel.load()
                 }
+                showAddDialog = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (name.isNotBlank()) {
-                        scope.launch {
-                            viewModel.create(name, contact.ifBlank { null })
-                            viewModel.load()
-                            showAddDialog = false
-                        }
-                    }
-                }) { Text(stringResource(R.string.action_save)) }
-            },
-            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
+
+    supplierToEdit?.let { supplier ->
+        SupplierDialog(
+            title = stringResource(R.string.supplier_edit),
+            initialName = supplier.name,
+            initialContact = supplier.contactInfo ?: "",
+            onDismiss = { supplierToEdit = null },
+            onSave = { name, contact ->
+                viewModel.viewModelScope.launch {
+                    viewModel.update(supplier.id, name, contact)
+                    viewModel.load()
+                }
+                supplierToEdit = null
+            },
+        )
+    }
+
+    supplierToDelete?.let { supplier ->
+        AlertDialog(
+            onDismissRequest = { supplierToDelete = null },
+            title = { Text(stringResource(R.string.confirm_delete_named_title, supplier.name)) },
+            text = { Text(stringResource(R.string.confirm_delete_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.delete(supplier.id); supplierToDelete = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = { TextButton(onClick = { supplierToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun SupplierDialog(
+    title: String,
+    initialName: String,
+    initialContact: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String?) -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var contact by remember { mutableStateOf(initialContact) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.supplier_name)) }, singleLine = true)
+                OutlinedTextField(
+                    value = contact,
+                    onValueChange = { contact = it },
+                    label = { Text(stringResource(R.string.supplier_contact)) },
+                    singleLine = true,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (name.isNotBlank()) onSave(name, contact.ifBlank { null })
+            }) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }

@@ -165,6 +165,8 @@ data class ExpenseDto(
     val active: Boolean,
     val notes: String?,
     val createdAt: String,
+    val paymentDayOfMonth: Int? = null,
+    val fromCashRegister: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)
@@ -176,6 +178,17 @@ data class ExpenseInput(
     val endDate: String?,
     val active: Boolean?,
     val notes: String?,
+    val paymentDayOfMonth: Int? = null,
+    val fromCashRegister: Boolean = false,
+)
+
+@JsonClass(generateAdapter = true)
+data class ExpensesForDayResponse(
+    val date: String,
+    val oneTime: List<ExpenseDto>,
+    val dailyShare: String,
+    val monthlyShare: String,
+    val total: String,
 )
 
 @JsonClass(generateAdapter = true)

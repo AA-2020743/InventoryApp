@@ -20,6 +20,8 @@
     <string name="action_logout">تسجيل الخروج</string>
     <string name="action_scan">مسح</string>
     <string name="action_confirm">تأكيد</string>
+    <string name="confirm_delete_named_title">هل تريد حذف "%1$s"؟</string>
+    <string name="confirm_delete_message">لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="error_generic">حدث خطأ ما. الرجاء المحاولة مرة أخرى.</string>
     <string name="loading">جارٍ التحميل…</string>
     <string name="currency_placeholder">%1$s</string>
@@ -121,10 +123,12 @@
     <!-- Suppliers &amp; Invoices -->
     <string name="suppliers_title">الموردون</string>
     <string name="supplier_add">إضافة مورد</string>
+    <string name="supplier_edit">تعديل المورد</string>
     <string name="supplier_name">اسم المورد</string>
     <string name="supplier_contact">بيانات التواصل</string>
     <string name="invoices_title">فواتير الموردين</string>
     <string name="invoices_add">إضافة فاتورة</string>
+    <string name="invoice_edit">تعديل الفاتورة</string>
     <string name="invoice_supplier">المورد</string>
     <string name="invoice_amount">المبلغ</string>
     <string name="invoice_number">رقم الفاتورة (اختياري)</string>
@@ -153,21 +157,29 @@
     <string name="cash_register_entry_note">ملاحظة (اختياري)</string>
     <string name="cash_register_ledger">الحركات الأخيرة</string>
     <string name="cash_register_ledger_empty">لا توجد حركات في صندوق النقدية بعد</string>
+    <string name="cash_register_reset_to_zero">إعادة التعيين إلى صفر</string>
+    <string name="cash_register_reset_to_zero_message">سيتم تصفير الرصيد المسجل إلى 0. لا يمكن التراجع عن هذا الإجراء.</string>
 
     <!-- Expenses -->
     <string name="expenses_title">المصروفات المتكررة</string>
     <string name="assets_title">الأصول</string>
     <string name="asset_add">إضافة أصل</string>
+    <string name="asset_edit">تعديل الأصل</string>
     <string name="asset_name">اسم الأصل (مثال: ثلاجة)</string>
     <string name="asset_value">القيمة</string>
     <string name="asset_category">الفئة (اختياري)</string>
     <string name="expense_add">إضافة مصروف</string>
+    <string name="expense_edit">تعديل المصروف</string>
     <string name="expense_name">الاسم (مثال: راتب الكاشير)</string>
     <string name="expense_amount">المبلغ</string>
     <string name="expense_frequency">التكرار</string>
     <string name="expense_frequency_daily">يومي</string>
     <string name="expense_frequency_monthly">شهري</string>
     <string name="expense_frequency_one_time">مرة واحدة</string>
+    <string name="expense_payment_day_label">يوم الدفع من الشهر</string>
+    <string name="expense_payment_day_short">اليوم %1$d</string>
+    <string name="expense_from_cash_register">مدفوع من صندوق النقدية</string>
+    <string name="expense_from_cash_register_badge">مدفوع من صندوق النقدية</string>
 
     <!-- Stats -->
     <string name="stats_title">الإحصائيات</string>
@@ -184,6 +196,8 @@
     <string name="stats_uncategorized">غير مصنف</string>
     <string name="stats_delete_sale_title">هل تريد حذف عملية البيع هذه؟</string>
     <string name="stats_delete_sale_message">سيتم إرجاع الكمية إلى المخزون وتحديث إجماليات اليوم. لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="stats_expenses_title">المصروفات</string>
+    <string name="stats_recurring_expenses_today">المصروفات المتكررة لهذا اليوم: %1$s</string>
     <string name="stats_other">أخرى</string>
 
     <!-- Settings -->
