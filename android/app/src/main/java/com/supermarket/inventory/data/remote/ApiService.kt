@@ -71,7 +71,7 @@ interface ApiService {
     suspend fun createInvoice(@Body input: InvoiceInput): SupplierInvoiceDto
 
     @POST("api/invoices/{id}/pay")
-    suspend fun markInvoicePaid(@Path("id") id: String): SupplierInvoiceDto
+    suspend fun markInvoicePaid(@Path("id") id: String, @Body request: PayInvoiceRequest = PayInvoiceRequest()): SupplierInvoiceDto
 
     // Sales
     @GET("api/sales")
@@ -79,10 +79,23 @@ interface ApiService {
         @Query("from") from: String? = null,
         @Query("to") to: String? = null,
         @Query("limit") limit: Int? = null,
+        @Query("paymentStatus") paymentStatus: String? = null,
     ): List<SaleDto>
+
+    @GET("api/sales/{id}")
+    suspend fun getSale(@Path("id") id: String): SaleDto
 
     @POST("api/sales")
     suspend fun createSale(@Body input: SaleInput): SaleDto
+
+    @PUT("api/sales/{id}")
+    suspend fun updateSale(@Path("id") id: String, @Body input: SaleEditInput): SaleDto
+
+    @DELETE("api/sales/{id}")
+    suspend fun deleteSale(@Path("id") id: String)
+
+    @POST("api/sales/{id}/collect")
+    suspend fun collectSale(@Path("id") id: String): SaleDto
 
     // Expenses
     @GET("api/expenses")
@@ -109,6 +122,16 @@ interface ApiService {
 
     @DELETE("api/assets/{id}")
     suspend fun deleteAsset(@Path("id") id: String)
+
+    // Cash register
+    @GET("api/cash-register")
+    suspend fun getCashRegister(): CashRegisterResponse
+
+    @POST("api/cash-register/set")
+    suspend fun setCashRegister(@Body request: SetCashRegisterRequest): CashRegisterEntryResponse
+
+    @POST("api/cash-register/entries")
+    suspend fun addCashRegisterEntry(@Body request: CashRegisterEntryRequest): CashRegisterEntryResponse
 
     // Dashboard / stats / alerts
     @GET("api/dashboard/summary")

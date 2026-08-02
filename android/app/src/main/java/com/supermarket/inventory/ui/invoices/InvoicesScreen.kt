@@ -12,9 +12,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -25,6 +27,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,19 +67,30 @@ fun InvoicesScreen(
     onOpenSuppliers: () -> Unit,
     onOpenExpenses: () -> Unit,
     onOpenAssets: () -> Unit,
+    onOpenDeferredSales: () -> Unit,
+    onOpenCashRegister: () -> Unit,
     viewModel: InvoicesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var payInvoiceTarget by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.invoices_title)) },
                 actions = {
-                    TextButton(onClick = onOpenSuppliers) { Text(stringResource(R.string.suppliers_title)) }
-                    TextButton(onClick = onOpenExpenses) { Text(stringResource(R.string.expenses_title)) }
-                    TextButton(onClick = onOpenAssets) { Text(stringResource(R.string.assets_title)) }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.suppliers_title)) }, onClick = { showMenu = false; onOpenSuppliers() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.expenses_title)) }, onClick = { showMenu = false; onOpenExpenses() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.assets_title)) }, onClick = { showMenu = false; onOpenAssets() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.deferred_sales_title)) }, onClick = { showMenu = false; onOpenDeferredSales() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.cash_register_title)) }, onClick = { showMenu = false; onOpenCashRegister() })
+                    }
                 },
             )
         },
@@ -96,7 +110,7 @@ fun InvoicesScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
             ) {
                 items(state.invoices.sortedBy { it.dueDate }, key = { it.id }) { invoice ->
-                    InvoiceRow(invoice = invoice, onMarkPaid = { viewModel.markPaid(invoice.id) })
+                    InvoiceRow(invoice = invoice, onMarkPaid = { payInvoiceTarget = invoice })
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -108,6 +122,17 @@ fun InvoicesScreen(
             viewModel = viewModel,
             onDismiss = { showAddDialog = false },
             onCreated = { showAddDialog = false; viewModel.load() },
+        )
+    }
+
+    payInvoiceTarget?.let { invoice ->
+        PayInvoiceDialog(
+            invoice = invoice,
+            onDismiss = { payInvoiceTarget = null },
+            onConfirm = { payFromCashRegister ->
+                viewModel.markPaid(invoice.id, payFromCashRegister)
+                payInvoiceTarget = null
+            },
         )
     }
 }
@@ -144,6 +169,28 @@ private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun PayInvoiceDialog(invoice: SupplierInvoiceDto, onDismiss: () -> Unit, onConfirm: (Boolean) -> Unit) {
+    var payFromCashRegister by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.invoice_mark_paid)) },
+        text = {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = payFromCashRegister, onCheckedChange = { payFromCashRegister = it })
+                Text(stringResource(R.string.invoice_pay_from_cash_register))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(payFromCashRegister) }) { Text(stringResource(R.string.action_confirm)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

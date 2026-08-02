@@ -19,6 +19,7 @@
     <string name="action_retry">Retry</string>
     <string name="action_logout">Log out</string>
     <string name="action_scan">Scan</string>
+    <string name="action_confirm">Confirm</string>
     <string name="error_generic">Something went wrong. Please try again.</string>
     <string name="loading">Loading…</string>
     <string name="currency_placeholder">%1$s</string>
@@ -36,6 +37,8 @@
     <string name="dashboard_inventory_value">Inventory value</string>
     <string name="dashboard_assets_value">Assets value</string>
     <string name="dashboard_pending_invoices">Pending supplier invoices</string>
+    <string name="dashboard_deferred_receivables">Owed by customers</string>
+    <string name="dashboard_cash_register">Cash register</string>
     <string name="dashboard_net_valuation">Net valuation</string>
     <string name="dashboard_today">Today</string>
     <string name="dashboard_this_month">This month</string>
@@ -110,6 +113,10 @@
     <string name="sales_grams_display">%1$sg</string>
     <string name="sales_insufficient_stock">Not enough stock for this item</string>
     <string name="sales_remove_item">Remove</string>
+    <string name="sales_deferred_toggle">Deferred payment (pay later)</string>
+    <string name="sales_customer_name_label">Customer name (optional)</string>
+    <string name="sales_add_item_label">Add an item</string>
+    <string name="edit_sale_title">Edit sale</string>
 
     <!-- Suppliers &amp; Invoices -->
     <string name="suppliers_title">Suppliers</string>
@@ -125,8 +132,27 @@
     <string name="invoice_status_pending">Pending</string>
     <string name="invoice_status_paid">Paid</string>
     <string name="invoice_mark_paid">Mark as paid</string>
+    <string name="invoice_pay_from_cash_register">Pay from cash register</string>
     <string name="invoice_overdue">Overdue</string>
     <string name="invoice_due_soon">Due soon</string>
+
+    <!-- Deferred sales -->
+    <string name="deferred_sales_title">Deferred sales</string>
+    <string name="deferred_sales_empty">No outstanding deferred sales</string>
+    <string name="deferred_sale_customer">Customer: %1$s</string>
+    <string name="deferred_sale_customer_unknown">Customer not recorded</string>
+    <string name="deferred_sale_mark_collected">Mark collected</string>
+
+    <!-- Cash register -->
+    <string name="cash_register_title">Cash register</string>
+    <string name="cash_register_balance">Current balance</string>
+    <string name="cash_register_set_balance">Set balance</string>
+    <string name="cash_register_add_entry">Add entry</string>
+    <string name="cash_register_new_value">New balance</string>
+    <string name="cash_register_entry_amount">Amount (+ in, - out)</string>
+    <string name="cash_register_entry_note">Note (optional)</string>
+    <string name="cash_register_ledger">Recent activity</string>
+    <string name="cash_register_ledger_empty">No cash register activity yet</string>
 
     <!-- Expenses -->
     <string name="expenses_title">Recurring expenses</string>
@@ -156,6 +182,8 @@
     <string name="stats_by_category">Sales by category</string>
     <string name="stats_by_item">Sales by item</string>
     <string name="stats_uncategorized">Uncategorized</string>
+    <string name="stats_delete_sale_title">Delete this sale?</string>
+    <string name="stats_delete_sale_message">Stock will be returned and today\'s totals will update. This can\'t be undone.</string>
     <string name="stats_other">Other</string>
 
     <!-- Settings -->

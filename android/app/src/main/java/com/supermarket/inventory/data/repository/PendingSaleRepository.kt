@@ -34,9 +34,22 @@ class PendingSaleRepository @Inject constructor(
 
     val pendingCount: Flow<Int> = dao.countFlow()
 
-    suspend fun queue(clientId: String, items: List<Pair<String, Double>>) {
+    suspend fun queue(
+        clientId: String,
+        items: List<Pair<String, Double>>,
+        isDeferred: Boolean = false,
+        customerName: String? = null,
+    ) {
         val pendingItems = items.map { (productId, quantity) -> PendingSaleItem(productId, quantity) }
-        dao.insert(PendingSaleEntity(clientId, itemsAdapter.toJson(pendingItems), System.currentTimeMillis()))
+        dao.insert(
+            PendingSaleEntity(
+                clientId,
+                itemsAdapter.toJson(pendingItems),
+                System.currentTimeMillis(),
+                isDeferred,
+                customerName,
+            )
+        )
         for ((productId, quantity) in items) {
             val cached = cacheDao.getById(productId) ?: continue
             val remaining = (cached.quantity.toDoubleOrNull() ?: 0.0) - quantity
@@ -56,7 +69,14 @@ class PendingSaleRepository @Inject constructor(
         var dropped = 0
         for (entry in dao.getAll()) {
             val items = itemsAdapter.fromJson(entry.itemsJson) ?: emptyList()
-            when (val result = salesRepository.createSale(items.map { it.productId to it.quantity }, entry.clientId)) {
+            when (
+                val result = salesRepository.createSale(
+                    items.map { it.productId to it.quantity },
+                    entry.clientId,
+                    entry.isDeferred,
+                    entry.customerName,
+                )
+            ) {
                 is ApiResult.Success -> {
                     dao.delete(entry.clientId)
                     synced++

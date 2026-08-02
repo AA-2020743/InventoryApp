@@ -4,6 +4,7 @@ import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth } from "../utils/dates";
+import { getCashRegisterBalance } from "./cashRegister.routes";
 
 export const dashboardRouter = Router();
 
@@ -53,7 +54,7 @@ dashboardRouter.get(
     const tomorrowKey = dateOnlyKey(new Date(now.getTime() + 86400000));
     const monthStartKey = dateOnlyKey(monthStart);
 
-    const [products, assets, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar] =
+    const [products, assets, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar, deferredSales, cashRegisterBalance] =
       await Promise.all([
         prisma.product.findMany({ where: { active: true } }),
         prisma.asset.findMany(),
@@ -69,6 +70,8 @@ dashboardRouter.get(
         }),
         prisma.workingDay.findUnique({ where: { date: todayKey } }),
         countWorkingDays(monthStartKey, tomorrowKey),
+        prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
+        getCashRegisterBalance(),
       ]);
 
     const inventoryValue = products.reduce(
@@ -80,7 +83,18 @@ dashboardRouter.get(
       (acc, i) => acc.add(i.amount),
       new Prisma.Decimal(0)
     );
-    const netValuation = inventoryValue.add(assetsValue).sub(pendingInvoicesTotal);
+    // Outstanding credit sales are a receivable - money owed to the
+    // business - so they add to net worth the same way inventory/assets
+    // do, symmetric with pending supplier invoices subtracting.
+    const deferredReceivablesTotal = deferredSales.reduce(
+      (acc, s) => acc.add(s.totalAmount),
+      new Prisma.Decimal(0)
+    );
+    const netValuation = inventoryValue
+      .add(assetsValue)
+      .add(deferredReceivablesTotal)
+      .add(cashRegisterBalance)
+      .sub(pendingInvoicesTotal);
 
     const sumRevenue = (sales: { totalAmount: Prisma.Decimal }[]) =>
       sales.reduce((acc, s) => acc.add(s.totalAmount), new Prisma.Decimal(0));
@@ -110,6 +124,8 @@ dashboardRouter.get(
     res.json({
       inventoryValue,
       assetsValue,
+      deferredReceivablesTotal,
+      cashRegisterBalance,
       pendingInvoicesTotal,
       netValuation,
       today: { revenue: todayRevenue, cost: todayCost, profit: todayProfit },

@@ -11,8 +11,13 @@ object Routes {
     const val SUPPLIERS = "suppliers"
     const val EXPENSES = "expenses"
     const val ASSETS = "assets"
+    const val DEFERRED_SALES = "deferred_sales"
+    const val CASH_REGISTER = "cash_register"
+    const val EDIT_SALE = "edit_sale/{saleId}"
     const val STATS = "stats"
     const val SETTINGS = "settings"
+
+    fun editSale(saleId: String) = "edit_sale/$saleId"
 
     fun productForm(productId: String? = null, barcode: String? = null): String {
         val p = productId?.let { "productId=$it" } ?: ""

@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -17,6 +21,8 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -54,9 +60,10 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
+fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showDatePicker by remember { mutableStateOf(false) }
+    var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val otherLabel = stringResource(R.string.stats_other)
 
@@ -120,7 +127,9 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                     if (state.period == StatsPeriod.DAY) {
                         item { Spacer(Modifier.height(16.dp)) }
                         item { Text(stringResource(R.string.sales_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
-                        items(state.salesForDay) { SaleRow(it) }
+                        items(state.salesForDay, key = { it.id }) { sale ->
+                            SaleRow(sale, onEdit = { onEditSale(sale.id) }, onDelete = { saleToDelete = sale })
+                        }
                     }
                 }
             }
@@ -145,6 +154,20 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    saleToDelete?.let { sale ->
+        AlertDialog(
+            onDismissRequest = { saleToDelete = null },
+            title = { Text(stringResource(R.string.stats_delete_sale_title)) },
+            text = { Text(stringResource(R.string.stats_delete_sale_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteSale(sale.id); saleToDelete = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = { TextButton(onClick = { saleToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
     }
 }
 
@@ -214,12 +237,25 @@ private fun MarginRow(item: MarginItemDto) {
 }
 
 @Composable
-private fun SaleRow(sale: SaleDto) {
+private fun SaleRow(sale: SaleDto, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatIsoDateTime(sale.createdAt), style = MaterialTheme.typography.bodyMedium)
-                Text(formatAmount(sale.totalAmount), style = MaterialTheme.typography.bodyMedium)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column {
+                    Text(formatIsoDateTime(sale.createdAt), style = MaterialTheme.typography.bodyMedium)
+                    if (sale.paymentStatus == "DEFERRED") {
+                        Text(
+                            stringResource(R.string.deferred_sales_title),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(formatAmount(sale.totalAmount), style = MaterialTheme.typography.bodyMedium)
+                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
+                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
+                }
             }
             Divider(Modifier.padding(vertical = 4.dp))
             sale.items.forEach { item ->

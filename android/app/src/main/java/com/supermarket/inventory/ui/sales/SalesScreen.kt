@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -165,6 +166,25 @@ fun SalesScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(stringResource(R.string.sales_total), style = MaterialTheme.typography.titleMedium)
                             Text(formatAmount(state.total.toPlainString()), style = MaterialTheme.typography.titleLarge)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier.fillMaxWidth().clickable { viewModel.onDeferredToggle(!state.isDeferred) },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(stringResource(R.string.sales_deferred_toggle))
+                            Switch(checked = state.isDeferred, onCheckedChange = viewModel::onDeferredToggle)
+                        }
+                        if (state.isDeferred) {
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = state.customerName,
+                                onValueChange = viewModel::onCustomerNameChange,
+                                label = { Text(stringResource(R.string.sales_customer_name_label)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                         Spacer(Modifier.height(8.dp))
                         Button(

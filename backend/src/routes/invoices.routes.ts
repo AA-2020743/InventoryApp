@@ -6,6 +6,10 @@ import { asyncHandler, HttpError } from "../middleware/errorHandler";
 
 export const invoicesRouter = Router();
 
+const payInput = z.object({
+  payFromCashRegister: z.boolean().optional().default(false),
+});
+
 const invoiceInput = z.object({
   supplierId: z.string().uuid(),
   invoiceNumber: z.string().trim().optional().nullable(),
@@ -98,13 +102,26 @@ invoicesRouter.put(
 invoicesRouter.post(
   "/:id/pay",
   asyncHandler(async (req, res) => {
-    const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id } });
+    const { payFromCashRegister } = payInput.parse(req.body ?? {});
+    const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
     if (!existing) throw new HttpError(404, "Invoice not found");
     if (existing.status === "PAID") throw new HttpError(400, "Invoice is already paid");
 
-    const invoice = await prisma.supplierInvoice.update({
-      where: { id: req.params.id },
-      data: { status: "PAID", paidAt: new Date() },
+    const invoice = await prisma.$transaction(async (tx) => {
+      const updated = await tx.supplierInvoice.update({
+        where: { id: req.params.id },
+        data: { status: "PAID", paidAt: new Date() },
+      });
+      if (payFromCashRegister) {
+        await tx.cashRegisterEntry.create({
+          data: {
+            amount: existing.amount.neg(),
+            note: `Paid invoice${existing.invoiceNumber ? ` #${existing.invoiceNumber}` : ""} — ${existing.supplier.name}`,
+            invoiceId: existing.id,
+          },
+        });
+      }
+      return updated;
     });
     res.json(invoice);
   })

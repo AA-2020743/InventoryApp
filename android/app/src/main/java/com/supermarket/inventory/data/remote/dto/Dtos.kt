@@ -111,10 +111,25 @@ data class UpcomingInvoicesResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class PayInvoiceRequest(val payFromCashRegister: Boolean = false)
+
+@JsonClass(generateAdapter = true)
 data class SaleItemInput(val productId: String, val quantity: Double)
 
 @JsonClass(generateAdapter = true)
-data class SaleInput(val clientId: String?, val items: List<SaleItemInput>)
+data class SaleInput(
+    val clientId: String?,
+    val items: List<SaleItemInput>,
+    val paymentStatus: String = "PAID",
+    val customerName: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class SaleEditInput(
+    val items: List<SaleItemInput>,
+    val customerName: String?,
+    val paymentStatus: String?,
+)
 
 @JsonClass(generateAdapter = true)
 data class SaleItemDto(
@@ -132,6 +147,9 @@ data class SaleDto(
     val id: String,
     val totalAmount: String,
     val totalCost: String,
+    val paymentStatus: String,
+    val customerName: String?,
+    val collectedAt: String?,
     val createdAt: String,
     val items: List<SaleItemDto>,
 )
@@ -177,6 +195,8 @@ data class DashboardAlertsDto(
 data class DashboardSummaryDto(
     val inventoryValue: String,
     val assetsValue: String,
+    val deferredReceivablesTotal: String,
+    val cashRegisterBalance: String,
     val pendingInvoicesTotal: String,
     val netValuation: String,
     val today: DashboardPeriodDto,
@@ -263,6 +283,33 @@ data class AssetInput(
     val category: String?,
     val notes: String?,
 )
+
+@JsonClass(generateAdapter = true)
+data class CashRegisterEntryDto(
+    val id: String,
+    val amount: String,
+    val note: String?,
+    val invoiceId: String?,
+    val createdAt: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class CashRegisterResponse(
+    val balance: String,
+    val entries: List<CashRegisterEntryDto>,
+)
+
+@JsonClass(generateAdapter = true)
+data class CashRegisterEntryResponse(
+    val balance: String,
+    val entry: CashRegisterEntryDto,
+)
+
+@JsonClass(generateAdapter = true)
+data class SetCashRegisterRequest(val value: Double, val note: String?)
+
+@JsonClass(generateAdapter = true)
+data class CashRegisterEntryRequest(val amount: Double, val note: String?)
 
 @JsonClass(generateAdapter = true)
 data class RestoreResponse(val success: Boolean, val restoredAt: String)

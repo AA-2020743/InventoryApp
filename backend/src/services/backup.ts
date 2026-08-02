@@ -21,13 +21,14 @@ export interface BackupPayload {
   workingDays: any[];
   inventoryTransactions: any[];
   assets: any[];
+  cashRegisterEntries: any[];
 }
 
 // The owner's login (User) is deliberately excluded: it isn't "business
 // data" the way the rest of this is, and restoring an old password hash
 // over the current one could lock the owner out of their own backend.
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, workingDays, inventoryTransactions, assets] =
+  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, workingDays, inventoryTransactions, assets, cashRegisterEntries] =
     await Promise.all([
       prisma.supplier.findMany(),
       prisma.product.findMany(),
@@ -38,6 +39,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
       prisma.workingDay.findMany(),
       prisma.inventoryTransaction.findMany(),
       prisma.asset.findMany(),
+      prisma.cashRegisterEntry.findMany(),
     ]);
 
   return {
@@ -52,6 +54,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     workingDays,
     inventoryTransactions,
     assets,
+    cashRegisterEntries,
   };
 }
 
@@ -75,6 +78,7 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       await tx.expense.deleteMany();
       await tx.workingDay.deleteMany();
       await tx.asset.deleteMany();
+      await tx.cashRegisterEntry.deleteMany();
 
       // Parents before children, mirroring the delete order above.
       if (payload.suppliers.length) {
@@ -104,7 +108,11 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       }
       if (payload.sales.length) {
         await tx.sale.createMany({
-          data: payload.sales.map((r) => ({ ...r, createdAt: toDate(r.createdAt) })),
+          data: payload.sales.map((r) => ({
+            ...r,
+            createdAt: toDate(r.createdAt),
+            collectedAt: toDate(r.collectedAt),
+          })),
         });
       }
       if (payload.saleItems.length) {
@@ -141,6 +149,11 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
             createdAt: toDate(r.createdAt),
             updatedAt: toDate(r.updatedAt),
           })),
+        });
+      }
+      if (payload.cashRegisterEntries.length) {
+        await tx.cashRegisterEntry.createMany({
+          data: payload.cashRegisterEntries.map((r) => ({ ...r, createdAt: toDate(r.createdAt) })),
         });
       }
     },

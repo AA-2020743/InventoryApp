@@ -19,6 +19,7 @@
     <string name="action_retry">إعادة المحاولة</string>
     <string name="action_logout">تسجيل الخروج</string>
     <string name="action_scan">مسح</string>
+    <string name="action_confirm">تأكيد</string>
     <string name="error_generic">حدث خطأ ما. الرجاء المحاولة مرة أخرى.</string>
     <string name="loading">جارٍ التحميل…</string>
     <string name="currency_placeholder">%1$s</string>
@@ -36,6 +37,8 @@
     <string name="dashboard_inventory_value">قيمة المخزون</string>
     <string name="dashboard_assets_value">قيمة الأصول</string>
     <string name="dashboard_pending_invoices">فواتير الموردين المستحقة</string>
+    <string name="dashboard_deferred_receivables">مستحق على العملاء</string>
+    <string name="dashboard_cash_register">صندوق النقدية</string>
     <string name="dashboard_net_valuation">صافي القيمة</string>
     <string name="dashboard_today">اليوم</string>
     <string name="dashboard_this_month">هذا الشهر</string>
@@ -110,6 +113,10 @@
     <string name="sales_grams_display">%1$s جم</string>
     <string name="sales_insufficient_stock">الكمية المتوفرة غير كافية لهذا الصنف</string>
     <string name="sales_remove_item">إزالة</string>
+    <string name="sales_deferred_toggle">دفع آجل (الدفع لاحقًا)</string>
+    <string name="sales_customer_name_label">اسم العميل (اختياري)</string>
+    <string name="sales_add_item_label">إضافة صنف</string>
+    <string name="edit_sale_title">تعديل عملية البيع</string>
 
     <!-- Suppliers &amp; Invoices -->
     <string name="suppliers_title">الموردون</string>
@@ -125,8 +132,27 @@
     <string name="invoice_status_pending">قيد الانتظار</string>
     <string name="invoice_status_paid">مدفوعة</string>
     <string name="invoice_mark_paid">تحديد كمدفوعة</string>
+    <string name="invoice_pay_from_cash_register">الدفع من صندوق النقدية</string>
     <string name="invoice_overdue">متأخرة</string>
     <string name="invoice_due_soon">مستحقة قريبًا</string>
+
+    <!-- Deferred sales -->
+    <string name="deferred_sales_title">المبيعات الآجلة</string>
+    <string name="deferred_sales_empty">لا توجد مبيعات آجلة مستحقة</string>
+    <string name="deferred_sale_customer">العميل: %1$s</string>
+    <string name="deferred_sale_customer_unknown">لم يُسجَّل اسم العميل</string>
+    <string name="deferred_sale_mark_collected">تحديد كمُحصَّل</string>
+
+    <!-- Cash register -->
+    <string name="cash_register_title">صندوق النقدية</string>
+    <string name="cash_register_balance">الرصيد الحالي</string>
+    <string name="cash_register_set_balance">تعيين الرصيد</string>
+    <string name="cash_register_add_entry">إضافة حركة</string>
+    <string name="cash_register_new_value">الرصيد الجديد</string>
+    <string name="cash_register_entry_amount">المبلغ (+ إدخال، - إخراج)</string>
+    <string name="cash_register_entry_note">ملاحظة (اختياري)</string>
+    <string name="cash_register_ledger">الحركات الأخيرة</string>
+    <string name="cash_register_ledger_empty">لا توجد حركات في صندوق النقدية بعد</string>
 
     <!-- Expenses -->
     <string name="expenses_title">المصروفات المتكررة</string>
@@ -156,6 +182,8 @@
     <string name="stats_by_category">المبيعات حسب الفئة</string>
     <string name="stats_by_item">المبيعات حسب الصنف</string>
     <string name="stats_uncategorized">غير مصنف</string>
+    <string name="stats_delete_sale_title">هل تريد حذف عملية البيع هذه؟</string>
+    <string name="stats_delete_sale_message">سيتم إرجاع الكمية إلى المخزون وتحديث إجماليات اليوم. لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="stats_other">أخرى</string>
 
     <!-- Settings -->

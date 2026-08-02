@@ -41,11 +41,12 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 | Auth | `POST /api/auth/login`, `POST /api/auth/change-password` |
 | Products | `GET/POST /api/products`, `GET/PUT/DELETE /api/products/:id`, `GET /api/products/barcode/:barcode`, `GET /api/products/categories` (distinct categories in use), `POST /api/products/:id/restock`, `POST /api/products/:id/adjust`, `GET /api/products/:id/transactions` |
 | Suppliers | `GET/POST /api/suppliers`, `GET/PUT/DELETE /api/suppliers/:id` |
-| Supplier invoices | `GET/POST /api/invoices`, `GET /api/invoices/upcoming?days=`, `PUT /api/invoices/:id`, `POST /api/invoices/:id/pay`, `DELETE /api/invoices/:id` |
-| Sales | `GET/POST /api/sales`, `GET /api/sales/:id` |
+| Supplier invoices | `GET/POST /api/invoices`, `GET /api/invoices/upcoming?days=`, `PUT /api/invoices/:id`, `POST /api/invoices/:id/pay` (optional `{ payFromCashRegister: true }` deducts the amount from the cash register), `DELETE /api/invoices/:id` |
+| Sales | `GET /api/sales?from=&to=&limit=&paymentStatus=`, `POST /api/sales`, `GET/PUT/DELETE /api/sales/:id`, `POST /api/sales/:id/collect` (marks a deferred sale as collected) |
 | Expenses (recurring, e.g. salaries) | `GET/POST /api/expenses`, `PUT/DELETE /api/expenses/:id` |
 | Assets (non-inventory business property) | `GET/POST /api/assets`, `PUT/DELETE /api/assets/:id` |
-| Dashboard | `GET /api/dashboard/summary` — inventory valuation, net worth after pending invoices, today/month revenue & profit, recurring expense burn rate, alert counts |
+| Cash register | `GET /api/cash-register` (balance + last 100 ledger entries), `POST /api/cash-register/set` (`{ value, note }` — reconciles to a counted amount), `POST /api/cash-register/entries` (`{ amount, note }` — manual signed entry) |
+| Dashboard | `GET /api/dashboard/summary` — inventory valuation, net worth after pending invoices/plus deferred receivables/cash register balance, today/month revenue & profit, recurring expense burn rate, alert counts |
 | Stats | `GET /api/stats/top-products?period=day\|month&date=&sortBy=quantity\|profit` (each item includes `category`, so a client can chart sales by category without a separate endpoint), `GET /api/stats/margins?limit=` (highest-margin items), `GET /api/stats/revenue?period=day\|month&from=&to=` |
 | Alerts | `GET /api/alerts?days=` — low-stock items + due-soon/overdue supplier invoices (polled by the Android app for reminders) |
 | Working days | `GET /api/workdays/today`, `POST /api/workdays/today` (`{ isWorking }`) — see below |
@@ -95,13 +96,39 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
   wage) from that day's and the month-to-date's profit calculation —
   `MONTHLY`-frequency expenses (rent, etc.) still accrue regardless, since
   those are owed whether or not the shop opened that particular day.
+- **Deferred (pay-later) sales**: `POST /api/sales` accepts
+  `paymentStatus: "PAID" | "DEFERRED"` (default `PAID`) and an optional
+  `customerName`. Revenue/cost/profit are recognized immediately either way —
+  the difference is only in cash flow: a `DEFERRED` sale's `totalAmount` is
+  counted as an outstanding receivable in `dashboard.deferredReceivablesTotal`
+  (and folded into `netValuation`) until `POST /api/sales/:id/collect` marks
+  it `PAID`, at which point it's credited to the cash register instead.
+- **Editing/deleting past sales**: `PUT /api/sales/:id` replaces a sale's
+  full item list at once (the Android edit screen reopens the sale as an
+  editable cart and resubmits everything); stock is reconciled by the *net*
+  per-product delta between the old and new item lists (one
+  `SALE_CORRECTION` inventory transaction per affected product, not an
+  unwind-then-redo pair), and pricing is re-snapshotted from each product's
+  *current* `sellingPrice`/`purchaseCost` at edit time. `DELETE
+  /api/sales/:id` reverses every item's quantity back to stock. Both keep
+  the sale's cash register entry (if any) in sync.
+- **Cash register**: a simple signed ledger (`CashRegisterEntry`) whose
+  balance is always the sum of every entry, never stored directly. Every
+  non-deferred sale automatically credits the register for its full amount
+  at checkout (and a deferred sale does so only once collected); editing or
+  deleting a sale updates or removes that one linked entry instead of
+  duplicating it. Paying a supplier invoice with `payFromCashRegister: true`
+  debits the register by the invoice amount — net effect on `netValuation`
+  is zero, since the pending-invoice liability drops by the same amount the
+  cash asset does.
 
 ### Backup & restore
 
 - `GET /api/backup/export` returns a **zip archive** (`Content-Type:
   application/zip`) containing `data.json` — one JSON document with every
   business table (products, suppliers, supplier invoices, sales, sale
-  items, expenses, working days, inventory transactions, assets) — plus an
+  items, expenses, working days, inventory transactions, assets, cash
+  register entries) — plus an
   `uploads/` folder holding every file currently in the server's uploads
   directory, so product photos are backed up too, not just the row that
   references them. The `User` table is **deliberately excluded** from

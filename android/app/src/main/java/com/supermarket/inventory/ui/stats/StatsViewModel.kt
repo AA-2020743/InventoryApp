@@ -125,4 +125,13 @@ class StatsViewModel @Inject constructor(
             )
         }
     }
+
+    fun deleteSale(id: String) {
+        viewModelScope.launch {
+            when (salesRepository.deleteSale(id)) {
+                is ApiResult.Success -> load()
+                is ApiResult.Error -> Unit
+            }
+        }
+    }
 }

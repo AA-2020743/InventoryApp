@@ -40,9 +40,9 @@ class InvoicesViewModel @Inject constructor(
         }
     }
 
-    fun markPaid(id: String) {
+    fun markPaid(id: String, payFromCashRegister: Boolean = false) {
         viewModelScope.launch {
-            when (invoiceRepository.markPaid(id)) {
+            when (invoiceRepository.markPaid(id, payFromCashRegister)) {
                 is ApiResult.Success -> load()
                 is ApiResult.Error -> Unit
             }

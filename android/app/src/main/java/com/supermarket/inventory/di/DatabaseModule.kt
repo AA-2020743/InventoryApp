@@ -19,7 +19,13 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "inventory_local.db").build()
+        // This DB only holds a transient product cache and a pending-sales
+        // queue meant to drain quickly - never permanent records - so a
+        // schema bump can safely just wipe and recreate it rather than
+        // needing a hand-written Migration.
+        Room.databaseBuilder(context, AppDatabase::class.java, "inventory_local.db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
     fun provideProductCacheDao(db: AppDatabase): ProductCacheDao = db.productCacheDao()

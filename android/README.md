@@ -53,14 +53,33 @@ time from Settings.
 - **Sell**: scan (or type) items into a running cart, then checkout; stock
   is decremented server-side. Adding a weight-based product to the cart
   prompts for grams sold instead of a whole-unit count (tap the row's edit
-  icon to change it later); everything else uses the usual +/- stepper. If
-  checkout can't reach the server, the sale is saved to a local offline
+  icon to change it later); everything else uses the usual +/- stepper. A
+  "deferred payment (pay later)" toggle plus an optional customer name lets
+  a sale go through on credit — see "Deferred sales & cash register" below.
+  If checkout can't reach the server, the sale is saved to a local offline
   queue instead of being lost, and a background job syncs it automatically
   once connectivity returns (each queued sale carries a client-generated ID
   so a retry after a dropped response can't double-sell). Barcode/name
   lookup also falls back to a local product cache when offline, so you can
   keep ringing up sales through a dropped connection — see "Offline
   selling" below for the tradeoffs this implies.
+- **Sales history, editing & deletion**: the Statistics screen's day view
+  lists every sale made that day; each row has an edit action (reopens the
+  sale as an editable cart — add/remove items, change quantities, adjust
+  customer name or deferred status, then Save) and a delete action
+  (confirmation dialog, returns the items' stock and updates that day's
+  totals). Both are for correcting mistakes after the fact, not routine use.
+- **Deferred sales & cash register**: a sale marked "pay later" still counts
+  toward today's/this month's revenue and profit immediately, but its amount
+  shows as an outstanding receivable on the Dashboard until collected. A
+  "Deferred sales" screen (reachable from the Invoices tab's overflow menu)
+  lists everything still owed with a "mark collected" action per sale. Every
+  regular (non-deferred) sale automatically credits a running cash register
+  balance at checkout, also shown on the Dashboard; the Cash Register screen
+  (same overflow menu) lets you reconcile it to a physically-counted amount
+  or add a manual signed entry, and shows a ledger of recent activity.
+  Marking a supplier invoice as paid offers a "pay from cash register"
+  option that deducts the invoice amount from the register.
 - **Supplier invoices**: track pending/paid invoices per supplier with due
   dates; the Dashboard surfaces overdue and due-soon counts.
 - **Recurring expenses**: salaries and other daily/monthly costs feed into
@@ -69,10 +88,11 @@ time from Settings.
   property (equipment, fixtures, etc.) — reachable from the Invoices tab —
   whose total value feeds into the Dashboard's net valuation alongside
   inventory.
-- **Dashboard**: net valuation (inventory + assets at value, minus pending
-  invoices), today/this-month revenue and profit-or-loss (auto-refreshes
-  every 30s so the running total stays live through the day), low-stock
-  and invoice alerts.
+- **Dashboard**: net valuation (inventory + assets at value, plus deferred
+  receivables and the cash register balance, minus pending invoices),
+  today/this-month revenue and profit-or-loss (auto-refreshes every 30s so
+  the running total stays live through the day), low-stock and invoice
+  alerts.
 - **Statistics**: top-selling items and highest-margin items, sortable by
   quantity or profit, plus a calendar/month picker to browse sales and
   stats for any specific day or month. Pie charts break the selected
@@ -104,11 +124,12 @@ The Sell screen keeps working through a dropped connection:
   local Room cache. If a later lookup can't reach the server, it's answered
   from that cache instead of failing outright.
 - If checkout itself can't reach the server, the finished sale is queued
-  locally (with a client-generated ID) instead of being lost, and a
-  WorkManager job — triggered immediately when the queue gains an entry,
-  and again on every app startup in case the app was killed first — syncs
-  it once connectivity returns. The Sell screen's title bar shows a "N
-  pending sync" badge whenever sales are queued.
+  locally (with a client-generated ID, and its deferred/customer-name state
+  if set) instead of being lost, and a WorkManager job — triggered
+  immediately when the queue gains an entry, and again on every app startup
+  in case the app was killed first — syncs it once connectivity returns.
+  The Sell screen's title bar shows a "N pending sync" badge whenever sales
+  are queued.
 - The client-generated ID means a retried sync after a dropped *response*
   (the sale actually went through, but the phone never heard back) is
   recognized by the server as the same sale rather than sold twice.

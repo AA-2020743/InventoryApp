@@ -55,6 +55,7 @@ enum InventoryTransactionType {
   RESTOCK
   SALE
   ADJUSTMENT
+  SALE_CORRECTION
 }
 
 // Audit trail of every stock movement, so current quantity is always
@@ -108,6 +109,11 @@ model SupplierInvoice {
   @@index([dueDate])
 }
 
+enum SalePaymentStatus {
+  PAID
+  DEFERRED
+}
+
 model Sale {
   id          String     @id @default(uuid())
   // Set by the Android app's offline sales queue so a retried sync (after a
@@ -116,6 +122,14 @@ model Sale {
   clientId    String?    @unique
   totalAmount Decimal    @db.Decimal(12, 2)
   totalCost   Decimal    @db.Decimal(12, 2) // snapshot COGS, for profit stats
+  // DEFERRED = sold on credit/a tab - goods left, cash hasn't. Revenue is
+  // still recognized immediately (totalAmount/totalCost already feed
+  // today/month profit like any sale); the outstanding DEFERRED amount is
+  // additionally counted as a receivable in the dashboard's net valuation
+  // until collectSale marks it PAID.
+  paymentStatus SalePaymentStatus @default(PAID)
+  customerName  String?
+  collectedAt   DateTime?
   createdAt   DateTime   @default(now())
 
   items SaleItem[]
@@ -182,4 +196,24 @@ model Asset {
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Signed ledger of physical cash movements (mirrors InventoryTransaction's
+// audit-log pattern) - the register's current balance is always the sum
+// of every entry, never stored/mutated directly, so it's reconstructable
+// and auditable the same way stock levels are. Positive = cash in
+// (including reconciling a manual count upward), negative = cash out
+// (e.g. paying a supplier invoice from the till).
+model CashRegisterEntry {
+  id        String   @id @default(uuid())
+  amount    Decimal  @db.Decimal(12, 2)
+  note      String?
+  invoiceId String?
+  // Set for entries auto-created from a non-deferred sale (or a deferred
+  // one once collected), so editing/deleting/collecting that sale later
+  // can find and adjust or remove exactly this entry instead of guessing.
+  saleId    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

@@ -29,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.SessionManager
+import com.supermarket.inventory.ui.cashregister.CashRegisterScreen
 import com.supermarket.inventory.ui.dashboard.DashboardScreen
 import com.supermarket.inventory.ui.inventory.InventoryListScreen
 import com.supermarket.inventory.ui.inventory.ProductFormScreen
@@ -37,6 +38,8 @@ import com.supermarket.inventory.ui.invoices.ExpensesScreen
 import com.supermarket.inventory.ui.invoices.InvoicesScreen
 import com.supermarket.inventory.ui.invoices.SuppliersScreen
 import com.supermarket.inventory.ui.login.LoginScreen
+import com.supermarket.inventory.ui.sales.DeferredSalesScreen
+import com.supermarket.inventory.ui.sales.EditSaleScreen
 import com.supermarket.inventory.ui.sales.SalesScreen
 import com.supermarket.inventory.ui.scan.BarcodeScannerScreen
 import com.supermarket.inventory.ui.settings.SettingsScreen
@@ -161,12 +164,22 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     onOpenSuppliers = { navController.navigate(Routes.SUPPLIERS) },
                     onOpenExpenses = { navController.navigate(Routes.EXPENSES) },
                     onOpenAssets = { navController.navigate(Routes.ASSETS) },
+                    onOpenDeferredSales = { navController.navigate(Routes.DEFERRED_SALES) },
+                    onOpenCashRegister = { navController.navigate(Routes.CASH_REGISTER) },
                 )
             }
             composable(Routes.SUPPLIERS) { SuppliersScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.EXPENSES) { ExpensesScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.ASSETS) { AssetsScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.STATS) { StatsScreen() }
+            composable(Routes.DEFERRED_SALES) { DeferredSalesScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.CASH_REGISTER) { CashRegisterScreen(onBack = { navController.popBackStack() }) }
+            composable(
+                route = Routes.EDIT_SALE,
+                arguments = listOf(navArgument("saleId") { type = NavType.StringType }),
+            ) { EditSaleScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.STATS) {
+                StatsScreen(onEditSale = { saleId -> navController.navigate(Routes.editSale(saleId)) })
+            }
             composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
         }
     }

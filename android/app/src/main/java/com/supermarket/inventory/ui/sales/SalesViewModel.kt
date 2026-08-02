@@ -40,6 +40,8 @@ data class SalesUiState(
     // product is scanned/selected (or an existing weight-based cart row is
     // tapped to edit), so the Composable can show a "how many grams" dialog.
     val pendingWeightProduct: ProductDto? = null,
+    val isDeferred: Boolean = false,
+    val customerName: String = "",
 ) {
     val total: BigDecimal get() = cart.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.subtotal) }
 }
@@ -163,17 +165,27 @@ class SalesViewModel @Inject constructor(
         uiState = uiState.copy(error = null, successMessage = null)
     }
 
+    fun onDeferredToggle(value: Boolean) {
+        uiState = uiState.copy(isDeferred = value)
+    }
+
+    fun onCustomerNameChange(value: String) {
+        uiState = uiState.copy(customerName = value)
+    }
+
     fun checkout() {
         if (uiState.cart.isEmpty()) return
         viewModelScope.launch {
             uiState = uiState.copy(isCheckingOut = true, error = null)
             val items = uiState.cart.map { it.product.id to it.quantity }
             val clientId = UUID.randomUUID().toString()
-            when (val result = salesRepository.createSale(items, clientId)) {
+            val isDeferred = uiState.isDeferred
+            val customerName = uiState.customerName.trim().ifBlank { null }
+            when (val result = salesRepository.createSale(items, clientId, isDeferred, customerName)) {
                 is ApiResult.Success -> uiState = SalesUiState(pendingSyncCount = uiState.pendingSyncCount, successMessage = "SALE_COMPLETED")
                 is ApiResult.Error -> {
                     if (result.isNetworkError) {
-                        pendingSaleRepository.queue(clientId, items)
+                        pendingSaleRepository.queue(clientId, items, isDeferred, customerName)
                         SalesSyncWorker.enqueue(context)
                         uiState = SalesUiState(pendingSyncCount = uiState.pendingSyncCount, successMessage = "OFFLINE_QUEUED")
                     } else {

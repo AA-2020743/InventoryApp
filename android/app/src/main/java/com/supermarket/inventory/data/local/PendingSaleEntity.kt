@@ -15,6 +15,8 @@ data class PendingSaleEntity(
     @PrimaryKey val clientId: String,
     val itemsJson: String,
     val createdAt: Long,
+    val isDeferred: Boolean = false,
+    val customerName: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
