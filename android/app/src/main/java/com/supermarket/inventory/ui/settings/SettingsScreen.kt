@@ -76,7 +76,7 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun exportBackup(): ApiResult<ByteArray> = backupRepository.exportBackup()
 
-    suspend fun restoreBackup(json: ByteArray): ApiResult<RestoreResponse> = backupRepository.restoreBackup(json)
+    suspend fun restoreBackup(archive: ByteArray): ApiResult<RestoreResponse> = backupRepository.restoreBackup(archive)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -258,7 +258,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                     }
                 }) { Text(stringResource(R.string.settings_backup_export_now)) }
                 Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { restoreLauncher.launch("application/json") }) {
+                OutlinedButton(onClick = { restoreLauncher.launch("application/zip") }) {
                     Text(stringResource(R.string.settings_backup_restore))
                 }
             }

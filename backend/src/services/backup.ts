@@ -1,4 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
+import AdmZip from "adm-zip";
 import { prisma } from "../db";
+import { env } from "../env";
 
 // Bumped whenever the payload shape changes in a way that would break an
 // older restore path; restore doesn't currently branch on it, but it's
@@ -129,4 +133,55 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
     },
     { timeout: 60_000, maxWait: 10_000 }
   );
+}
+
+const ARCHIVE_DATA_ENTRY = "data.json";
+const ARCHIVE_UPLOADS_PREFIX = "uploads/";
+
+// The JSON export only ever covered database rows - a product's imageUrl
+// would survive a restore, but the actual photo file it points to wouldn't.
+// Bundling uploads/ into the same archive means a restore brings images
+// back too, not just the row that references them.
+export async function buildBackupArchive(): Promise<{ buffer: Buffer; exportedAt: string }> {
+  const payload = await buildBackupPayload();
+  const zip = new AdmZip();
+  zip.addFile(ARCHIVE_DATA_ENTRY, Buffer.from(JSON.stringify(payload)));
+
+  const uploadsDir = path.resolve(env.uploadsDir);
+  if (fs.existsSync(uploadsDir)) {
+    for (const filename of fs.readdirSync(uploadsDir)) {
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.statSync(filePath).isFile()) {
+        zip.addLocalFile(filePath, "uploads");
+      }
+    }
+  }
+
+  return { buffer: zip.toBuffer(), exportedAt: payload.exportedAt };
+}
+
+// Mirrors restoreFromPayload's full wipe-and-replace semantics: every file
+// currently in uploads/ is removed before the archive's own files are
+// written, so a restore doesn't leave orphaned images from the state it's
+// replacing mixed in with the restored ones.
+export async function restoreFromArchive(buffer: Buffer): Promise<void> {
+  const zip = new AdmZip(buffer);
+  const dataEntry = zip.getEntry(ARCHIVE_DATA_ENTRY);
+  if (!dataEntry) {
+    throw new Error("Backup archive is missing data.json");
+  }
+  const payload = JSON.parse(dataEntry.getData().toString("utf-8")) as BackupPayload;
+  await restoreFromPayload(payload);
+
+  const uploadsDir = path.resolve(env.uploadsDir);
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  for (const existing of fs.readdirSync(uploadsDir)) {
+    fs.rmSync(path.join(uploadsDir, existing), { force: true });
+  }
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory || !entry.entryName.startsWith(ARCHIVE_UPLOADS_PREFIX)) continue;
+    const filename = entry.entryName.slice(ARCHIVE_UPLOADS_PREFIX.length);
+    if (!filename) continue;
+    fs.writeFileSync(path.join(uploadsDir, filename), entry.getData());
+  }
 }

@@ -1,42 +1,29 @@
 import { Router } from "express";
-import { z } from "zod";
+import express from "express";
 import { asyncHandler } from "../middleware/errorHandler";
-import { buildBackupPayload, restoreFromPayload, type BackupPayload } from "../services/backup";
+import { buildBackupArchive, restoreFromArchive } from "../services/backup";
 
 export const backupRouter = Router();
 
 backupRouter.get(
   "/export",
   asyncHandler(async (_req, res) => {
-    const payload = await buildBackupPayload();
-    const filename = `inventory-backup-${payload.exportedAt.slice(0, 10)}.json`;
+    const { buffer, exportedAt } = await buildBackupArchive();
+    const filename = `inventory-backup-${exportedAt.slice(0, 10)}.zip`;
+    res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.json(payload);
+    res.send(buffer);
   })
 );
 
-// Row-level shape isn't strictly validated here (a full per-model zod
-// schema would duplicate the Prisma schema) - this only confirms a backup
-// file produced by our own /export endpoint was uploaded, not a random
-// unrelated JSON blob. Restoring is inherently a "trust this file" action.
-const backupPayloadSchema = z.object({
-  version: z.number(),
-  exportedAt: z.string(),
-  suppliers: z.array(z.record(z.any())),
-  products: z.array(z.record(z.any())),
-  supplierInvoices: z.array(z.record(z.any())),
-  sales: z.array(z.record(z.any())),
-  saleItems: z.array(z.record(z.any())),
-  expenses: z.array(z.record(z.any())),
-  workingDays: z.array(z.record(z.any())),
-  inventoryTransactions: z.array(z.record(z.any())),
-});
-
+// The archive's data.json isn't strictly schema-validated here (a full
+// per-model zod schema would duplicate the Prisma schema) - restoring is
+// inherently a "trust this file" action, same as before this was zipped.
 backupRouter.post(
   "/restore",
+  express.raw({ type: "application/zip", limit: "200mb" }),
   asyncHandler(async (req, res) => {
-    const payload = backupPayloadSchema.parse(req.body) as BackupPayload;
-    await restoreFromPayload(payload);
+    await restoreFromArchive(req.body as Buffer);
     res.json({ success: true, restoredAt: new Date().toISOString() });
   })
 );

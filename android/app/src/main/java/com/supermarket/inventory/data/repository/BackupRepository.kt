@@ -14,7 +14,7 @@ class BackupRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun exportBackup(): ApiResult<ByteArray> = apiCall { api.exportBackup().bytes() }
 
-    suspend fun restoreBackup(json: ByteArray): ApiResult<RestoreResponse> = apiCall {
-        api.restoreBackup(json.toRequestBody("application/json".toMediaType()))
+    suspend fun restoreBackup(archive: ByteArray): ApiResult<RestoreResponse> = apiCall {
+        api.restoreBackup(archive.toRequestBody("application/zip".toMediaType()))
     }
 }

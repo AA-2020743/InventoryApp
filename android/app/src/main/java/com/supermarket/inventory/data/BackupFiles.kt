@@ -22,7 +22,7 @@ object BackupFiles {
         File(context.getExternalFilesDir(null), "backups").apply { mkdirs() }
 
     fun write(context: Context, bytes: ByteArray): File {
-        val filename = "inventory-backup-${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.json"
+        val filename = "inventory-backup-${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.zip"
         val file = File(dir(context), filename)
         file.writeBytes(bytes)
         rotate(context)
@@ -30,14 +30,14 @@ object BackupFiles {
     }
 
     fun list(context: Context): List<File> =
-        dir(context).listFiles { f -> f.extension == "json" }
+        dir(context).listFiles { f -> f.extension == "zip" }
             ?.sortedByDescending { it.lastModified() }
             ?: emptyList()
 
     fun shareIntentFor(context: Context, file: File): Intent {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         return Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
+            type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }

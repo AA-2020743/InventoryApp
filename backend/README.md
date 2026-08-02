@@ -49,7 +49,7 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 | Alerts | `GET /api/alerts?days=` — low-stock items + due-soon/overdue supplier invoices (polled by the Android app for reminders) |
 | Working days | `GET /api/workdays/today`, `POST /api/workdays/today` (`{ isWorking }`) — see below |
 | Uploads | `POST /api/uploads/image` (multipart `image` field) — used for barcode-less "fallback" products |
-| Backup | `GET /api/backup/export` — full JSON dump of all business data; `POST /api/backup/restore` — wipes and replaces all business data from an uploaded dump — see below |
+| Backup | `GET /api/backup/export` — zip archive with a full JSON dump of all business data plus the uploads folder; `POST /api/backup/restore` — wipes and replaces all business data and uploaded files from an uploaded archive — see below |
 
 ### Key business rules
 
@@ -86,21 +86,28 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 
 ### Backup & restore
 
-- `GET /api/backup/export` returns one JSON document with every business
-  table (products, suppliers, supplier invoices, sales, sale items,
-  expenses, working days, inventory transactions). The `User` table is
-  **deliberately excluded** — restoring an old password hash over the
-  current one could lock the owner out of their own backend.
-- `POST /api/backup/restore` accepts that same JSON shape and does a **full
-  wipe-and-replace**: every business table is cleared and re-populated from
-  the upload, preserving original IDs/timestamps so relations between
-  records stay intact. This is destructive and irreversible — there is no
-  merge or partial-restore mode.
+- `GET /api/backup/export` returns a **zip archive** (`Content-Type:
+  application/zip`) containing `data.json` — one JSON document with every
+  business table (products, suppliers, supplier invoices, sales, sale
+  items, expenses, working days, inventory transactions) — plus an
+  `uploads/` folder holding every file currently in the server's uploads
+  directory, so product photos are backed up too, not just the row that
+  references them. The `User` table is **deliberately excluded** from
+  `data.json` — restoring an old password hash over the current one could
+  lock the owner out of their own backend.
+- `POST /api/backup/restore` accepts that same archive shape and does a
+  **full wipe-and-replace**: every business table is cleared and
+  re-populated from `data.json` (preserving original IDs/timestamps so
+  relations between records stay intact), and every file currently in
+  `uploads/` is deleted and replaced with the archive's `uploads/` files.
+  This is destructive and irreversible — there is no merge or
+  partial-restore mode.
 - The server also takes its **own daily backup automatically**: once at
-  startup and then every 24h, a timestamped `inventory-backup-YYYY-MM-DD.json`
-  file is written to `BACKUP_DIR` (default `backups/`, configurable via
-  `.env`), with files older than `BACKUP_RETENTION_DAYS` (default 14) deleted
-  on each run. This protects against *data* loss (a bad restore, a dropped
-  table) but **not** against losing the whole disk/server — since it's
-  same-disk, it is not a substitute for copying a backup somewhere else
-  (e.g. the Android app's weekly pull, see `android/README.md`).
+  startup and then every 24h, a timestamped `inventory-backup-YYYY-MM-DD.zip`
+  file (same archive format as `/export`) is written to `BACKUP_DIR`
+  (default `backups/`, configurable via `.env`), with files older than
+  `BACKUP_RETENTION_DAYS` (default 14) deleted on each run. This protects
+  against *data* loss (a bad restore, a dropped table) but **not** against
+  losing the whole disk/server — since it's same-disk, it is not a
+  substitute for copying a backup somewhere else (e.g. the Android app's
+  weekly pull, see `android/README.md`).
