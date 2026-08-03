@@ -20,6 +20,8 @@
     <string name="action_retry">Retry</string>
     <string name="action_logout">Log out</string>
     <string name="action_scan">Scan</string>
+    <string name="sell_fab_scan">Scan to sell</string>
+    <string name="sell_fab_search">Search to sell</string>
     <string name="action_confirm">Confirm</string>
     <string name="confirm_delete_named_title">Delete “%1$s”?</string>
     <string name="confirm_delete_message">This can\'t be undone.</string>

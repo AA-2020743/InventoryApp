@@ -6,7 +6,10 @@ object Routes {
     const val INVENTORY = "inventory"
     const val PRODUCT_FORM = "product_form?productId={productId}&barcode={barcode}"
     const val SCAN = "scan/{purpose}"
-    const val SALES = "sales"
+    // focusSearch: set when navigating here from the floating sell button's
+    // "search" fallback action, so the screen can jump straight to the
+    // manual-entry/search field with the keyboard already up.
+    const val SALES = "sales?focusSearch={focusSearch}"
     const val EXPENSES = "expenses"
     const val INVOICES = "invoices"
     const val EDIT_SALE = "edit_sale/{saleId}"
@@ -23,6 +26,8 @@ object Routes {
     }
 
     fun scan(purpose: String) = "scan/$purpose"
+
+    fun sales(focusSearch: Boolean = false) = "sales?focusSearch=$focusSearch"
 }
 
 object ScanPurpose {

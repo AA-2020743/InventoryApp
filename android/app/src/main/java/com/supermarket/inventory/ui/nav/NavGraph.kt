@@ -1,5 +1,7 @@
 package com.supermarket.inventory.ui.nav
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
@@ -38,6 +40,7 @@ import com.supermarket.inventory.ui.login.LoginScreen
 import com.supermarket.inventory.ui.others.OthersScreen
 import com.supermarket.inventory.ui.sales.EditSaleScreen
 import com.supermarket.inventory.ui.sales.SalesScreen
+import com.supermarket.inventory.ui.sales.SellFab
 import com.supermarket.inventory.ui.scan.BarcodeScannerScreen
 import com.supermarket.inventory.ui.settings.SettingsScreen
 import com.supermarket.inventory.ui.stats.StatsScreen
@@ -84,7 +87,11 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
-                            navController.navigate(tab.route) {
+                            // Routes.SALES is a pattern with a query arg (focusSearch), so
+                            // the concrete destination to navigate to has to be resolved via
+                            // Routes.sales() rather than using the raw pattern string.
+                            val target = if (tab.route == Routes.SALES) Routes.sales() else tab.route
+                            navController.navigate(target) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -97,76 +104,102 @@ fun InventoryNavHost(sessionManager: SessionManager) {
             }
         },
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = Routes.DASHBOARD,
-            modifier = Modifier.padding(padding),
-        ) {
-            composable(Routes.DASHBOARD) {
-                DashboardScreen(
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                    onViewInventory = { navController.navigate(Routes.INVENTORY) },
-                    onViewInvoices = { navController.navigate(Routes.INVOICES) },
-                )
+        val backStackEntry by navController.currentBackStackEntryAsState()
+        // Shown on every bottom tab except Sell itself (which already has
+        // its own scan button front and center) - a quick way to jump
+        // straight into scanning (or, as a fallback, searching) to sell
+        // without navigating down to the Sell tab first.
+        val sellFabVisibleRoutes = setOf(Routes.DASHBOARD, Routes.INVENTORY, Routes.EXPENSES, Routes.INVOICES, Routes.STATS)
+        val sellFabVisible = backStackEntry?.destination?.route in sellFabVisibleRoutes
+
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = Routes.DASHBOARD,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                composable(Routes.DASHBOARD) {
+                    DashboardScreen(
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        onViewInventory = { navController.navigate(Routes.INVENTORY) },
+                        onViewInvoices = { navController.navigate(Routes.INVOICES) },
+                    )
+                }
+                composable(Routes.INVENTORY) { backStackEntry ->
+                    val scannedBarcode by backStackEntry.scannedBarcodeState()
+                    InventoryListScreen(
+                        onAddProduct = { navController.navigate(Routes.productForm()) },
+                        onEditProduct = { id -> navController.navigate(Routes.productForm(productId = id)) },
+                        onAddProductWithBarcode = { barcode -> navController.navigate(Routes.productForm(barcode = barcode)) },
+                        onScanToAdd = { navController.navigate(Routes.scan(ScanPurpose.ADD_PRODUCT)) },
+                        scannedBarcode = scannedBarcode,
+                        onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
+                    )
+                }
+                composable(
+                    route = Routes.PRODUCT_FORM,
+                    arguments = listOf(
+                        navArgument("productId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("barcode") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { backStackEntry ->
+                    val scannedBarcode by backStackEntry.scannedBarcodeState()
+                    ProductFormScreen(
+                        onScanBarcode = { navController.navigate(Routes.scan(ScanPurpose.ADD_PRODUCT)) },
+                        scannedBarcode = scannedBarcode,
+                        onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = Routes.SCAN,
+                    arguments = listOf(navArgument("purpose") { type = NavType.StringType }),
+                ) { backStackEntry ->
+                    val purpose = backStackEntry.arguments?.getString("purpose") ?: ScanPurpose.SELL
+                    BarcodeScannerScreen(
+                        purpose = purpose,
+                        onBarcodeScanned = { barcode ->
+                            navController.previousBackStackEntry?.savedStateHandle?.set(SCANNED_BARCODE_KEY, barcode)
+                            navController.popBackStack()
+                        },
+                        onCancel = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = Routes.SALES,
+                    arguments = listOf(navArgument("focusSearch") { type = NavType.BoolType; defaultValue = false }),
+                ) { backStackEntry ->
+                    val scannedBarcode by backStackEntry.scannedBarcodeState()
+                    val focusSearch = backStackEntry.arguments?.getBoolean("focusSearch") ?: false
+                    SalesScreen(
+                        onScan = { navController.navigate(Routes.scan(ScanPurpose.SELL)) },
+                        scannedBarcode = scannedBarcode,
+                        onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
+                        focusSearchOnOpen = focusSearch,
+                    )
+                }
+                composable(Routes.EXPENSES) { ExpensesScreen() }
+                composable(Routes.INVOICES) { OthersScreen() }
+                composable(
+                    route = Routes.EDIT_SALE,
+                    arguments = listOf(navArgument("saleId") { type = NavType.StringType }),
+                ) { EditSaleScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.STATS) {
+                    StatsScreen(onEditSale = { saleId -> navController.navigate(Routes.editSale(saleId)) })
+                }
+                composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
             }
-            composable(Routes.INVENTORY) { backStackEntry ->
-                val scannedBarcode by backStackEntry.scannedBarcodeState()
-                InventoryListScreen(
-                    onAddProduct = { navController.navigate(Routes.productForm()) },
-                    onEditProduct = { id -> navController.navigate(Routes.productForm(productId = id)) },
-                    onAddProductWithBarcode = { barcode -> navController.navigate(Routes.productForm(barcode = barcode)) },
-                    onScanToAdd = { navController.navigate(Routes.scan(ScanPurpose.ADD_PRODUCT)) },
-                    scannedBarcode = scannedBarcode,
-                    onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
-                )
-            }
-            composable(
-                route = Routes.PRODUCT_FORM,
-                arguments = listOf(
-                    navArgument("productId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("barcode") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { backStackEntry ->
-                val scannedBarcode by backStackEntry.scannedBarcodeState()
-                ProductFormScreen(
-                    onScanBarcode = { navController.navigate(Routes.scan(ScanPurpose.ADD_PRODUCT)) },
-                    scannedBarcode = scannedBarcode,
-                    onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
-                    onDone = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = Routes.SCAN,
-                arguments = listOf(navArgument("purpose") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val purpose = backStackEntry.arguments?.getString("purpose") ?: ScanPurpose.SELL
-                BarcodeScannerScreen(
-                    purpose = purpose,
-                    onBarcodeScanned = { barcode ->
-                        navController.previousBackStackEntry?.savedStateHandle?.set(SCANNED_BARCODE_KEY, barcode)
-                        navController.popBackStack()
-                    },
-                    onCancel = { navController.popBackStack() },
-                )
-            }
-            composable(Routes.SALES) { backStackEntry ->
-                val scannedBarcode by backStackEntry.scannedBarcodeState()
-                SalesScreen(
-                    onScan = { navController.navigate(Routes.scan(ScanPurpose.SELL)) },
-                    scannedBarcode = scannedBarcode,
-                    onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
-                )
-            }
-            composable(Routes.EXPENSES) { ExpensesScreen() }
-            composable(Routes.INVOICES) { OthersScreen() }
-            composable(
-                route = Routes.EDIT_SALE,
-                arguments = listOf(navArgument("saleId") { type = NavType.StringType }),
-            ) { EditSaleScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.STATS) {
-                StatsScreen(onEditSale = { saleId -> navController.navigate(Routes.editSale(saleId)) })
-            }
-            composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
+
+            SellFab(
+                visible = sellFabVisible,
+                onScan = {
+                    navController.navigate(Routes.sales()) { launchSingleTop = true }
+                    navController.navigate(Routes.scan(ScanPurpose.SELL))
+                },
+                onSearch = {
+                    navController.navigate(Routes.sales(focusSearch = true)) { launchSingleTop = true }
+                },
+            )
         }
     }
 }

@@ -20,6 +20,8 @@
     <string name="action_retry">إعادة المحاولة</string>
     <string name="action_logout">تسجيل الخروج</string>
     <string name="action_scan">مسح</string>
+    <string name="sell_fab_scan">مسح للبيع</string>
+    <string name="sell_fab_search">بحث للبيع</string>
     <string name="action_confirm">تأكيد</string>
     <string name="confirm_delete_named_title">هل تريد حذف "%1$s"؟</string>
     <string name="confirm_delete_message">لا يمكن التراجع عن هذا الإجراء.</string>

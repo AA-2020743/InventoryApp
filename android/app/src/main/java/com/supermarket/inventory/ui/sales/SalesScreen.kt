@@ -59,11 +59,19 @@ fun SalesScreen(
     onScan: () -> Unit,
     scannedBarcode: String?,
     onScannedBarcodeConsumed: () -> Unit,
+    focusSearchOnOpen: Boolean = false,
     viewModel: SalesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.uiState
     val snackbarHostState = remember { SnackbarHostState() }
     val focusRequester = remember { FocusRequester() }
+
+    // Set by the floating sell button's "search" fallback (barcode not
+    // scanning) so the manual-entry field is already focused with the
+    // keyboard up the moment this screen appears.
+    LaunchedEffect(focusSearchOnOpen) {
+        if (focusSearchOnOpen) focusRequester.requestFocus()
+    }
 
     LaunchedEffect(scannedBarcode) {
         if (scannedBarcode != null) {
