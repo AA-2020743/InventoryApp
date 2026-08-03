@@ -21,13 +21,11 @@ import androidx.compose.ui.unit.dp
 import com.supermarket.inventory.R
 import com.supermarket.inventory.ui.cashregister.CashRegisterTabContent
 import com.supermarket.inventory.ui.invoices.AssetsTabContent
-import com.supermarket.inventory.ui.invoices.ExpensesTabContent
 import com.supermarket.inventory.ui.invoices.InvoicesTabContent
 import com.supermarket.inventory.ui.sales.DeferredSalesTabContent
 
 private enum class OthersTab(val titleRes: Int) {
     INVOICES(R.string.invoices_title),
-    EXPENSES(R.string.expenses_title),
     ASSETS(R.string.assets_title),
     DEFERRED_SALES(R.string.deferred_sales_title),
     CASH_REGISTER(R.string.cash_register_title),
@@ -59,7 +57,6 @@ fun OthersScreen() {
             Box(Modifier.weight(1f).fillMaxSize()) {
                 when (selectedTab) {
                     OthersTab.INVOICES -> InvoicesTabContent()
-                    OthersTab.EXPENSES -> ExpensesTabContent()
                     OthersTab.ASSETS -> AssetsTabContent()
                     OthersTab.DEFERRED_SALES -> DeferredSalesTabContent()
                     OthersTab.CASH_REGISTER -> CashRegisterTabContent()

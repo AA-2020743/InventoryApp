@@ -6,8 +6,14 @@ import { asyncHandler } from "../middleware/errorHandler";
 
 export const cashRegisterRouter = Router();
 
-export async function getCashRegisterBalance(): Promise<Prisma.Decimal> {
-  const entries = await prisma.cashRegisterEntry.findMany();
+// Accepts an optional transaction client so a caller that's already inside
+// a $transaction (e.g. the expense cash-deduction logic) reads a balance
+// consistent with writes made earlier in that same transaction, instead of
+// racing against it via the global client.
+export async function getCashRegisterBalance(
+  client: Prisma.TransactionClient | typeof prisma = prisma
+): Promise<Prisma.Decimal> {
+  const entries = await client.cashRegisterEntry.findMany();
   return entries.reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
 }
 

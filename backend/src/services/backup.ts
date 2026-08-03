@@ -18,7 +18,6 @@ export interface BackupPayload {
   sales: any[];
   saleItems: any[];
   expenses: any[];
-  workingDays: any[];
   inventoryTransactions: any[];
   assets: any[];
   cashRegisterEntries: any[];
@@ -28,7 +27,7 @@ export interface BackupPayload {
 // data" the way the rest of this is, and restoring an old password hash
 // over the current one could lock the owner out of their own backend.
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, workingDays, inventoryTransactions, assets, cashRegisterEntries] =
+  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries] =
     await Promise.all([
       prisma.supplier.findMany(),
       prisma.product.findMany(),
@@ -36,7 +35,6 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
       prisma.sale.findMany(),
       prisma.saleItem.findMany(),
       prisma.expense.findMany(),
-      prisma.workingDay.findMany(),
       prisma.inventoryTransaction.findMany(),
       prisma.asset.findMany(),
       prisma.cashRegisterEntry.findMany(),
@@ -51,7 +49,6 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     sales,
     saleItems,
     expenses,
-    workingDays,
     inventoryTransactions,
     assets,
     cashRegisterEntries,
@@ -76,7 +73,6 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       await tx.product.deleteMany();
       await tx.supplier.deleteMany();
       await tx.expense.deleteMany();
-      await tx.workingDay.deleteMany();
       await tx.asset.deleteMany();
       await tx.cashRegisterEntry.deleteMany();
 
@@ -126,16 +122,6 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       if (payload.expenses.length) {
         await tx.expense.createMany({
           data: payload.expenses.map((r) => ({
-            ...r,
-            startDate: toDate(r.startDate),
-            endDate: toDate(r.endDate),
-            createdAt: toDate(r.createdAt),
-          })),
-        });
-      }
-      if (payload.workingDays.length) {
-        await tx.workingDay.createMany({
-          data: payload.workingDays.map((r) => ({
             ...r,
             date: toDate(r.date),
             createdAt: toDate(r.createdAt),

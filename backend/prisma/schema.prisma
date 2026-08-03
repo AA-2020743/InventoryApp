@@ -151,46 +151,21 @@ model SaleItem {
   @@index([productId])
 }
 
-enum ExpenseFrequency {
-  DAILY
-  MONTHLY
-  ONE_TIME
-}
-
-// Recurring operating costs (e.g. staff salaries, rent) used to compute
-// a realistic daily/monthly burn rate alongside inventory valuation.
+// A one-off operating cost (rent, salaries, supplies, etc.), always paid
+// out of the cash register immediately: if the register doesn't have
+// enough cash on hand, only what's available is deducted and the shortfall
+// is recorded as deficitAmount rather than ever letting the register go
+// negative. See applyExpenseCashDeduction in expenses.routes.ts.
 model Expense {
-  id        String           @id @default(uuid())
-  name      String
-  amount    Decimal          @db.Decimal(12, 2)
-  frequency ExpenseFrequency
-  // For ONE_TIME expenses, the actual calendar day the expense happened
-  // (shown to the owner and counted toward that day's/month's profit).
-  // For DAILY/MONTHLY it's just "when this recurring expense started" and
-  // isn't otherwise used in the profit math.
-  startDate DateTime         @default(now())
-  endDate   DateTime?
-  active    Boolean          @default(true)
-  notes     String?
-  createdAt DateTime         @default(now())
-  // MONTHLY-only: the day of the month it's actually paid (e.g. rent due
-  // the 1st), clamped to the last day of shorter months. Null defaults to
-  // the 1st. The full amount hits as an outgoing on that single day each
-  // month rather than being spread evenly across every day.
-  paymentDayOfMonth Int?
-}
-
-// One row per calendar day the owner has answered "was the shop open
-// today?". A day with no row is assumed to be a working day (isWorking
-// defaults to true elsewhere) - this table only needs to record the
-// exceptions (closed days), so DAILY-frequency expenses like a cashier's
-// wage can be excluded from that day's cost. MONTHLY-frequency expenses
-// (rent, etc.) are unaffected and always accrue regardless of this table.
-model WorkingDay {
-  id        String   @id @default(uuid())
-  date      DateTime @unique @db.Date
-  isWorking Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  name          String
+  amount        Decimal  @db.Decimal(12, 2)
+  // The calendar day the expense happened - shown to the owner and counted
+  // toward that day's/month's profit and expense totals.
+  date          DateTime @default(now())
+  deficitAmount Decimal  @default(0) @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime @default(now())
 }
 
 // Non-inventory business property (equipment, fixtures, etc.) that still
@@ -222,9 +197,9 @@ model CashRegisterEntry {
   // one once collected), so editing/deleting/collecting that sale later
   // can find and adjust or remove exactly this entry instead of guessing.
   saleId    String?
-  // Set for entries auto-created from an expense marked "paid from cash
-  // register", mirroring saleId - lets editing/deleting that expense find
-  // and adjust or remove exactly this entry.
+  // Set for the entry auto-created when an expense is paid out of the
+  // register (fully or partially), mirroring saleId - lets editing/deleting
+  // that expense find and adjust or remove exactly this entry.
   expenseId String?
   createdAt DateTime @default(now())
 

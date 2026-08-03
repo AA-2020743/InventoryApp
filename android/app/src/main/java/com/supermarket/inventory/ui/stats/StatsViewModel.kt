@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
-import com.supermarket.inventory.data.remote.dto.ExpensesForDayResponse
+import com.supermarket.inventory.data.remote.dto.ExpensesForRangeResponse
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
@@ -31,7 +31,7 @@ data class StatsUiState(
     val topProducts: List<TopProductItemDto> = emptyList(),
     val margins: List<MarginItemDto> = emptyList(),
     val salesForDay: List<SaleDto> = emptyList(),
-    val expensesForDay: ExpensesForDayResponse? = null,
+    val expensesForRange: ExpensesForRangeResponse? = null,
     val periodRevenue: String = "0",
     val periodCost: String = "0",
     val periodProfit: String = "0",
@@ -79,7 +79,7 @@ class StatsViewModel @Inject constructor(
             val marginsDeferred = statsRepository.getMargins(20)
 
             var salesForDay: List<SaleDto> = emptyList()
-            var expensesForDay: ExpensesForDayResponse? = null
+            var expensesForRange: ExpensesForRangeResponse? = null
             var revenue = "0"
             var cost = "0"
             var profit = "0"
@@ -98,8 +98,8 @@ class StatsViewModel @Inject constructor(
                     }
                     is ApiResult.Error -> Unit
                 }
-                when (val expensesResult = expenseRepository.getExpensesForDay(dayStart)) {
-                    is ApiResult.Success -> expensesForDay = expensesResult.data
+                when (val expensesResult = expenseRepository.getExpensesForRange("day", dayStart)) {
+                    is ApiResult.Success -> expensesForRange = expensesResult.data
                     is ApiResult.Error -> Unit
                 }
             } else {
@@ -113,6 +113,10 @@ class StatsViewModel @Inject constructor(
                         cost = bucket?.cost ?: "0"
                         profit = bucket?.profit ?: "0"
                     }
+                    is ApiResult.Error -> Unit
+                }
+                when (val expensesResult = expenseRepository.getExpensesForRange("month", monthStart)) {
+                    is ApiResult.Success -> expensesForRange = expensesResult.data
                     is ApiResult.Error -> Unit
                 }
             }
@@ -131,7 +135,7 @@ class StatsViewModel @Inject constructor(
                 topProducts = topProducts,
                 margins = margins,
                 salesForDay = salesForDay,
-                expensesForDay = expensesForDay,
+                expensesForRange = expensesForRange,
                 periodRevenue = revenue,
                 periodCost = cost,
                 periodProfit = profit,
@@ -148,15 +152,8 @@ class StatsViewModel @Inject constructor(
         }
     }
 
-    suspend fun updateExpense(
-        id: String,
-        name: String,
-        amount: Double,
-        frequency: String,
-        startDate: String?,
-        paymentDayOfMonth: Int?,
-        fromCashRegister: Boolean,
-    ) = expenseRepository.updateExpense(id, name, amount, frequency, startDate, null, paymentDayOfMonth, fromCashRegister)
+    suspend fun updateExpense(id: String, name: String, amount: Double, date: String?, notes: String?) =
+        expenseRepository.updateExpense(id, name, amount, date, notes)
 
     fun deleteExpense(id: String) {
         viewModelScope.launch {

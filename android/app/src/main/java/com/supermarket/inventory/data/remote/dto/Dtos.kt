@@ -159,43 +159,37 @@ data class ExpenseDto(
     val id: String,
     val name: String,
     val amount: String,
-    val frequency: String,
-    val startDate: String,
-    val endDate: String?,
-    val active: Boolean,
+    val date: String,
+    val deficitAmount: String,
     val notes: String?,
     val createdAt: String,
-    val paymentDayOfMonth: Int? = null,
-    val fromCashRegister: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)
 data class ExpenseInput(
     val name: String,
     val amount: Double,
-    val frequency: String,
-    val startDate: String?,
-    val endDate: String?,
-    val active: Boolean?,
+    val date: String?,
     val notes: String?,
-    val paymentDayOfMonth: Int? = null,
-    val fromCashRegister: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)
-data class ExpensesForDayResponse(
+data class ExpensesForRangeResponse(
+    val period: String,
     val date: String,
-    val oneTime: List<ExpenseDto>,
-    val dailyShare: String,
-    val monthlyShare: String,
+    val items: List<ExpenseDto>,
     val total: String,
+    val deficit: String,
 )
 
 @JsonClass(generateAdapter = true)
-data class DashboardPeriodDto(val revenue: String, val cost: String, val profit: String)
-
-@JsonClass(generateAdapter = true)
-data class RecurringExpensesDto(val dailyRate: String, val monthlyRate: String)
+data class DashboardPeriodDto(
+    val revenue: String,
+    val cost: String,
+    val profit: String,
+    val expenses: String,
+    val deficit: String,
+)
 
 @JsonClass(generateAdapter = true)
 data class DashboardAlertsDto(
@@ -214,7 +208,6 @@ data class DashboardSummaryDto(
     val netValuation: String,
     val today: DashboardPeriodDto,
     val month: DashboardPeriodDto,
-    val recurringExpenses: RecurringExpensesDto,
     val alerts: DashboardAlertsDto,
 )
 
@@ -271,12 +264,6 @@ data class AlertsResponse(
     val overdueInvoices: List<SupplierInvoiceDto>,
     val dueSoonInvoices: List<SupplierInvoiceDto>,
 )
-
-@JsonClass(generateAdapter = true)
-data class WorkingDayDto(val date: String, val isWorking: Boolean, val answered: Boolean)
-
-@JsonClass(generateAdapter = true)
-data class SetWorkingDayRequest(val isWorking: Boolean)
 
 @JsonClass(generateAdapter = true)
 data class AssetDto(

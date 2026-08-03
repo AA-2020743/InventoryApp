@@ -1,6 +1,5 @@
 package com.supermarket.inventory.ui.dashboard
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,20 +14,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.supermarket.inventory.R
@@ -105,11 +101,9 @@ fun DashboardScreen(
 
             state.summary != null -> DashboardContent(
                 summary = state.summary,
-                todayIsWorkingDay = state.todayIsWorkingDay,
                 modifier = Modifier.padding(padding),
                 onViewInventory = onViewInventory,
                 onViewInvoices = onViewInvoices,
-                onWorkingDayBadgeClick = viewModel::reopenWorkingDayPrompt,
             )
 
             state.error != null -> Column(
@@ -123,41 +117,27 @@ fun DashboardScreen(
             }
         }
     }
-
-    if (state.showWorkingDayPrompt) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = {}, // must be answered - re-shows next refresh otherwise
-            title = { Text(stringResource(R.string.workday_prompt_title)) },
-            text = { Text(stringResource(R.string.workday_prompt_message)) },
-            confirmButton = {
-                Button(onClick = { viewModel.answerWorkingDay(true) }) { Text(stringResource(R.string.workday_yes)) }
-            },
-            dismissButton = {
-                Button(onClick = { viewModel.answerWorkingDay(false) }) { Text(stringResource(R.string.workday_no)) }
-            },
-        )
-    }
 }
 
 @Composable
 private fun DashboardContent(
     summary: DashboardSummaryDto,
-    todayIsWorkingDay: Boolean?,
     modifier: Modifier = Modifier,
     onViewInventory: () -> Unit,
     onViewInvoices: () -> Unit,
-    onWorkingDayBadgeClick: () -> Unit,
 ) {
     val hasAlerts = summary.alerts.lowStockCount > 0 ||
         summary.alerts.dueSoonInvoicesCount > 0 ||
         summary.alerts.overdueInvoicesCount > 0
 
+    // Day, then month, then valuation, then (if any) alerts - the order the
+    // owner asked for: today's figures first, this month's right after,
+    // then "what is the business worth", with warnings last.
     val sections = buildList {
-        add("hero")
-        if (hasAlerts) add("alerts")
-        add("valuation")
+        add("today")
         add("month")
-        add("expenses")
+        add("valuation")
+        if (hasAlerts) add("alerts")
     }
 
     LazyColumn(
@@ -167,23 +147,46 @@ private fun DashboardContent(
     ) {
         items(sections) { section ->
             when (section) {
-                "hero" -> TodayHeroCard(summary.today, todayIsWorkingDay, onWorkingDayBadgeClick)
-                "alerts" -> AlertsCard(summary, onViewInventory, onViewInvoices)
-                "valuation" -> ValuationCard(summary)
+                "today" -> TodayCard(summary.today)
                 "month" -> MonthCard(summary.month)
-                "expenses" -> ExpensesCard(summary)
+                "valuation" -> ValuationCard(summary)
+                "alerts" -> AlertsCard(summary, onViewInventory, onViewInvoices)
             }
         }
     }
 }
 
-// The headline figure the owner cares about most, front and center: is
-// today making money or losing it, and why (revenue/cost/expenses split).
+// A label/value pair laid out so the value keeps its natural width and the
+// label absorbs any extra space - two numbers (or a long Arabic label)
+// side by side never overlap the way a fixed-width Row of columns could.
 @Composable
-private fun TodayHeroCard(today: DashboardPeriodDto, todayIsWorkingDay: Boolean?, onWorkingDayBadgeClick: () -> Unit) {
+private fun StatLine(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    valueStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(value, style = valueStyle, color = valueColor, textAlign = TextAlign.End)
+    }
+}
+
+// The headline figure the owner cares about most, front and center: is
+// today making money or losing it, and why (revenue/cost/expenses split,
+// plus any deficit if an expense couldn't be fully paid from the till).
+@Composable
+private fun TodayCard(today: DashboardPeriodDto) {
     val profit = today.profit.toDoubleOrNull() ?: 0.0
     val isLoss = profit < 0
     val color = if (isLoss) LossRed else ProfitGreen
+    val deficit = today.deficit.toDoubleOrNull() ?: 0.0
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -198,10 +201,6 @@ private fun TodayHeroCard(today: DashboardPeriodDto, todayIsWorkingDay: Boolean?
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.dashboard_today), style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.weight(1f))
-                if (todayIsWorkingDay != null) {
-                    WorkingDayBadge(isWorking = todayIsWorkingDay, onClick = onWorkingDayBadgeClick)
-                }
             }
             Spacer(Modifier.height(4.dp))
             Text(
@@ -215,45 +214,95 @@ private fun TodayHeroCard(today: DashboardPeriodDto, todayIsWorkingDay: Boolean?
                 color = color,
             )
             Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                HeroStat(stringResource(R.string.dashboard_revenue), formatAmount(today.revenue))
-                HeroStat(stringResource(R.string.dashboard_cost), formatAmount(today.cost))
+            StatLine(stringResource(R.string.dashboard_revenue), formatAmount(today.revenue))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_cost), formatAmount(today.cost))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_expenses), formatAmount(today.expenses))
+            if (deficit > 0) {
+                Spacer(Modifier.height(8.dp))
+                StatLine(
+                    stringResource(R.string.dashboard_deficit),
+                    formatAmount(today.deficit),
+                    valueColor = LossRed,
+                    valueStyle = MaterialTheme.typography.titleMedium,
+                )
             }
         }
     }
 }
 
+// This month's totals, right after today's - revenue, expenses, profit,
+// and (if any) the deficit accumulated so far this month.
 @Composable
-private fun WorkingDayBadge(isWorking: Boolean, onClick: () -> Unit) {
-    val color = if (isWorking) ProfitGreen else WarningAmber
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.15f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            if (isWorking) Icons.Filled.CheckCircle else Icons.Filled.RemoveCircle,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(16.dp),
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            stringResource(if (isWorking) R.string.dashboard_status_open else R.string.dashboard_status_closed),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-        )
+private fun MonthCard(month: DashboardPeriodDto) {
+    val profit = month.profit.toDoubleOrNull() ?: 0.0
+    val color = if (profit < 0) LossRed else ProfitGreen
+    val deficit = month.deficit.toDoubleOrNull() ?: 0.0
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text(stringResource(R.string.dashboard_this_month), style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(12.dp))
+            StatLine(stringResource(R.string.dashboard_revenue), formatAmount(month.revenue))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_expenses), formatAmount(month.expenses))
+            Spacer(Modifier.height(8.dp))
+            StatLine(
+                stringResource(R.string.dashboard_profit),
+                formatAmount(month.profit),
+                valueColor = color,
+                valueStyle = MaterialTheme.typography.titleMedium,
+            )
+            if (deficit > 0) {
+                Spacer(Modifier.height(8.dp))
+                StatLine(
+                    stringResource(R.string.dashboard_deficit),
+                    formatAmount(month.deficit),
+                    valueColor = LossRed,
+                    valueStyle = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
     }
 }
 
+// What the business is worth right now: inventory + assets + cash +
+// receivables, minus what's owed to suppliers and this month's deficit (an
+// expense that couldn't be fully covered by the till is a hole in the
+// business's finances the other figures don't otherwise reflect).
 @Composable
-private fun HeroStat(label: String, value: String) {
-    Column {
-        Text(label, style = MaterialTheme.typography.bodySmall)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
+private fun ValuationCard(summary: DashboardSummaryDto) {
+    val deficit = summary.month.deficit.toDoubleOrNull() ?: 0.0
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.dashboard_net_valuation), style = MaterialTheme.typography.labelLarge)
+            }
+            Text(formatAmount(summary.netValuation), style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(12.dp))
+            StatLine(stringResource(R.string.dashboard_inventory_value), formatAmount(summary.inventoryValue))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_assets_value), formatAmount(summary.assetsValue))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_cash_register), formatAmount(summary.cashRegisterBalance))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_deferred_receivables), formatAmount(summary.deferredReceivablesTotal))
+            Spacer(Modifier.height(8.dp))
+            StatLine(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal))
+            if (deficit > 0) {
+                Spacer(Modifier.height(8.dp))
+                StatLine(
+                    stringResource(R.string.dashboard_overall_deficit),
+                    formatAmount(summary.month.deficit),
+                    valueColor = LossRed,
+                    valueStyle = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
     }
 }
 
@@ -310,64 +359,5 @@ private fun AlertRow(icon: ImageVector, text: String, color: Color, onClick: () 
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.labelLarge,
         )
-    }
-}
-
-@Composable
-private fun ValuationCard(summary: DashboardSummaryDto) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.dashboard_net_valuation), style = MaterialTheme.typography.labelLarge)
-            }
-            Text(formatAmount(summary.netValuation), style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                HeroStat(stringResource(R.string.dashboard_inventory_value), formatAmount(summary.inventoryValue))
-                HeroStat(stringResource(R.string.dashboard_assets_value), formatAmount(summary.assetsValue))
-                HeroStat(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal))
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                HeroStat(stringResource(R.string.dashboard_deferred_receivables), formatAmount(summary.deferredReceivablesTotal))
-                HeroStat(stringResource(R.string.dashboard_cash_register), formatAmount(summary.cashRegisterBalance))
-            }
-        }
-    }
-}
-
-@Composable
-private fun MonthCard(month: DashboardPeriodDto) {
-    val profit = month.profit.toDoubleOrNull() ?: 0.0
-    val color = if (profit < 0) LossRed else ProfitGreen
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.dashboard_this_month), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                HeroStat(stringResource(R.string.dashboard_revenue), formatAmount(month.revenue))
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(stringResource(R.string.dashboard_profit), style = MaterialTheme.typography.bodySmall)
-                    Text(formatAmount(month.profit), style = MaterialTheme.typography.titleMedium, color = color)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExpensesCard(summary: DashboardSummaryDto) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Payments, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.dashboard_daily_expenses), style = MaterialTheme.typography.labelLarge)
-            }
-            Text(formatAmount(summary.recurringExpenses.dailyRate), style = MaterialTheme.typography.titleMedium)
-        }
     }
 }

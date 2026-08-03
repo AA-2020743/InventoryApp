@@ -7,6 +7,7 @@
     <string name="nav_inventory">المخزون</string>
     <string name="nav_sell">البيع</string>
     <string name="nav_others">أخرى</string>
+    <string name="nav_expenses">المصروفات</string>
     <string name="nav_stats">الإحصائيات</string>
     <string name="nav_settings">الإعدادات</string>
 
@@ -48,10 +49,10 @@
     <string name="dashboard_cost">التكلفة</string>
     <string name="dashboard_profit">الأرباح</string>
     <string name="dashboard_loss">الخسارة</string>
-    <string name="dashboard_daily_expenses">المصروفات المتكررة (المعدل اليومي)</string>
+    <string name="dashboard_expenses">المصروفات</string>
+    <string name="dashboard_deficit">العجز</string>
+    <string name="dashboard_overall_deficit">إجمالي العجز (هذا الشهر)</string>
     <string name="dashboard_needs_attention">يتطلب انتباهك</string>
-    <string name="dashboard_status_open">مفتوح اليوم</string>
-    <string name="dashboard_status_closed">مغلق اليوم</string>
     <string name="dashboard_low_stock_alert">‏%1$d صنف منخفض المخزون</string>
     <string name="dashboard_invoices_due_alert">‏%1$d فاتورة مستحقة قريبًا</string>
     <string name="dashboard_invoices_overdue_alert">‏%1$d فاتورة متأخرة السداد</string>
@@ -162,7 +163,8 @@
     <string name="cash_register_reset_to_zero_message">سيتم تصفير الرصيد المسجل إلى 0. لا يمكن التراجع عن هذا الإجراء.</string>
 
     <!-- Expenses -->
-    <string name="expenses_title">المصروفات المتكررة</string>
+    <string name="expenses_title">المصروفات</string>
+    <string name="expenses_empty">لا توجد مصروفات بعد. اضغط + للإضافة.</string>
     <string name="assets_title">الأصول</string>
     <string name="asset_add">إضافة أصل</string>
     <string name="asset_edit">تعديل الأصل</string>
@@ -173,14 +175,8 @@
     <string name="expense_edit">تعديل المصروف</string>
     <string name="expense_name">الاسم (مثال: راتب الكاشير)</string>
     <string name="expense_amount">المبلغ</string>
-    <string name="expense_frequency">التكرار</string>
-    <string name="expense_frequency_daily">يومي</string>
-    <string name="expense_frequency_monthly">شهري</string>
-    <string name="expense_frequency_one_time">مرة واحدة</string>
-    <string name="expense_payment_day_label">يوم الدفع من الشهر</string>
-    <string name="expense_payment_day_short">اليوم %1$d</string>
-    <string name="expense_from_cash_register">مدفوع من صندوق النقدية</string>
-    <string name="expense_from_cash_register_badge">مدفوع من صندوق النقدية</string>
+    <string name="expense_date">التاريخ</string>
+    <string name="expense_deficit_badge">العجز: %1$s</string>
 
     <!-- Stats -->
     <string name="stats_title">الإحصائيات</string>
@@ -190,7 +186,6 @@
     <string name="stats_tab_top_products">الأكثر مبيعًا</string>
     <string name="stats_tab_margins">هامش الربح</string>
     <string name="stats_top_products_month_label">يُعرض: %1$s</string>
-    <string name="stats_month_view_hint">بدّل إلى \"يوم\" لرؤية المبيعات والمصروفات الفردية ليوم محدد.</string>
     <string name="stats_no_sales_this_day">لا توجد مبيعات في هذا اليوم</string>
     <string name="stats_period_day">يوم</string>
     <string name="stats_period_month">شهر</string>
@@ -204,7 +199,9 @@
     <string name="stats_delete_sale_title">هل تريد حذف عملية البيع هذه؟</string>
     <string name="stats_delete_sale_message">سيتم إرجاع الكمية إلى المخزون وتحديث إجماليات اليوم. لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="stats_expenses_title">المصروفات</string>
-    <string name="stats_recurring_expenses_today">المصروفات المتكررة لهذا اليوم: %1$s</string>
+    <string name="stats_expenses_total">الإجمالي: %1$s</string>
+    <string name="stats_expenses_deficit">العجز: %1$s</string>
+    <string name="stats_no_expenses_this_period">لا توجد مصروفات في هذه الفترة</string>
     <string name="stats_other">أخرى</string>
 
     <!-- Settings -->
@@ -245,9 +242,4 @@
     <string name="notif_sales_sync_issue_title">تعذرت مزامنة بعض المبيعات غير المتصلة</string>
     <string name="notif_sales_sync_issue_body">‏تعذر إرسال %1$d عملية بيع محفوظة أثناء عدم الاتصال إلى الخادم وتم تجاهلها. يرجى مراجعة مستويات المخزون الأخيرة.</string>
 
-    <!-- Working day prompt -->
-    <string name="workday_prompt_title">هل اليوم يوم عمل؟</string>
-    <string name="workday_prompt_message">يحدد هذا ما إذا كانت المصروفات المتكررة اليومية (مثل راتب الكاشير) ستُحتسب ضمن أرباح اليوم أم لا.</string>
-    <string name="workday_yes">نعم، مفتوح اليوم</string>
-    <string name="workday_no">لا، مغلق اليوم</string>
 </resources>

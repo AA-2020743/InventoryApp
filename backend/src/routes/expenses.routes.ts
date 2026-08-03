@@ -3,110 +3,78 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
-import { dateOnlyKey, startOfDay, startOfNextDay } from "../utils/dates";
-import { dailyOnlyRate, monthlyDueOnDate, oneTimeAmountInRange } from "../services/expenseCalc";
+import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { getCashRegisterBalance } from "./cashRegister.routes";
 
 export const expensesRouter = Router();
 
 const expenseInput = z.object({
   name: z.string().trim().min(1),
   amount: z.number().positive(),
-  frequency: z.enum(["DAILY", "MONTHLY", "ONE_TIME"]),
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional().nullable(),
-  active: z.boolean().optional(),
+  date: z.coerce.date().optional(),
   notes: z.string().trim().optional().nullable(),
-  paymentDayOfMonth: z.number().int().min(1).max(31).optional().nullable(),
-  // Asked on every create/edit regardless of frequency: whether this
-  // expense's cash actually left the register. Mirrors syncSaleCashEntry's
-  // pattern - see syncExpenseCashEntry below.
-  fromCashRegister: z.boolean().optional().default(false),
 });
 
-// Keeps the one CashRegisterEntry linked to this expense (if any) in sync
-// with whether it's marked as paid from the register and its current
-// amount, rather than creating a fresh entry on every edit. Debits the
-// register (negative amount) since paying an expense is cash going out.
-async function syncExpenseCashEntry(
+// Always tries to pay an expense out of the till in full. Any prior entry
+// linked to this expense is reversed first (so edits recompute cleanly
+// instead of stacking), then as much of the amount as the register can
+// cover is debited - never pushing the balance negative - and whatever's
+// left over is returned so the caller can persist it as the deficit.
+async function applyExpenseCashDeduction(
   tx: Prisma.TransactionClient,
   expenseId: string,
-  fromCashRegister: boolean,
   amount: Prisma.Decimal,
   name: string
-): Promise<void> {
+): Promise<Prisma.Decimal> {
   const existing = await tx.cashRegisterEntry.findFirst({ where: { expenseId } });
-  const debit = amount.neg();
-  if (fromCashRegister) {
-    if (existing) {
-      if (!existing.amount.equals(debit)) {
-        await tx.cashRegisterEntry.update({ where: { id: existing.id }, data: { amount: debit } });
-      }
-    } else {
-      await tx.cashRegisterEntry.create({ data: { amount: debit, note: `Expense: ${name}`, expenseId } });
-    }
-  } else if (existing) {
+  if (existing) {
     await tx.cashRegisterEntry.delete({ where: { id: existing.id } });
   }
-}
 
-// fromCashRegister isn't a stored column - it's derived by checking whether
-// a CashRegisterEntry currently links to each expense, so the client can
-// show an accurate checkbox state without a separate round trip.
-async function attachFromCashRegister<T extends { id: string }>(
-  expenses: T[]
-): Promise<(T & { fromCashRegister: boolean })[]> {
-  if (expenses.length === 0) return [];
-  const entries = await prisma.cashRegisterEntry.findMany({
-    where: { expenseId: { in: expenses.map((e) => e.id) } },
-    select: { expenseId: true },
-  });
-  const linked = new Set(entries.map((e) => e.expenseId));
-  return expenses.map((e) => ({ ...e, fromCashRegister: linked.has(e.id) }));
+  const balance = Prisma.Decimal.max(await getCashRegisterBalance(tx), 0);
+  const paid = Prisma.Decimal.min(balance, amount);
+  if (paid.gt(0)) {
+    await tx.cashRegisterEntry.create({
+      data: { amount: paid.neg(), note: `Expense: ${name}`, expenseId },
+    });
+  }
+  return amount.sub(paid);
 }
 
 expensesRouter.get(
   "/",
-  asyncHandler(async (req, res) => {
-    const activeOnly = req.query.activeOnly === "true";
-    const expenses = await prisma.expense.findMany({
-      where: activeOnly ? { active: true } : undefined,
-      orderBy: { createdAt: "desc" },
-    });
-    res.json(await attachFromCashRegister(expenses));
+  asyncHandler(async (_req, res) => {
+    const expenses = await prisma.expense.findMany({ orderBy: { date: "desc" } });
+    res.json(expenses);
   })
 );
 
-// GET /api/expenses/for-day?date= - what a specific calendar day's expense
-// side of profit is made of: any ONE_TIME expenses dated that day, plus the
-// DAILY (if it was a working day) and MONTHLY-due share, mirroring the
-// dashboard summary's math for an arbitrary day instead of just "today".
+// GET /api/expenses/for-range?period=day|month&date= - the expense side of
+// profit for a specific calendar day or month, mirroring the dashboard
+// summary's math for an arbitrary period instead of just "today"/"this
+// month". Also surfaces the deficit (amount that couldn't be paid from the
+// cash register) accumulated over that same period.
 expensesRouter.get(
-  "/for-day",
+  "/for-range",
   asyncHandler(async (req, res) => {
+    const period = req.query.period === "month" ? "month" : "day";
     const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
-    const dayStart = startOfDay(dateParam);
-    const dayEnd = startOfNextDay(dateParam);
-    const dayKey = dateOnlyKey(dateParam);
+    const from = period === "month" ? startOfMonth(dateParam) : startOfDay(dateParam);
+    const to = period === "month" ? startOfNextMonth(dateParam) : startOfNextDay(dateParam);
 
-    const [activeExpenses, workingDayRecord] = await Promise.all([
-      prisma.expense.findMany({ where: { active: true } }),
-      prisma.workingDay.findUnique({ where: { date: dayKey } }),
-    ]);
-    const isWorking = workingDayRecord?.isWorking ?? true;
-
-    const oneTime = activeExpenses.filter(
-      (e) => e.frequency === "ONE_TIME" && e.startDate >= dayStart && e.startDate < dayEnd
-    );
-    const dailyShare = isWorking ? dailyOnlyRate(activeExpenses) : new Prisma.Decimal(0);
-    const monthlyShare = monthlyDueOnDate(activeExpenses, dayStart);
-    const oneTimeTotal = oneTimeAmountInRange(activeExpenses, dayStart, dayEnd);
+    const items = await prisma.expense.findMany({
+      where: { date: { gte: from, lt: to } },
+      orderBy: { date: "desc" },
+    });
+    const total = items.reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
+    const deficit = items.reduce((acc, e) => acc.add(e.deficitAmount), new Prisma.Decimal(0));
 
     res.json({
-      date: dayKey.toISOString().slice(0, 10),
-      oneTime: await attachFromCashRegister(oneTime),
-      dailyShare,
-      monthlyShare,
-      total: dailyShare.add(monthlyShare).add(oneTimeTotal),
+      period,
+      date: dateOnlyKey(dateParam).toISOString().slice(0, 10),
+      items,
+      total,
+      deficit,
     });
   })
 );
@@ -114,35 +82,28 @@ expensesRouter.get(
 expensesRouter.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { fromCashRegister, ...data } = expenseInput.parse(req.body);
+    const data = expenseInput.parse(req.body);
     const expense = await prisma.$transaction(async (tx) => {
       const created = await tx.expense.create({ data });
-      await syncExpenseCashEntry(tx, created.id, fromCashRegister, created.amount, created.name);
-      return created;
+      const deficit = await applyExpenseCashDeduction(tx, created.id, created.amount, created.name);
+      return tx.expense.update({ where: { id: created.id }, data: { deficitAmount: deficit } });
     });
-    res.status(201).json({ ...expense, fromCashRegister });
+    res.status(201).json(expense);
   })
 );
 
 expensesRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
-    const { fromCashRegister, ...data } = expenseInput.partial().parse(req.body);
-    const result = await prisma.$transaction(async (tx) => {
+    const data = expenseInput.partial().parse(req.body);
+    const expense = await prisma.$transaction(async (tx) => {
       const existing = await tx.expense.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Expense not found");
       const updated = await tx.expense.update({ where: { id: req.params.id }, data });
-      // Omitted (undefined) on a partial edit means "leave as-is" - inferred
-      // from whether a cash entry already exists for this expense, rather
-      // than defaulting to false and silently reversing a prior payment.
-      const effectiveFromCashRegister =
-        fromCashRegister !== undefined
-          ? fromCashRegister
-          : (await tx.cashRegisterEntry.findFirst({ where: { expenseId: updated.id } })) !== null;
-      await syncExpenseCashEntry(tx, updated.id, effectiveFromCashRegister, updated.amount, updated.name);
-      return { expense: updated, fromCashRegister: effectiveFromCashRegister };
+      const deficit = await applyExpenseCashDeduction(tx, updated.id, updated.amount, updated.name);
+      return tx.expense.update({ where: { id: updated.id }, data: { deficitAmount: deficit } });
     });
-    res.json({ ...result.expense, fromCashRegister: result.fromCashRegister });
+    res.json(expense);
   })
 );
 

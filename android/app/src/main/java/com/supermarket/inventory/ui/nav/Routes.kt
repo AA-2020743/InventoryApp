@@ -7,6 +7,7 @@ object Routes {
     const val PRODUCT_FORM = "product_form?productId={productId}&barcode={barcode}"
     const val SCAN = "scan/{purpose}"
     const val SALES = "sales"
+    const val EXPENSES = "expenses"
     const val INVOICES = "invoices"
     const val EDIT_SALE = "edit_sale/{saleId}"
     const val STATS = "stats"

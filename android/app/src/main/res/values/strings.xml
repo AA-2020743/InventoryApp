@@ -7,6 +7,7 @@
     <string name="nav_inventory">Inventory</string>
     <string name="nav_sell">Sell</string>
     <string name="nav_others">Others</string>
+    <string name="nav_expenses">Expenses</string>
     <string name="nav_stats">Stats</string>
     <string name="nav_settings">Settings</string>
 
@@ -48,10 +49,10 @@
     <string name="dashboard_cost">Cost</string>
     <string name="dashboard_profit">Profit</string>
     <string name="dashboard_loss">Loss</string>
-    <string name="dashboard_daily_expenses">Recurring expenses (daily rate)</string>
+    <string name="dashboard_expenses">Expenses</string>
+    <string name="dashboard_deficit">Deficit</string>
+    <string name="dashboard_overall_deficit">Overall deficit (this month)</string>
     <string name="dashboard_needs_attention">Needs attention</string>
-    <string name="dashboard_status_open">Open today</string>
-    <string name="dashboard_status_closed">Closed today</string>
     <string name="dashboard_low_stock_alert">%1$d item(s) low on stock</string>
     <string name="dashboard_invoices_due_alert">%1$d invoice(s) due soon</string>
     <string name="dashboard_invoices_overdue_alert">%1$d invoice(s) overdue</string>
@@ -162,7 +163,8 @@
     <string name="cash_register_reset_to_zero_message">This clears the recorded balance to 0. This can\'t be undone.</string>
 
     <!-- Expenses -->
-    <string name="expenses_title">Recurring expenses</string>
+    <string name="expenses_title">Expenses</string>
+    <string name="expenses_empty">No expenses yet. Tap + to add one.</string>
     <string name="assets_title">Assets</string>
     <string name="asset_add">Add asset</string>
     <string name="asset_edit">Edit asset</string>
@@ -173,14 +175,8 @@
     <string name="expense_edit">Edit expense</string>
     <string name="expense_name">Name (e.g. Cashier salary)</string>
     <string name="expense_amount">Amount</string>
-    <string name="expense_frequency">Frequency</string>
-    <string name="expense_frequency_daily">Daily</string>
-    <string name="expense_frequency_monthly">Monthly</string>
-    <string name="expense_frequency_one_time">One-time</string>
-    <string name="expense_payment_day_label">Payment day of month</string>
-    <string name="expense_payment_day_short">Day %1$d</string>
-    <string name="expense_from_cash_register">Paid from cash register</string>
-    <string name="expense_from_cash_register_badge">Paid from cash register</string>
+    <string name="expense_date">Date</string>
+    <string name="expense_deficit_badge">Deficit: %1$s</string>
 
     <!-- Stats -->
     <string name="stats_title">Statistics</string>
@@ -190,7 +186,6 @@
     <string name="stats_tab_top_products">Top Products</string>
     <string name="stats_tab_margins">Margins</string>
     <string name="stats_top_products_month_label">Showing: %1$s</string>
-    <string name="stats_month_view_hint">Switch to Day to see individual sales and expenses for a specific date.</string>
     <string name="stats_no_sales_this_day">No sales this day</string>
     <string name="stats_period_day">Day</string>
     <string name="stats_period_month">Month</string>
@@ -204,7 +199,9 @@
     <string name="stats_delete_sale_title">Delete this sale?</string>
     <string name="stats_delete_sale_message">Stock will be returned and today\'s totals will update. This can\'t be undone.</string>
     <string name="stats_expenses_title">Expenses</string>
-    <string name="stats_recurring_expenses_today">Recurring expenses this day: %1$s</string>
+    <string name="stats_expenses_total">Total: %1$s</string>
+    <string name="stats_expenses_deficit">Deficit: %1$s</string>
+    <string name="stats_no_expenses_this_period">No expenses this period</string>
     <string name="stats_other">Other</string>
 
     <!-- Settings -->
@@ -245,9 +242,4 @@
     <string name="notif_sales_sync_issue_title">Some offline sales didn\'t sync</string>
     <string name="notif_sales_sync_issue_body">%1$d sale(s) saved while offline could not be sent to the server and were dropped. Please review recent stock levels.</string>
 
-    <!-- Working day prompt -->
-    <string name="workday_prompt_title">Is today a working day?</string>
-    <string name="workday_prompt_message">This decides whether today\'s recurring daily expenses (e.g. cashier wage) count toward today\'s profit calculation.</string>
-    <string name="workday_yes">Yes, open today</string>
-    <string name="workday_no">No, closed today</string>
 </resources>

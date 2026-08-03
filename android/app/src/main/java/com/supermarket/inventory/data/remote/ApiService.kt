@@ -111,10 +111,13 @@ interface ApiService {
 
     // Expenses
     @GET("api/expenses")
-    suspend fun getExpenses(@Query("activeOnly") activeOnly: Boolean? = null): List<ExpenseDto>
+    suspend fun getExpenses(): List<ExpenseDto>
 
-    @GET("api/expenses/for-day")
-    suspend fun getExpensesForDay(@Query("date") date: String? = null): ExpensesForDayResponse
+    @GET("api/expenses/for-range")
+    suspend fun getExpensesForRange(
+        @Query("period") period: String,
+        @Query("date") date: String? = null,
+    ): ExpensesForRangeResponse
 
     @POST("api/expenses")
     suspend fun createExpense(@Body input: ExpenseInput): ExpenseDto
@@ -172,12 +175,6 @@ interface ApiService {
 
     @GET("api/alerts")
     suspend fun getAlerts(@Query("days") days: Int? = null): AlertsResponse
-
-    @GET("api/workdays/today")
-    suspend fun getTodayWorkingDay(): WorkingDayDto
-
-    @POST("api/workdays/today")
-    suspend fun setTodayWorkingDay(@Body request: SetWorkingDayRequest): WorkingDayDto
 
     // Backup / restore
     @Streaming

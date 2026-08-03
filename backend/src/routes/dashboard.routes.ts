@@ -3,22 +3,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler } from "../middleware/errorHandler";
-import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
 import { getCashRegisterBalance } from "./cashRegister.routes";
-import { dailyOnlyRate, monthlyAccruedThroughDate, monthlyDueOnDate, oneTimeAmountInRange } from "../services/expenseCalc";
+import { amountInRange, deficitInRange } from "../services/expenseCalc";
 
 export const dashboardRouter = Router();
-
-// Working days between [from, to) (calendar-day keys, `to` exclusive).
-// A day with no WorkingDay row is assumed worked - only explicit
-// isWorking=false rows are subtracted from the plain calendar-day count.
-async function countWorkingDays(from: Date, to: Date): Promise<number> {
-  const totalDays = Math.round((to.getTime() - from.getTime()) / 86400000);
-  const nonWorkingDays = await prisma.workingDay.count({
-    where: { date: { gte: from, lt: to }, isWorking: false },
-  });
-  return Math.max(0, totalDays - nonWorkingDays);
-}
 
 // The core "how much is my supermarket worth right now" figure the owner
 // asked for: stock at purchase cost, minus what's still owed to suppliers.
@@ -30,16 +19,15 @@ dashboardRouter.get(
     const todayEnd = startOfNextDay(now);
     const monthStart = startOfMonth(now);
     const monthEnd = startOfNextMonth(now);
-    const todayKey = dateOnlyKey(now);
-    const tomorrowKey = dateOnlyKey(todayEnd);
-    const monthStartKey = dateOnlyKey(monthStart);
 
-    const [products, assets, pendingInvoices, activeExpenses, todaySales, monthSales, upcoming, todayWorkingDay, workingDaysSoFar, deferredSales, cashRegisterBalance] =
+    // "Today" always falls inside "this month", so one fetch of the
+    // month's expenses covers both the today and month-to-date figures.
+    const [products, assets, pendingInvoices, monthExpenses, todaySales, monthSales, upcoming, deferredSales, cashRegisterBalance] =
       await Promise.all([
         prisma.product.findMany({ where: { active: true } }),
         prisma.asset.findMany(),
         prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
-        prisma.expense.findMany({ where: { active: true } }),
+        prisma.expense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } } }),
         prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
         prisma.sale.findMany({ where: { createdAt: { gte: monthStart } } }),
         prisma.supplierInvoice.findMany({
@@ -48,8 +36,6 @@ dashboardRouter.get(
             dueDate: { lte: new Date(now.getTime() + env.invoiceReminderDays * 86400000) },
           },
         }),
-        prisma.workingDay.findUnique({ where: { date: todayKey } }),
-        countWorkingDays(monthStartKey, tomorrowKey),
         prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
         getCashRegisterBalance(),
       ]);
@@ -70,11 +56,21 @@ dashboardRouter.get(
       (acc, s) => acc.add(s.totalAmount),
       new Prisma.Decimal(0)
     );
+
+    const monthExpensesTotal = amountInRange(monthExpenses, monthStart, monthEnd);
+    const monthDeficitTotal = deficitInRange(monthExpenses, monthStart, monthEnd);
+    const todayExpensesTotal = amountInRange(monthExpenses, todayStart, todayEnd);
+    const todayDeficitTotal = deficitInRange(monthExpenses, todayStart, todayEnd);
+
+    // An expense that couldn't be fully paid from the till is a hole in the
+    // business's finances that inventory/cash/receivables don't reflect -
+    // it's subtracted here the same way pending supplier invoices are.
     const netValuation = inventoryValue
       .add(assetsValue)
       .add(deferredReceivablesTotal)
       .add(cashRegisterBalance)
-      .sub(pendingInvoicesTotal);
+      .sub(pendingInvoicesTotal)
+      .sub(monthDeficitTotal);
 
     const sumRevenue = (sales: { totalAmount: Prisma.Decimal }[]) =>
       sales.reduce((acc, s) => acc.add(s.totalAmount), new Prisma.Decimal(0));
@@ -86,17 +82,8 @@ dashboardRouter.get(
     const monthRevenue = sumRevenue(monthSales);
     const monthCost = sumCost(monthSales);
 
-    const isTodayWorking = todayWorkingDay?.isWorking ?? true;
-    const dailyExpenses = (isTodayWorking ? dailyOnlyRate(activeExpenses) : new Prisma.Decimal(0))
-      .add(monthlyDueOnDate(activeExpenses, now))
-      .add(oneTimeAmountInRange(activeExpenses, todayStart, todayEnd));
-    const monthlyExpenses = dailyOnlyRate(activeExpenses)
-      .mul(workingDaysSoFar)
-      .add(monthlyAccruedThroughDate(activeExpenses, now))
-      .add(oneTimeAmountInRange(activeExpenses, monthStart, monthEnd));
-
-    const todayProfit = todayRevenue.sub(todayCost).sub(dailyExpenses);
-    const monthProfit = monthRevenue.sub(monthCost).sub(monthlyExpenses);
+    const todayProfit = todayRevenue.sub(todayCost).sub(todayExpensesTotal);
+    const monthProfit = monthRevenue.sub(monthCost).sub(monthExpensesTotal);
 
     const lowStockCount = products.filter((p) => p.quantity.lte(p.lowStockThreshold)).length;
     const overdueInvoicesCount = upcoming.filter((i) => i.dueDate < now).length;
@@ -109,9 +96,20 @@ dashboardRouter.get(
       cashRegisterBalance,
       pendingInvoicesTotal,
       netValuation,
-      today: { revenue: todayRevenue, cost: todayCost, profit: todayProfit },
-      month: { revenue: monthRevenue, cost: monthCost, profit: monthProfit },
-      recurringExpenses: { dailyRate: dailyExpenses, monthlyRate: monthlyExpenses },
+      today: {
+        revenue: todayRevenue,
+        cost: todayCost,
+        profit: todayProfit,
+        expenses: todayExpensesTotal,
+        deficit: todayDeficitTotal,
+      },
+      month: {
+        revenue: monthRevenue,
+        cost: monthCost,
+        profit: monthProfit,
+        expenses: monthExpensesTotal,
+        deficit: monthDeficitTotal,
+      },
       alerts: {
         lowStockCount,
         overdueInvoicesCount,

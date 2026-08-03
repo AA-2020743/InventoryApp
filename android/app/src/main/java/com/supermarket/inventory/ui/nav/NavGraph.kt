@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -30,6 +31,7 @@ import androidx.navigation.navArgument
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.ui.dashboard.DashboardScreen
+import com.supermarket.inventory.ui.expenses.ExpensesScreen
 import com.supermarket.inventory.ui.inventory.InventoryListScreen
 import com.supermarket.inventory.ui.inventory.ProductFormScreen
 import com.supermarket.inventory.ui.login.LoginScreen
@@ -67,6 +69,7 @@ fun InventoryNavHost(sessionManager: SessionManager) {
         BottomTab(Routes.DASHBOARD, R.string.nav_dashboard, Icons.Filled.Dashboard),
         BottomTab(Routes.INVENTORY, R.string.nav_inventory, Icons.Filled.Inventory2),
         BottomTab(Routes.SALES, R.string.nav_sell, Icons.Filled.AttachMoney),
+        BottomTab(Routes.EXPENSES, R.string.nav_expenses, Icons.Filled.Payments),
         BottomTab(Routes.INVOICES, R.string.nav_others, Icons.Filled.Receipt),
         BottomTab(Routes.STATS, R.string.nav_stats, Icons.Filled.BarChart),
     )
@@ -154,6 +157,7 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
                 )
             }
+            composable(Routes.EXPENSES) { ExpensesScreen() }
             composable(Routes.INVOICES) { OthersScreen() }
             composable(
                 route = Routes.EDIT_SALE,

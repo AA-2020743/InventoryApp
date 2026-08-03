@@ -56,7 +56,7 @@ import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.common.topSlicesWithOther
-import com.supermarket.inventory.ui.invoices.ExpenseDialog
+import com.supermarket.inventory.ui.expenses.ExpenseDialog
 import com.supermarket.inventory.ui.theme.LossRed
 import com.supermarket.inventory.ui.theme.ProfitGreen
 import kotlinx.coroutines.launch
@@ -192,14 +192,11 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
             title = stringResource(R.string.expense_edit),
             initialName = expense.name,
             initialAmount = expense.amount,
-            initialFrequency = expense.frequency,
-            initialStartDateIso = expense.startDate,
-            initialPaymentDayOfMonth = expense.paymentDayOfMonth ?: 1,
-            initialFromCashRegister = expense.fromCashRegister,
+            initialDateIso = expense.date,
             onDismiss = { expenseToEdit = null },
-            onSave = { name, amount, frequency, startDate, paymentDayOfMonth, fromCashRegister ->
+            onSave = { name, amount, date ->
                 viewModel.viewModelScope.launch {
-                    viewModel.updateExpense(expense.id, name, amount, frequency, startDate, paymentDayOfMonth, fromCashRegister)
+                    viewModel.updateExpense(expense.id, name, amount, date, expense.notes)
                     viewModel.load()
                 }
                 expenseToEdit = null
@@ -222,6 +219,9 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
     }
 }
 
+// Expenses+deficit for the selected day/month are shown right after the
+// summary card - before the sold items list - so the owner can see both
+// without scrolling past a long list of sales first.
 @Composable
 private fun OverviewTab(
     state: StatsUiState,
@@ -232,6 +232,17 @@ private fun OverviewTab(
 ) {
     LazyColumn(contentPadding = PaddingValues(12.dp)) {
         item { PeriodSummaryCard(state) }
+        state.expensesForRange?.let { expenses ->
+            item { Spacer(Modifier.height(16.dp)) }
+            item { Text(stringResource(R.string.stats_expenses_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp)) }
+            item { ExpensesSummaryRow(expenses.total, expenses.deficit) }
+            if (expenses.items.isEmpty()) {
+                item { Text(stringResource(R.string.stats_no_expenses_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
+            }
+            items(expenses.items, key = { it.id }) { expense ->
+                DayExpenseRow(expense, onEdit = { onEditExpenseRequest(expense) }, onDelete = { onDeleteExpenseRequest(expense) })
+            }
+        }
         if (state.period == StatsPeriod.DAY) {
             item { Spacer(Modifier.height(16.dp)) }
             item { Text(stringResource(R.string.sales_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
@@ -241,25 +252,23 @@ private fun OverviewTab(
             items(state.salesForDay, key = { it.id }) { sale ->
                 SaleRow(sale, onEdit = { onEditSale(sale.id) }, onDelete = { onDeleteSaleRequest(sale) })
             }
-            state.expensesForDay?.let { expensesForDay ->
-                item { Spacer(Modifier.height(16.dp)) }
-                item { Text(stringResource(R.string.stats_expenses_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
-                item {
-                    val recurringShare = (expensesForDay.dailyShare.toDoubleOrNull() ?: 0.0) +
-                        (expensesForDay.monthlyShare.toDoubleOrNull() ?: 0.0)
-                    Text(
-                        stringResource(R.string.stats_recurring_expenses_today, formatAmount(recurringShare.toString())),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
-                items(expensesForDay.oneTime, key = { it.id }) { expense ->
-                    DayExpenseRow(expense, onEdit = { onEditExpenseRequest(expense) }, onDelete = { onDeleteExpenseRequest(expense) })
-                }
+        }
+    }
+}
+
+@Composable
+private fun ExpensesSummaryRow(total: String, deficit: String) {
+    val hasDeficit = (deficit.toDoubleOrNull() ?: 0.0) > 0
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(R.string.stats_expenses_total, formatAmount(total)), style = MaterialTheme.typography.bodyMedium)
+            if (hasDeficit) {
+                Text(
+                    stringResource(R.string.stats_expenses_deficit, formatAmount(deficit)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-        } else {
-            item { Spacer(Modifier.height(12.dp)) }
-            item { Text(stringResource(R.string.stats_month_view_hint), style = MaterialTheme.typography.bodyMedium) }
         }
     }
 }
@@ -378,15 +387,16 @@ private fun MarginRow(item: MarginItemDto) {
 
 @Composable
 private fun DayExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val deficit = expense.deficitAmount.toDoubleOrNull() ?: 0.0
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(expense.name, style = MaterialTheme.typography.bodyLarge)
-                if (expense.fromCashRegister) {
+                if (deficit > 0) {
                     Text(
-                        stringResource(R.string.expense_from_cash_register_badge),
+                        stringResource(R.string.expense_deficit_badge, formatAmount(expense.deficitAmount)),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
