@@ -22,12 +22,17 @@ dashboardRouter.get(
 
     // "Today" always falls inside "this month", so one fetch of the
     // month's expenses covers both the today and month-to-date figures.
-    const [products, assets, pendingInvoices, monthExpenses, todaySales, monthSales, upcoming, deferredSales, cashRegisterBalance] =
+    // The all-time deficit total is aggregated separately (not scoped to
+    // this month) since it feeds net valuation - a shortfall from any
+    // past expense is still money the business doesn't have right now,
+    // not something that resets at the start of a new month.
+    const [products, assets, pendingInvoices, monthExpenses, allTimeDeficitAgg, todaySales, monthSales, upcoming, deferredSales, cashRegisterBalance] =
       await Promise.all([
         prisma.product.findMany({ where: { active: true } }),
         prisma.asset.findMany(),
         prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
         prisma.expense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } } }),
+        prisma.expense.aggregate({ _sum: { deficitAmount: true } }),
         prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
         prisma.sale.findMany({ where: { createdAt: { gte: monthStart } } }),
         prisma.supplierInvoice.findMany({
@@ -61,16 +66,20 @@ dashboardRouter.get(
     const monthDeficitTotal = deficitInRange(monthExpenses, monthStart, monthEnd);
     const todayExpensesTotal = amountInRange(monthExpenses, todayStart, todayEnd);
     const todayDeficitTotal = deficitInRange(monthExpenses, todayStart, todayEnd);
+    const allTimeDeficitTotal = allTimeDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0);
 
     // An expense that couldn't be fully paid from the till is a hole in the
     // business's finances that inventory/cash/receivables don't reflect -
     // it's subtracted here the same way pending supplier invoices are.
+    // Uses the all-time total, not just this month's, since valuation is a
+    // snapshot of the business's worth right now - an unpaid shortfall from
+    // a prior month is still missing today.
     const netValuation = inventoryValue
       .add(assetsValue)
       .add(deferredReceivablesTotal)
       .add(cashRegisterBalance)
       .sub(pendingInvoicesTotal)
-      .sub(monthDeficitTotal);
+      .sub(allTimeDeficitTotal);
 
     const sumRevenue = (sales: { totalAmount: Prisma.Decimal }[]) =>
       sales.reduce((acc, s) => acc.add(s.totalAmount), new Prisma.Decimal(0));
@@ -95,6 +104,7 @@ dashboardRouter.get(
       deferredReceivablesTotal,
       cashRegisterBalance,
       pendingInvoicesTotal,
+      allTimeDeficitTotal,
       netValuation,
       today: {
         revenue: todayRevenue,

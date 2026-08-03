@@ -205,6 +205,7 @@ data class DashboardSummaryDto(
     val deferredReceivablesTotal: String,
     val cashRegisterBalance: String,
     val pendingInvoicesTotal: String,
+    val allTimeDeficitTotal: String,
     val netValuation: String,
     val today: DashboardPeriodDto,
     val month: DashboardPeriodDto,

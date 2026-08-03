@@ -51,7 +51,7 @@
     <string name="dashboard_loss">الخسارة</string>
     <string name="dashboard_expenses">المصروفات</string>
     <string name="dashboard_deficit">العجز</string>
-    <string name="dashboard_overall_deficit">إجمالي العجز (هذا الشهر)</string>
+    <string name="dashboard_overall_deficit">إجمالي العجز (كل الوقت)</string>
     <string name="dashboard_needs_attention">يتطلب انتباهك</string>
     <string name="dashboard_low_stock_alert">‏%1$d صنف منخفض المخزون</string>
     <string name="dashboard_invoices_due_alert">‏%1$d فاتورة مستحقة قريبًا</string>

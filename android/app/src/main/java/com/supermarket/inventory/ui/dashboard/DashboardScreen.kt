@@ -268,12 +268,15 @@ private fun MonthCard(month: DashboardPeriodDto) {
 }
 
 // What the business is worth right now: inventory + assets + cash +
-// receivables, minus what's owed to suppliers and this month's deficit (an
+// receivables, minus what's owed to suppliers and the all-time deficit (an
 // expense that couldn't be fully covered by the till is a hole in the
-// business's finances the other figures don't otherwise reflect).
+// business's finances the other figures don't otherwise reflect - and
+// unlike the Today/Month cards, this isn't scoped to the current month,
+// since valuation is what the business is worth right now, not just this
+// month's activity).
 @Composable
 private fun ValuationCard(summary: DashboardSummaryDto) {
-    val deficit = summary.month.deficit.toDoubleOrNull() ?: 0.0
+    val deficit = summary.allTimeDeficitTotal.toDoubleOrNull() ?: 0.0
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -296,7 +299,7 @@ private fun ValuationCard(summary: DashboardSummaryDto) {
             Spacer(Modifier.height(8.dp))
             StatLine(
                 stringResource(R.string.dashboard_overall_deficit),
-                formatAmount(summary.month.deficit),
+                formatAmount(summary.allTimeDeficitTotal),
                 valueColor = if (deficit > 0) LossRed else MaterialTheme.colorScheme.onSurface,
             )
         }

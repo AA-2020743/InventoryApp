@@ -51,7 +51,7 @@
     <string name="dashboard_loss">Loss</string>
     <string name="dashboard_expenses">Expenses</string>
     <string name="dashboard_deficit">Deficit</string>
-    <string name="dashboard_overall_deficit">Overall deficit (this month)</string>
+    <string name="dashboard_overall_deficit">Overall deficit (all time)</string>
     <string name="dashboard_needs_attention">Needs attention</string>
     <string name="dashboard_low_stock_alert">%1$d item(s) low on stock</string>
     <string name="dashboard_invoices_due_alert">%1$d invoice(s) due soon</string>
