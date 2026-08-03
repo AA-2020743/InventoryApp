@@ -315,3 +315,9 @@ data class CashRegisterEntryRequest(val amount: Double, val note: String?)
 
 @JsonClass(generateAdapter = true)
 data class RestoreResponse(val success: Boolean, val restoredAt: String)
+
+@JsonClass(generateAdapter = true)
+data class SettingsDto(val startingValue: String)
+
+@JsonClass(generateAdapter = true)
+data class UpdateSettingsRequest(val startingValue: Double)

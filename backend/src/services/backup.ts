@@ -21,13 +21,14 @@ export interface BackupPayload {
   inventoryTransactions: any[];
   assets: any[];
   cashRegisterEntries: any[];
+  businessSettings: any | null;
 }
 
 // The owner's login (User) is deliberately excluded: it isn't "business
 // data" the way the rest of this is, and restoring an old password hash
 // over the current one could lock the owner out of their own backend.
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries] =
+  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries, businessSettings] =
     await Promise.all([
       prisma.supplier.findMany(),
       prisma.product.findMany(),
@@ -38,6 +39,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
       prisma.inventoryTransaction.findMany(),
       prisma.asset.findMany(),
       prisma.cashRegisterEntry.findMany(),
+      prisma.businessSettings.findFirst(),
     ]);
 
   return {
@@ -52,6 +54,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     inventoryTransactions,
     assets,
     cashRegisterEntries,
+    businessSettings,
   };
 }
 
@@ -75,6 +78,7 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       await tx.expense.deleteMany();
       await tx.asset.deleteMany();
       await tx.cashRegisterEntry.deleteMany();
+      await tx.businessSettings.deleteMany();
 
       // Parents before children, mirroring the delete order above.
       if (payload.suppliers.length) {
@@ -140,6 +144,13 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       if (payload.cashRegisterEntries.length) {
         await tx.cashRegisterEntry.createMany({
           data: payload.cashRegisterEntries.map((r) => ({ ...r, createdAt: toDate(r.createdAt) })),
+        });
+      }
+      // Older backups predate this setting, so it may be missing entirely
+      // rather than just null.
+      if (payload.businessSettings) {
+        await tx.businessSettings.create({
+          data: { ...payload.businessSettings, updatedAt: toDate(payload.businessSettings.updatedAt) ?? new Date() },
         });
       }
     },

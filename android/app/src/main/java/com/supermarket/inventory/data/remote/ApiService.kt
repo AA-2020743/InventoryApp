@@ -176,6 +176,13 @@ interface ApiService {
     @GET("api/alerts")
     suspend fun getAlerts(@Query("days") days: Int? = null): AlertsResponse
 
+    // Settings
+    @GET("api/settings")
+    suspend fun getSettings(): SettingsDto
+
+    @PUT("api/settings")
+    suspend fun updateSettings(@Body request: UpdateSettingsRequest): SettingsDto
+
     // Backup / restore
     @Streaming
     @GET("api/backup/export")

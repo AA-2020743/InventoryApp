@@ -18,6 +18,16 @@ model User {
   createdAt    DateTime @default(now())
 }
 
+// Single settings row (singleton, like User) - always read/written via the
+// fixed id "singleton" rather than looking one up, since there's only ever
+// one. Currently just the starting capital the owner invested, used to
+// tell whether the business's current net worth has fallen below it.
+model BusinessSettings {
+  id            String   @id
+  startingValue Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt     DateTime @updatedAt
+}
+
 model Product {
   id                String   @id @default(uuid())
   // Nullable: fallback products (no printed barcode, e.g. loose produce)

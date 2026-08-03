@@ -216,6 +216,11 @@
     <string name="settings_theme_light">فاتح</string>
     <string name="settings_theme_dark">داكن</string>
     <string name="settings_server_url">رابط الخادم</string>
+    <string name="settings_starting_value_title">القيمة الابتدائية</string>
+    <string name="settings_starting_value_description">رأس المال الذي بدأت به المتجر. تُظهر الرئيسية عجزًا إجماليًا إذا انخفضت القيمة الصافية الحالية عن هذا المبلغ.</string>
+    <string name="settings_starting_value_label">القيمة الابتدائية</string>
+    <string name="settings_starting_value_invalid">أدخل مبلغًا صحيحًا</string>
+    <string name="settings_starting_value_saved">تم حفظ القيمة الابتدائية</string>
     <string name="settings_change_password">تغيير كلمة المرور</string>
     <string name="settings_current_password">كلمة المرور الحالية</string>
     <string name="settings_new_password">كلمة المرور الجديدة</string>

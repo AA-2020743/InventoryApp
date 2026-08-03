@@ -216,6 +216,11 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_server_url">Server URL</string>
+    <string name="settings_starting_value_title">Starting value</string>
+    <string name="settings_starting_value_description">The capital you started the business with. The dashboard shows an overall deficit if the current net valuation has fallen below this.</string>
+    <string name="settings_starting_value_label">Starting value</string>
+    <string name="settings_starting_value_invalid">Enter a valid amount</string>
+    <string name="settings_starting_value_saved">Starting value saved</string>
     <string name="settings_change_password">Change password</string>
     <string name="settings_current_password">Current password</string>
     <string name="settings_new_password">New password</string>

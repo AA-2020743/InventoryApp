@@ -39,6 +39,7 @@ dashboardRouter.get(
       upcoming,
       deferredSales,
       cashRegisterBalance,
+      settings,
     ] = await Promise.all([
       prisma.product.findMany({ where: { active: true } }),
       prisma.asset.findMany(),
@@ -56,6 +57,7 @@ dashboardRouter.get(
       }),
       prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
       getCashRegisterBalance(),
+      prisma.businessSettings.findUnique({ where: { id: "singleton" } }),
     ]);
 
     const inventoryValue = products.reduce(
@@ -79,22 +81,31 @@ dashboardRouter.get(
     const monthDeficitTotal = deficitInRange(monthExpenses, monthStart, monthEnd);
     const todayExpensesTotal = amountInRange(monthExpenses, todayStart, todayEnd);
     const todayDeficitTotal = deficitInRange(monthExpenses, todayStart, todayEnd);
-    const allTimeDeficitTotal = (allTimeExpenseDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)).add(
+
+    // An expense/invoice that couldn't be fully paid from the till is a
+    // hole in the business's finances that inventory/cash/receivables
+    // don't otherwise reflect - not scoped to this month, since a past
+    // shortfall is still missing today.
+    const unpaidShortfallTotal = (allTimeExpenseDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)).add(
       allTimeInvoiceDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)
     );
 
-    // An expense that couldn't be fully paid from the till is a hole in the
-    // business's finances that inventory/cash/receivables don't reflect -
-    // it's subtracted here the same way pending supplier invoices are.
-    // Uses the all-time total, not just this month's, since valuation is a
-    // snapshot of the business's worth right now - an unpaid shortfall from
-    // a prior month is still missing today.
-    const netValuation = inventoryValue
+    // What the business is actually holding right now, before factoring in
+    // either kind of deficit below.
+    const currentNetWorth = inventoryValue
       .add(assetsValue)
       .add(deferredReceivablesTotal)
       .add(cashRegisterBalance)
-      .sub(pendingInvoicesTotal)
-      .sub(allTimeDeficitTotal);
+      .sub(pendingInvoicesTotal);
+
+    // If the owner set a starting capital figure, the business having
+    // fallen below it is itself a deficit - it's eaten into what it
+    // started with, on top of any unpaid shortfall tracked above.
+    const startingValue = settings?.startingValue ?? new Prisma.Decimal(0);
+    const startingValueDeficit = Prisma.Decimal.max(startingValue.sub(currentNetWorth), 0);
+
+    const allTimeDeficitTotal = unpaidShortfallTotal.add(startingValueDeficit);
+    const netValuation = currentNetWorth.sub(allTimeDeficitTotal);
 
     const sumRevenue = (sales: { totalAmount: Prisma.Decimal }[]) =>
       sales.reduce((acc, s) => acc.add(s.totalAmount), new Prisma.Decimal(0));
