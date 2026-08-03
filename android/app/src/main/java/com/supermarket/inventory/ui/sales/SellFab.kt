@@ -50,9 +50,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.supermarket.inventory.R
 
-// A hovering, semi-transparent shortcut to "start selling" from anywhere
-// in the app except the Sell tab itself, so the owner doesn't have to
-// navigate down to Sell and then tap scan every time a customer walks up.
+// Selling has no dedicated bottom tab - this hovering, semi-transparent
+// shortcut is the only entry point, reachable from every other tab, so the
+// owner doesn't have to navigate anywhere just to tap scan.
 // A gentle breathing pulse hints it's there without demanding attention.
 // Tapping it opens the scanner directly; tapping it again (it morphs into
 // a close button) reveals a "search" fallback for when a barcode won't

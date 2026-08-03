@@ -5,7 +5,6 @@
     <!-- Navigation -->
     <string name="nav_dashboard">Dashboard</string>
     <string name="nav_inventory">Inventory</string>
-    <string name="nav_sell">Sell</string>
     <string name="nav_others">Others</string>
     <string name="nav_expenses">Expenses</string>
     <string name="nav_stats">Stats</string>

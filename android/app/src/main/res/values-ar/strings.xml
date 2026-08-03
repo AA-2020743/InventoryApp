@@ -5,7 +5,6 @@
     <!-- Navigation -->
     <string name="nav_dashboard">الرئيسية</string>
     <string name="nav_inventory">المخزون</string>
-    <string name="nav_sell">البيع</string>
     <string name="nav_others">أخرى</string>
     <string name="nav_expenses">المصروفات</string>
     <string name="nav_stats">الإحصائيات</string>

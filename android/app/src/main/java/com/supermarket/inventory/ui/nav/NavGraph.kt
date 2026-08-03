@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inventory2
@@ -71,7 +70,6 @@ fun InventoryNavHost(sessionManager: SessionManager) {
     val tabs = listOf(
         BottomTab(Routes.DASHBOARD, R.string.nav_dashboard, Icons.Filled.Dashboard),
         BottomTab(Routes.INVENTORY, R.string.nav_inventory, Icons.Filled.Inventory2),
-        BottomTab(Routes.SALES, R.string.nav_sell, Icons.Filled.AttachMoney),
         BottomTab(Routes.EXPENSES, R.string.nav_expenses, Icons.Filled.Payments),
         BottomTab(Routes.INVOICES, R.string.nav_others, Icons.Filled.Receipt),
         BottomTab(Routes.STATS, R.string.nav_stats, Icons.Filled.BarChart),
@@ -87,11 +85,7 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
-                            // Routes.SALES is a pattern with a query arg (focusSearch), so
-                            // the concrete destination to navigate to has to be resolved via
-                            // Routes.sales() rather than using the raw pattern string.
-                            val target = if (tab.route == Routes.SALES) Routes.sales() else tab.route
-                            navController.navigate(target) {
+                            navController.navigate(tab.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -105,10 +99,9 @@ fun InventoryNavHost(sessionManager: SessionManager) {
         },
     ) { padding ->
         val backStackEntry by navController.currentBackStackEntryAsState()
-        // Shown on every bottom tab except Sell itself (which already has
-        // its own scan button front and center) - a quick way to jump
-        // straight into scanning (or, as a fallback, searching) to sell
-        // without navigating down to the Sell tab first.
+        // Sell no longer has its own bottom tab - this is the only entry
+        // point into selling, so it's shown on every remaining tab and
+        // jumps straight into scanning (or, as a fallback, searching).
         val sellFabVisibleRoutes = setOf(Routes.DASHBOARD, Routes.INVENTORY, Routes.EXPENSES, Routes.INVOICES, Routes.STATS)
         val sellFabVisible = backStackEntry?.destination?.route in sellFabVisibleRoutes
 
