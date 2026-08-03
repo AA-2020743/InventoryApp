@@ -293,15 +293,12 @@ private fun ValuationCard(summary: DashboardSummaryDto) {
             StatLine(stringResource(R.string.dashboard_deferred_receivables), formatAmount(summary.deferredReceivablesTotal))
             Spacer(Modifier.height(8.dp))
             StatLine(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal))
-            if (deficit > 0) {
-                Spacer(Modifier.height(8.dp))
-                StatLine(
-                    stringResource(R.string.dashboard_overall_deficit),
-                    formatAmount(summary.month.deficit),
-                    valueColor = LossRed,
-                    valueStyle = MaterialTheme.typography.titleMedium,
-                )
-            }
+            Spacer(Modifier.height(8.dp))
+            StatLine(
+                stringResource(R.string.dashboard_overall_deficit),
+                formatAmount(summary.month.deficit),
+                valueColor = if (deficit > 0) LossRed else MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }
