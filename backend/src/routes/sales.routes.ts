@@ -51,7 +51,12 @@ const saleInput = z.object({
         quantity: z.number().positive(),
       })
     )
-    .min(1, "A sale must have at least one item"),
+    .optional()
+    .default([]),
+  // Used only when items is empty: a manually-entered deferred sale total
+  // (e.g. recording an existing customer tab/IOU that isn't tied to
+  // specific inventory) rather than one built from real line items.
+  manualAmount: z.number().positive().optional(),
 });
 
 // GET /api/sales?from=&to=&limit=&paymentStatus=
@@ -100,7 +105,11 @@ salesRouter.get(
 salesRouter.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { clientId, paymentStatus, customerName, items } = saleInput.parse(req.body);
+    const { clientId, paymentStatus, customerName, items, manualAmount } = saleInput.parse(req.body);
+
+    if (items.length === 0 && (paymentStatus !== "DEFERRED" || manualAmount === undefined)) {
+      throw new HttpError(400, "A sale must have at least one item, or be a deferred sale with a manual amount");
+    }
 
     if (clientId) {
       const existing = await prisma.sale.findUnique({
@@ -111,6 +120,27 @@ salesRouter.post(
         res.status(200).json(existing);
         return;
       }
+    }
+
+    // A manual deferred sale (no real line items) just records a total
+    // owed by a customer directly - no stock to validate or decrement.
+    if (items.length === 0) {
+      const sale = await prisma.$transaction(async (tx) => {
+        const created = await tx.sale.create({
+          data: {
+            clientId,
+            paymentStatus,
+            customerName: customerName ?? null,
+            totalAmount: manualAmount!,
+            totalCost: 0,
+          },
+          include: { items: { include: { product: true } } },
+        });
+        await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount);
+        return created;
+      });
+      res.status(201).json(sale);
+      return;
     }
 
     const sale = await prisma.$transaction(async (tx) => {

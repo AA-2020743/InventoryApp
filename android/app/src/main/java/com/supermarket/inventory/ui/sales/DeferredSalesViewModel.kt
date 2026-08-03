@@ -46,4 +46,7 @@ class DeferredSalesViewModel @Inject constructor(
             }
         }
     }
+
+    suspend fun addManualDeferredSale(amount: Double, customerName: String?) =
+        salesRepository.createManualDeferredSale(amount, customerName)
 }

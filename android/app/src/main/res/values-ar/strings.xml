@@ -144,6 +144,9 @@
     <!-- Deferred sales -->
     <string name="deferred_sales_title">المبيعات الآجلة</string>
     <string name="deferred_sales_empty">لا توجد مبيعات آجلة مستحقة</string>
+    <string name="deferred_sale_add">إضافة مبيعة آجلة</string>
+    <string name="deferred_sale_amount">المبلغ المستحق</string>
+    <string name="deferred_sale_invalid_amount">أدخل مبلغًا صحيحًا</string>
     <string name="deferred_sale_customer">العميل: %1$s</string>
     <string name="deferred_sale_customer_unknown">لم يُسجَّل اسم العميل</string>
     <string name="deferred_sale_mark_collected">تحديد كمُحصَّل</string>

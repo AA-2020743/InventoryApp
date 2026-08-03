@@ -38,6 +38,21 @@ class SalesRepository @Inject constructor(private val api: ApiService) {
         )
     }
 
+    // Records a deferred sale directly as a total owed by a customer,
+    // without going through the checkout flow or tying it to specific
+    // inventory - e.g. an existing customer tab being entered into the app.
+    suspend fun createManualDeferredSale(amount: Double, customerName: String? = null): ApiResult<SaleDto> = apiCall {
+        api.createSale(
+            SaleInput(
+                clientId = null,
+                items = emptyList(),
+                paymentStatus = "DEFERRED",
+                customerName = customerName,
+                manualAmount = amount,
+            )
+        )
+    }
+
     suspend fun updateSale(
         id: String,
         items: List<Pair<String, Double>>,

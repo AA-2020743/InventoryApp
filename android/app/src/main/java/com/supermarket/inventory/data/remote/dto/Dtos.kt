@@ -120,6 +120,9 @@ data class SaleInput(
     val items: List<SaleItemInput>,
     val paymentStatus: String = "PAID",
     val customerName: String? = null,
+    // Set only for a manually-entered deferred sale (items empty) - a total
+    // owed by a customer that isn't tied to specific inventory.
+    val manualAmount: Double? = null,
 )
 
 @JsonClass(generateAdapter = true)

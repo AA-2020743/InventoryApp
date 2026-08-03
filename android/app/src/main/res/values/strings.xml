@@ -144,6 +144,9 @@
     <!-- Deferred sales -->
     <string name="deferred_sales_title">Deferred sales</string>
     <string name="deferred_sales_empty">No outstanding deferred sales</string>
+    <string name="deferred_sale_add">Add deferred sale</string>
+    <string name="deferred_sale_amount">Amount owed</string>
+    <string name="deferred_sale_invalid_amount">Enter a valid amount</string>
     <string name="deferred_sale_customer">Customer: %1$s</string>
     <string name="deferred_sale_customer_unknown">Customer not recorded</string>
     <string name="deferred_sale_mark_collected">Mark collected</string>
