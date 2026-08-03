@@ -337,20 +337,29 @@ private fun AlertsCard(summary: DashboardSummaryDto, onViewInventory: () -> Unit
     }
 }
 
+// A single Row with the alert text weighted (and truncated if it still
+// doesn't fit) rather than two independently-sized Rows pushed apart by
+// SpaceBetween - a long count-interpolated alert (e.g. "12 items low on
+// stock") can never overlap the fixed "View all" label this way.
 @Composable
 private fun AlertRow(icon: ImageVector, text: String, color: Color, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Warning, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(text, color = color, style = MaterialTheme.typography.bodyMedium)
-        }
+        Icon(Icons.Filled.Warning, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text,
+            color = color,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
         Text(
             stringResource(R.string.dashboard_view_all),
             color = MaterialTheme.colorScheme.primary,
