@@ -80,7 +80,7 @@ interface ApiService {
     suspend fun updateInvoice(@Path("id") id: String, @Body input: InvoiceInput): SupplierInvoiceDto
 
     @POST("api/invoices/{id}/pay")
-    suspend fun markInvoicePaid(@Path("id") id: String, @Body request: PayInvoiceRequest = PayInvoiceRequest()): SupplierInvoiceDto
+    suspend fun markInvoicePaid(@Path("id") id: String): SupplierInvoiceDto
 
     @DELETE("api/invoices/{id}")
     suspend fun deleteInvoice(@Path("id") id: String)

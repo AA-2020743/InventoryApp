@@ -47,8 +47,8 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
     ): ApiResult<SupplierInvoiceDto> =
         apiCall { api.updateInvoice(id, InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes)) }
 
-    suspend fun markPaid(id: String, payFromCashRegister: Boolean = false): ApiResult<SupplierInvoiceDto> =
-        apiCall { api.markInvoicePaid(id, PayInvoiceRequest(payFromCashRegister)) }
+    suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
+        apiCall { api.markInvoicePaid(id) }
 
     suspend fun deleteInvoice(id: String): ApiResult<Unit> = apiCall { api.deleteInvoice(id) }
 }

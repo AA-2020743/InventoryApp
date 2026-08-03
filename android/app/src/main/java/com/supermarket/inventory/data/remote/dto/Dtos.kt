@@ -91,6 +91,7 @@ data class SupplierInvoiceDto(
     val dueDate: String,
     val status: String,
     val paidAt: String?,
+    val deficitAmount: String,
     val notes: String?,
     val createdAt: String,
 )
@@ -109,9 +110,6 @@ data class UpcomingInvoicesResponse(
     val overdue: List<SupplierInvoiceDto>,
     val dueSoon: List<SupplierInvoiceDto>,
 )
-
-@JsonClass(generateAdapter = true)
-data class PayInvoiceRequest(val payFromCashRegister: Boolean = false)
 
 @JsonClass(generateAdapter = true)
 data class SaleItemInput(val productId: String, val quantity: Double)

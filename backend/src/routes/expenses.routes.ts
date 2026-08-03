@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
-import { getCashRegisterBalance } from "./cashRegister.routes";
+import { applyCashDeduction } from "./cashRegister.routes";
 
 export const expensesRouter = Router();
 
@@ -14,32 +14,6 @@ const expenseInput = z.object({
   date: z.coerce.date().optional(),
   notes: z.string().trim().optional().nullable(),
 });
-
-// Always tries to pay an expense out of the till in full. Any prior entry
-// linked to this expense is reversed first (so edits recompute cleanly
-// instead of stacking), then as much of the amount as the register can
-// cover is debited - never pushing the balance negative - and whatever's
-// left over is returned so the caller can persist it as the deficit.
-async function applyExpenseCashDeduction(
-  tx: Prisma.TransactionClient,
-  expenseId: string,
-  amount: Prisma.Decimal,
-  name: string
-): Promise<Prisma.Decimal> {
-  const existing = await tx.cashRegisterEntry.findFirst({ where: { expenseId } });
-  if (existing) {
-    await tx.cashRegisterEntry.delete({ where: { id: existing.id } });
-  }
-
-  const balance = Prisma.Decimal.max(await getCashRegisterBalance(tx), 0);
-  const paid = Prisma.Decimal.min(balance, amount);
-  if (paid.gt(0)) {
-    await tx.cashRegisterEntry.create({
-      data: { amount: paid.neg(), note: `Expense: ${name}`, expenseId },
-    });
-  }
-  return amount.sub(paid);
-}
 
 expensesRouter.get(
   "/",
@@ -85,7 +59,7 @@ expensesRouter.post(
     const data = expenseInput.parse(req.body);
     const expense = await prisma.$transaction(async (tx) => {
       const created = await tx.expense.create({ data });
-      const deficit = await applyExpenseCashDeduction(tx, created.id, created.amount, created.name);
+      const deficit = await applyCashDeduction(tx, { expenseId: created.id }, created.amount, `Expense: ${created.name}`);
       return tx.expense.update({ where: { id: created.id }, data: { deficitAmount: deficit } });
     });
     res.status(201).json(expense);
@@ -100,7 +74,7 @@ expensesRouter.put(
       const existing = await tx.expense.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Expense not found");
       const updated = await tx.expense.update({ where: { id: req.params.id }, data });
-      const deficit = await applyExpenseCashDeduction(tx, updated.id, updated.amount, updated.name);
+      const deficit = await applyCashDeduction(tx, { expenseId: updated.id }, updated.amount, `Expense: ${updated.name}`);
       return tx.expense.update({ where: { id: updated.id }, data: { deficitAmount: deficit } });
     });
     res.json(expense);

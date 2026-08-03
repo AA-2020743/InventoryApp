@@ -100,6 +100,10 @@ model SupplierInvoice {
   dueDate       DateTime
   status        InvoiceStatus @default(PENDING)
   paidAt        DateTime?
+  // Set when marking this invoice paid couldn't fully cover it from the
+  // cash register - mirrors Expense.deficitAmount, same always-deduct
+  // mechanism (see applyCashDeduction).
+  deficitAmount Decimal       @default(0) @db.Decimal(12, 2)
   notes         String?
   createdAt     DateTime      @default(now())
 

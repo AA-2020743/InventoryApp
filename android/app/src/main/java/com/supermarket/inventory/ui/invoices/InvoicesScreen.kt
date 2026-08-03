@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -66,7 +65,6 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
     var showManageSuppliers by remember { mutableStateOf(false) }
-    var payInvoiceTarget by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceToEdit by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceToDelete by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
 
@@ -87,7 +85,7 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                     items(state.invoices.sortedBy { it.dueDate }, key = { it.id }) { invoice ->
                         InvoiceRow(
                             invoice = invoice,
-                            onMarkPaid = { payInvoiceTarget = invoice },
+                            onMarkPaid = { viewModel.markPaid(invoice.id) },
                             onEdit = { invoiceToEdit = invoice },
                             onDelete = { invoiceToDelete = invoice },
                         )
@@ -141,17 +139,6 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             dismissButton = { TextButton(onClick = { invoiceToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
-
-    payInvoiceTarget?.let { invoice ->
-        PayInvoiceDialog(
-            invoice = invoice,
-            onDismiss = { payInvoiceTarget = null },
-            onConfirm = { payFromCashRegister ->
-                viewModel.markPaid(invoice.id, payFromCashRegister)
-                payInvoiceTarget = null
-            },
-        )
-    }
 }
 
 @Composable
@@ -165,11 +152,20 @@ private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit, onEd
         else -> WarningAmber
     }
 
+    val deficit = invoice.deficitAmount.toDoubleOrNull() ?: 0.0
+
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(invoice.supplier?.name ?: invoice.supplierId, style = MaterialTheme.typography.titleMedium)
+                    if (deficit > 0) {
+                        Text(
+                            stringResource(R.string.expense_deficit_badge, formatAmount(invoice.deficitAmount)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
                 Text(formatAmount(invoice.amount), style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
@@ -182,6 +178,9 @@ private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit, onEd
                     color = statusColor,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                // No "pay from cash register?" choice anymore - marking paid
+                // always tries to pay from the till, recording a deficit if
+                // it comes up short, so this is a direct one-tap action.
                 if (invoice.status == "PENDING") {
                     TextButton(onClick = onMarkPaid) { Text(stringResource(R.string.invoice_mark_paid)) }
                 } else {
@@ -190,28 +189,6 @@ private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit, onEd
             }
         }
     }
-}
-
-@Composable
-private fun PayInvoiceDialog(invoice: SupplierInvoiceDto, onDismiss: () -> Unit, onConfirm: (Boolean) -> Unit) {
-    var payFromCashRegister by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.invoice_mark_paid)) },
-        text = {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(checked = payFromCashRegister, onCheckedChange = { payFromCashRegister = it })
-                Text(stringResource(R.string.invoice_pay_from_cash_register))
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(payFromCashRegister) }) { Text(stringResource(R.string.action_confirm)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

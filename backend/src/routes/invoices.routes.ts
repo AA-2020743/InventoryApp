@@ -3,12 +3,9 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
+import { applyCashDeduction } from "./cashRegister.routes";
 
 export const invoicesRouter = Router();
-
-const payInput = z.object({
-  payFromCashRegister: z.boolean().optional().default(false),
-});
 
 const invoiceInput = z.object({
   supplierId: z.string().uuid(),
@@ -18,6 +15,10 @@ const invoiceInput = z.object({
   dueDate: z.coerce.date(),
   notes: z.string().trim().optional().nullable(),
 });
+
+function paymentNote(invoiceNumber: string | null, supplierName: string): string {
+  return `Paid invoice${invoiceNumber ? ` #${invoiceNumber}` : ""} — ${supplierName}`;
+}
 
 // GET /api/invoices?status=PENDING&upcomingDays=7
 invoicesRouter.get(
@@ -88,21 +89,38 @@ invoicesRouter.post(
   })
 );
 
+// Editing an already-paid invoice's amount recomputes its cash deduction
+// and deficit the same way an expense edit does - a pending invoice hasn't
+// touched the register yet, so no deduction runs for it here.
 invoicesRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
     const data = invoiceInput.partial().parse(req.body);
-    const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id } });
-    if (!existing) throw new HttpError(404, "Invoice not found");
-    const invoice = await prisma.supplierInvoice.update({ where: { id: req.params.id }, data });
+    const invoice = await prisma.$transaction(async (tx) => {
+      const existing = await tx.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
+      if (!existing) throw new HttpError(404, "Invoice not found");
+      const updated = await tx.supplierInvoice.update({ where: { id: req.params.id }, data });
+      if (updated.status !== "PAID") return updated;
+
+      const deficit = await applyCashDeduction(
+        tx,
+        { invoiceId: updated.id },
+        updated.amount,
+        paymentNote(updated.invoiceNumber, existing.supplier.name)
+      );
+      return tx.supplierInvoice.update({ where: { id: updated.id }, data: { deficitAmount: deficit } });
+    });
     res.json(invoice);
   })
 );
 
+// Always tries to pay the invoice out of the till in full - there's no
+// "pay from cash register?" choice anymore, mirroring expenses. Any
+// shortfall is recorded as a deficit rather than pushing the register
+// negative.
 invoicesRouter.post(
   "/:id/pay",
   asyncHandler(async (req, res) => {
-    const { payFromCashRegister } = payInput.parse(req.body ?? {});
     const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
     if (!existing) throw new HttpError(404, "Invoice not found");
     if (existing.status === "PAID") throw new HttpError(400, "Invoice is already paid");
@@ -112,16 +130,13 @@ invoicesRouter.post(
         where: { id: req.params.id },
         data: { status: "PAID", paidAt: new Date() },
       });
-      if (payFromCashRegister) {
-        await tx.cashRegisterEntry.create({
-          data: {
-            amount: existing.amount.neg(),
-            note: `Paid invoice${existing.invoiceNumber ? ` #${existing.invoiceNumber}` : ""} — ${existing.supplier.name}`,
-            invoiceId: existing.id,
-          },
-        });
-      }
-      return updated;
+      const deficit = await applyCashDeduction(
+        tx,
+        { invoiceId: existing.id },
+        existing.amount,
+        paymentNote(existing.invoiceNumber, existing.supplier.name)
+      );
+      return tx.supplierInvoice.update({ where: { id: existing.id }, data: { deficitAmount: deficit } });
     });
     res.json(invoice);
   })
@@ -130,9 +145,12 @@ invoicesRouter.post(
 invoicesRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id } });
-    if (!existing) throw new HttpError(404, "Invoice not found");
-    await prisma.supplierInvoice.delete({ where: { id: req.params.id } });
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.supplierInvoice.findUnique({ where: { id: req.params.id } });
+      if (!existing) throw new HttpError(404, "Invoice not found");
+      await tx.cashRegisterEntry.deleteMany({ where: { invoiceId: existing.id } });
+      await tx.supplierInvoice.delete({ where: { id: req.params.id } });
+    });
     res.status(204).send();
   })
 );

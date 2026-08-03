@@ -23,27 +23,40 @@ dashboardRouter.get(
     // "Today" always falls inside "this month", so one fetch of the
     // month's expenses covers both the today and month-to-date figures.
     // The all-time deficit total is aggregated separately (not scoped to
-    // this month) since it feeds net valuation - a shortfall from any
-    // past expense is still money the business doesn't have right now,
-    // not something that resets at the start of a new month.
-    const [products, assets, pendingInvoices, monthExpenses, allTimeDeficitAgg, todaySales, monthSales, upcoming, deferredSales, cashRegisterBalance] =
-      await Promise.all([
-        prisma.product.findMany({ where: { active: true } }),
-        prisma.asset.findMany(),
-        prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
-        prisma.expense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } } }),
-        prisma.expense.aggregate({ _sum: { deficitAmount: true } }),
-        prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
-        prisma.sale.findMany({ where: { createdAt: { gte: monthStart } } }),
-        prisma.supplierInvoice.findMany({
-          where: {
-            status: "PENDING",
-            dueDate: { lte: new Date(now.getTime() + env.invoiceReminderDays * 86400000) },
-          },
-        }),
-        prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
-        getCashRegisterBalance(),
-      ]);
+    // this month, and combining both expenses and paid invoices) since it
+    // feeds net valuation - a shortfall from any past expense or invoice
+    // payment is still money the business doesn't have right now, not
+    // something that resets at the start of a new month.
+    const [
+      products,
+      assets,
+      pendingInvoices,
+      monthExpenses,
+      allTimeExpenseDeficitAgg,
+      allTimeInvoiceDeficitAgg,
+      todaySales,
+      monthSales,
+      upcoming,
+      deferredSales,
+      cashRegisterBalance,
+    ] = await Promise.all([
+      prisma.product.findMany({ where: { active: true } }),
+      prisma.asset.findMany(),
+      prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
+      prisma.expense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } } }),
+      prisma.expense.aggregate({ _sum: { deficitAmount: true } }),
+      prisma.supplierInvoice.aggregate({ _sum: { deficitAmount: true } }),
+      prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
+      prisma.sale.findMany({ where: { createdAt: { gte: monthStart } } }),
+      prisma.supplierInvoice.findMany({
+        where: {
+          status: "PENDING",
+          dueDate: { lte: new Date(now.getTime() + env.invoiceReminderDays * 86400000) },
+        },
+      }),
+      prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
+      getCashRegisterBalance(),
+    ]);
 
     const inventoryValue = products.reduce(
       (acc, p) => acc.add(p.purchaseCost.mul(p.quantity)),
@@ -66,7 +79,9 @@ dashboardRouter.get(
     const monthDeficitTotal = deficitInRange(monthExpenses, monthStart, monthEnd);
     const todayExpensesTotal = amountInRange(monthExpenses, todayStart, todayEnd);
     const todayDeficitTotal = deficitInRange(monthExpenses, todayStart, todayEnd);
-    const allTimeDeficitTotal = allTimeDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0);
+    const allTimeDeficitTotal = (allTimeExpenseDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)).add(
+      allTimeInvoiceDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)
+    );
 
     // An expense that couldn't be fully paid from the till is a hole in the
     // business's finances that inventory/cash/receivables don't reflect -

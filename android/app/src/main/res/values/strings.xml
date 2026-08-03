@@ -138,7 +138,6 @@
     <string name="invoice_status_pending">Pending</string>
     <string name="invoice_status_paid">Paid</string>
     <string name="invoice_mark_paid">Mark as paid</string>
-    <string name="invoice_pay_from_cash_register">Pay from cash register</string>
     <string name="invoice_overdue">Overdue</string>
     <string name="invoice_due_soon">Due soon</string>
 
