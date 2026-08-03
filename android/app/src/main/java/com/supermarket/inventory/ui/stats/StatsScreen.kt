@@ -243,6 +243,23 @@ private fun OverviewTab(
                 DayExpenseRow(expense, onEdit = { onEditExpenseRequest(expense) }, onDelete = { onDeleteExpenseRequest(expense) })
             }
         }
+        state.otherSalesForRange?.let { otherSales ->
+            item { Spacer(Modifier.height(16.dp)) }
+            item { Text(stringResource(R.string.stats_other_sales_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp)) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.stats_other_sales_total, formatAmount(otherSales.total)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
+            if (otherSales.items.isEmpty()) {
+                item { Text(stringResource(R.string.stats_no_other_sales_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
+            }
+            items(otherSales.items, key = { it.id }) { entry -> OtherSaleStatsRow(entry) }
+        }
         if (state.period == StatsPeriod.DAY) {
             item { Spacer(Modifier.height(16.dp)) }
             item { Text(stringResource(R.string.sales_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
@@ -269,6 +286,24 @@ private fun ExpensesSummaryRow(total: String, deficit: String) {
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun OtherSaleStatsRow(entry: com.supermarket.inventory.data.remote.dto.OtherSaleDto) {
+    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column {
+                Text(
+                    entry.category?.takeIf { it.isNotBlank() } ?: stringResource(R.string.other_sale_uncategorized),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                entry.notes?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                }
+            }
+            Text(formatAmount(entry.amount), style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

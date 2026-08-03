@@ -32,8 +32,10 @@ dashboardRouter.get(
       assets,
       pendingInvoices,
       monthExpenses,
+      monthOtherSales,
       allTimeExpenseDeficitAgg,
       allTimeInvoiceDeficitAgg,
+      allTimeRestockDeficitAgg,
       todaySales,
       monthSales,
       upcoming,
@@ -45,8 +47,10 @@ dashboardRouter.get(
       prisma.asset.findMany(),
       prisma.supplierInvoice.findMany({ where: { status: "PENDING" } }),
       prisma.expense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } } }),
+      prisma.otherSale.findMany({ where: { date: { gte: monthStart, lt: monthEnd } } }),
       prisma.expense.aggregate({ _sum: { deficitAmount: true } }),
       prisma.supplierInvoice.aggregate({ _sum: { deficitAmount: true } }),
+      prisma.inventoryTransaction.aggregate({ where: { type: "RESTOCK" }, _sum: { deficitAmount: true } }),
       prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
       prisma.sale.findMany({ where: { createdAt: { gte: monthStart } } }),
       prisma.supplierInvoice.findMany({
@@ -71,9 +75,11 @@ dashboardRouter.get(
     );
     // Outstanding credit sales are a receivable - money owed to the
     // business - so they add to net worth the same way inventory/assets
-    // do, symmetric with pending supplier invoices subtracting.
+    // do, symmetric with pending supplier invoices subtracting. Only the
+    // remaining balance counts once partial payments have chipped away at
+    // it - the collected portion is already reflected in cashRegisterBalance.
     const deferredReceivablesTotal = deferredSales.reduce(
-      (acc, s) => acc.add(s.totalAmount),
+      (acc, s) => acc.add(s.totalAmount.sub(s.amountCollected)),
       new Prisma.Decimal(0)
     );
 
@@ -82,13 +88,13 @@ dashboardRouter.get(
     const todayExpensesTotal = amountInRange(monthExpenses, todayStart, todayEnd);
     const todayDeficitTotal = deficitInRange(monthExpenses, todayStart, todayEnd);
 
-    // An expense/invoice that couldn't be fully paid from the till is a
-    // hole in the business's finances that inventory/cash/receivables
+    // An expense/invoice/restock that couldn't be fully paid from the till
+    // is a hole in the business's finances that inventory/cash/receivables
     // don't otherwise reflect - not scoped to this month, since a past
     // shortfall is still missing today.
-    const unpaidShortfallTotal = (allTimeExpenseDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)).add(
-      allTimeInvoiceDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0)
-    );
+    const unpaidShortfallTotal = (allTimeExpenseDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0))
+      .add(allTimeInvoiceDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0))
+      .add(allTimeRestockDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0));
 
     // What the business is actually holding right now, before factoring in
     // either kind of deficit below.
@@ -111,10 +117,17 @@ dashboardRouter.get(
       sales.reduce((acc, s) => acc.add(s.totalAmount), new Prisma.Decimal(0));
     const sumCost = (sales: { totalCost: Prisma.Decimal }[]) =>
       sales.reduce((acc, s) => acc.add(s.totalCost), new Prisma.Decimal(0));
+    // OtherSale entries are pure profit (no cost side, unlike a checkout
+    // sale) - counted straight into revenue so they flow through to profit
+    // the same way, for whichever day/month they're dated.
+    const sumOtherSalesInRange = (from: Date, to: Date) =>
+      monthOtherSales
+        .filter((o) => o.date >= from && o.date < to)
+        .reduce((acc, o) => acc.add(o.amount), new Prisma.Decimal(0));
 
-    const todayRevenue = sumRevenue(todaySales);
+    const todayRevenue = sumRevenue(todaySales).add(sumOtherSalesInRange(todayStart, todayEnd));
     const todayCost = sumCost(todaySales);
-    const monthRevenue = sumRevenue(monthSales);
+    const monthRevenue = sumRevenue(monthSales).add(sumOtherSalesInRange(monthStart, monthEnd));
     const monthCost = sumCost(monthSales);
 
     const todayProfit = todayRevenue.sub(todayCost).sub(todayExpensesTotal);

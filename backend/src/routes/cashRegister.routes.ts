@@ -17,15 +17,16 @@ export async function getCashRegisterBalance(
   return entries.reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
 }
 
-// Shared by expenses and supplier-invoice payments - the two places that
-// always try to pay themselves out of the till immediately: reverses any
-// prior entry linked via `link` (so an edit recomputes cleanly instead of
-// stacking), then pays as much of `amount` as the register can cover -
-// never pushing the balance negative - and returns whatever's left over so
-// the caller can persist it as that record's deficit.
+// Shared by expenses, supplier-invoice payments, and non-invoiced restocks
+// - the places that always try to pay themselves out of the till
+// immediately: reverses any prior entry linked via `link` (so an edit
+// recomputes cleanly instead of stacking), then pays as much of `amount`
+// as the register can cover - never pushing the balance negative - and
+// returns whatever's left over so the caller can persist it as that
+// record's deficit.
 export async function applyCashDeduction(
   tx: Prisma.TransactionClient,
-  link: { expenseId: string } | { invoiceId: string },
+  link: { expenseId: string } | { invoiceId: string } | { inventoryTransactionId: string },
   amount: Prisma.Decimal,
   note: string
 ): Promise<Prisma.Decimal> {

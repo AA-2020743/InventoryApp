@@ -3,6 +3,7 @@ package com.supermarket.inventory.data.repository
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.apiCall
 import com.supermarket.inventory.data.remote.ApiService
+import com.supermarket.inventory.data.remote.dto.CollectPartialRequest
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.SaleEditInput
 import com.supermarket.inventory.data.remote.dto.SaleInput
@@ -72,4 +73,7 @@ class SalesRepository @Inject constructor(private val api: ApiService) {
     suspend fun deleteSale(id: String): ApiResult<Unit> = apiCall { api.deleteSale(id) }
 
     suspend fun collectSale(id: String): ApiResult<SaleDto> = apiCall { api.collectSale(id) }
+
+    suspend fun collectSalePartial(id: String, amount: Double): ApiResult<SaleDto> =
+        apiCall { api.collectSalePartial(id, CollectPartialRequest(amount)) }
 }

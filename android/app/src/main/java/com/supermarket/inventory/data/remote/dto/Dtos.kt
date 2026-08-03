@@ -153,7 +153,11 @@ data class SaleDto(
     val collectedAt: String?,
     val createdAt: String,
     val items: List<SaleItemDto>,
+    val amountCollected: String = "0",
 )
+
+@JsonClass(generateAdapter = true)
+data class CollectPartialRequest(val amount: Double)
 
 @JsonClass(generateAdapter = true)
 data class ExpenseDto(
@@ -321,3 +325,29 @@ data class SettingsDto(val startingValue: String)
 
 @JsonClass(generateAdapter = true)
 data class UpdateSettingsRequest(val startingValue: Double)
+
+@JsonClass(generateAdapter = true)
+data class OtherSaleDto(
+    val id: String,
+    val amount: String,
+    val category: String?,
+    val notes: String?,
+    val date: String,
+    val createdAt: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class OtherSaleInput(
+    val amount: Double,
+    val category: String?,
+    val notes: String?,
+    val date: String?,
+)
+
+@JsonClass(generateAdapter = true)
+data class OtherSalesForRangeResponse(
+    val period: String,
+    val date: String,
+    val items: List<OtherSaleDto>,
+    val total: String,
+)

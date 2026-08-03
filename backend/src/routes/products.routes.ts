@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
+import { applyCashDeduction } from "./cashRegister.routes";
 
 export const productsRouter = Router();
 
@@ -96,24 +97,38 @@ productsRouter.post(
       throw new HttpError(400, "Products without a barcode must have a fallback image");
     }
 
-    const product = await prisma.product.create({
-      data: {
-        ...data,
-        barcode: data.barcode ?? null,
-      },
-    });
-
-    if (product.quantity.gt(0)) {
-      await prisma.inventoryTransaction.create({
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
         data: {
-          productId: product.id,
-          type: "RESTOCK",
-          quantityChange: product.quantity,
-          unitCost: product.purchaseCost,
-          note: "Initial stock on product creation",
+          ...data,
+          barcode: data.barcode ?? null,
         },
       });
-    }
+
+      if (created.quantity.gt(0)) {
+        const txn = await tx.inventoryTransaction.create({
+          data: {
+            productId: created.id,
+            type: "RESTOCK",
+            quantityChange: created.quantity,
+            unitCost: created.purchaseCost,
+            note: "Initial stock on product creation",
+          },
+        });
+        // Paying for initial stock always tries the till first, same as
+        // any other restock not tied to a supplier invoice.
+        const cost = created.purchaseCost.mul(created.quantity);
+        const deficit = await applyCashDeduction(
+          tx,
+          { inventoryTransactionId: txn.id },
+          cost,
+          `Initial stock: ${created.name}`
+        );
+        await tx.inventoryTransaction.update({ where: { id: txn.id }, data: { deficitAmount: deficit } });
+      }
+
+      return created;
+    });
 
     res.status(201).json(product);
   })
@@ -160,25 +175,43 @@ productsRouter.post(
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) throw new HttpError(404, "Product not found");
 
-    const [updated] = await prisma.$transaction([
-      prisma.product.update({
+    const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedProduct = await tx.product.update({
         where: { id: product.id },
         data: {
           quantity: { increment: quantity },
           ...(unitCost !== undefined ? { purchaseCost: unitCost } : {}),
         },
-      }),
-      prisma.inventoryTransaction.create({
+      });
+      const txn = await tx.inventoryTransaction.create({
         data: {
           productId: product.id,
           type: "RESTOCK",
           quantityChange: quantity,
-          unitCost: unitCost ?? product.purchaseCost,
+          unitCost: effectiveUnitCost,
           note,
           supplierInvoiceId,
         },
-      }),
-    ]);
+      });
+
+      // Only when this restock isn't tied to a supplier invoice - that
+      // invoice's own PENDING/PAID lifecycle already governs when cash
+      // leaves the register for it, so deducting here too would double-pay.
+      if (!supplierInvoiceId) {
+        const cost = effectiveUnitCost.mul(quantity);
+        const deficit = await applyCashDeduction(
+          tx,
+          { inventoryTransactionId: txn.id },
+          cost,
+          `Restock: ${product.name}`
+        );
+        await tx.inventoryTransaction.update({ where: { id: txn.id }, data: { deficitAmount: deficit } });
+      }
+
+      return updatedProduct;
+    });
 
     res.json(updated);
   })

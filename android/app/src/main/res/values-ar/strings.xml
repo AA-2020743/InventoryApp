@@ -147,6 +147,9 @@
     <string name="deferred_sale_add">إضافة مبيعة آجلة</string>
     <string name="deferred_sale_amount">المبلغ المستحق</string>
     <string name="deferred_sale_invalid_amount">أدخل مبلغًا صحيحًا</string>
+    <string name="deferred_sale_remaining">المتبقي: %1$s</string>
+    <string name="deferred_sale_collect_partial">تحصيل جزئي</string>
+    <string name="deferred_sale_partial_exceeds_remaining">المبلغ يتجاوز الرصيد المتبقي</string>
     <string name="deferred_sale_customer">العميل: %1$s</string>
     <string name="deferred_sale_customer_unknown">لم يُسجَّل اسم العميل</string>
     <string name="deferred_sale_mark_collected">تحديد كمُحصَّل</string>
@@ -180,6 +183,17 @@
     <string name="expense_date">التاريخ</string>
     <string name="expense_deficit_badge">العجز: %1$s</string>
 
+    <!-- Other sales -->
+    <string name="other_sales_title">مبيعات أخرى</string>
+    <string name="other_sales_empty">لا توجد مبيعات أخرى بعد. اضغط + للإضافة.</string>
+    <string name="other_sale_add">إضافة بيع آخر</string>
+    <string name="other_sale_edit">تعديل البيع الآخر</string>
+    <string name="other_sale_amount">المبلغ</string>
+    <string name="other_sale_category">الفئة (اختياري)</string>
+    <string name="other_sale_notes">ملاحظات (اختياري)</string>
+    <string name="other_sale_date">التاريخ</string>
+    <string name="other_sale_uncategorized">غير مصنف</string>
+
     <!-- Stats -->
     <string name="stats_title">الإحصائيات</string>
     <string name="stats_top_products">الأصناف الأكثر مبيعًا</string>
@@ -204,6 +218,9 @@
     <string name="stats_expenses_total">الإجمالي: %1$s</string>
     <string name="stats_expenses_deficit">العجز: %1$s</string>
     <string name="stats_no_expenses_this_period">لا توجد مصروفات في هذه الفترة</string>
+    <string name="stats_other_sales_title">مبيعات أخرى</string>
+    <string name="stats_other_sales_total">الإجمالي: %1$s</string>
+    <string name="stats_no_other_sales_this_period">لا توجد مبيعات أخرى في هذه الفترة</string>
     <string name="stats_other">أخرى</string>
 
     <!-- Settings -->

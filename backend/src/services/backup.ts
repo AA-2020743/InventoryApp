@@ -22,13 +22,14 @@ export interface BackupPayload {
   assets: any[];
   cashRegisterEntries: any[];
   businessSettings: any | null;
+  otherSales: any[];
 }
 
 // The owner's login (User) is deliberately excluded: it isn't "business
 // data" the way the rest of this is, and restoring an old password hash
 // over the current one could lock the owner out of their own backend.
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries, businessSettings] =
+  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries, businessSettings, otherSales] =
     await Promise.all([
       prisma.supplier.findMany(),
       prisma.product.findMany(),
@@ -40,6 +41,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
       prisma.asset.findMany(),
       prisma.cashRegisterEntry.findMany(),
       prisma.businessSettings.findFirst(),
+      prisma.otherSale.findMany(),
     ]);
 
   return {
@@ -55,6 +57,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     assets,
     cashRegisterEntries,
     businessSettings,
+    otherSales,
   };
 }
 
@@ -79,6 +82,7 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       await tx.asset.deleteMany();
       await tx.cashRegisterEntry.deleteMany();
       await tx.businessSettings.deleteMany();
+      await tx.otherSale.deleteMany();
 
       // Parents before children, mirroring the delete order above.
       if (payload.suppliers.length) {
@@ -151,6 +155,15 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       if (payload.businessSettings) {
         await tx.businessSettings.create({
           data: { ...payload.businessSettings, updatedAt: toDate(payload.businessSettings.updatedAt) ?? new Date() },
+        });
+      }
+      if (payload.otherSales?.length) {
+        await tx.otherSale.createMany({
+          data: payload.otherSales.map((r) => ({
+            ...r,
+            date: toDate(r.date),
+            createdAt: toDate(r.createdAt),
+          })),
         });
       }
     },

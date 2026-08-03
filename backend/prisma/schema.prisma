@@ -80,6 +80,11 @@ model InventoryTransaction {
   note           String?
   supplierInvoiceId String?
   supplierInvoice   SupplierInvoice?      @relation(fields: [supplierInvoiceId], references: [id])
+  // RESTOCK only, and only when not linked to a supplierInvoice above (that
+  // invoice's own PENDING/PAID lifecycle already governs the cash side) -
+  // set when paying for this stock couldn't be fully covered by the cash
+  // register. Same always-deduct mechanism as Expense/SupplierInvoice.
+  deficitAmount  Decimal                  @default(0) @db.Decimal(12, 2)
   createdAt      DateTime                 @default(now())
 
   @@index([productId])
@@ -145,6 +150,11 @@ model Sale {
   customerName  String?
   collectedAt   DateTime?
   createdAt   DateTime   @default(now())
+  // Running total actually received so far on a DEFERRED sale via partial
+  // repayments (see collect-partial in sales.routes.ts). Reaches
+  // totalAmount exactly when the sale flips to PAID. Always 0 for a sale
+  // that was PAID from the start.
+  amountCollected Decimal @default(0) @db.Decimal(12, 2)
 
   items SaleItem[]
 
@@ -182,6 +192,19 @@ model Expense {
   createdAt     DateTime @default(now())
 }
 
+// A miscellaneous profit entry not tied to inventory or a checkout sale
+// (e.g. a service fee, a one-off arrangement) - the mirror image of
+// Expense, except there's no deficit concept since receiving money can't
+// come up short: it always credits the cash register in full immediately.
+model OtherSale {
+  id        String   @id @default(uuid())
+  amount    Decimal  @db.Decimal(12, 2)
+  category  String?
+  notes     String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
 // Non-inventory business property (equipment, fixtures, etc.) that still
 // counts toward "what is this business worth" - its value is summed into
 // the dashboard's net valuation alongside inventory, separately from
@@ -215,6 +238,19 @@ model CashRegisterEntry {
   // register (fully or partially), mirroring saleId - lets editing/deleting
   // that expense find and adjust or remove exactly this entry.
   expenseId String?
+  // Set for the entry auto-created when a RESTOCK is paid out of the
+  // register (not linked to a supplier invoice), mirroring expenseId.
+  inventoryTransactionId String?
+  // Set for the entry auto-created when a miscellaneous profit entry
+  // (OtherSale) is recorded, mirroring expenseId.
+  otherSaleId String?
+  // True only for entries created by a partial repayment on a DEFERRED
+  // sale (see collectSaleAmount in sales.routes.ts). A sale can have many
+  // of these over time, unlike the single sync entry create/edit maintain
+  // via saleId - keeping them flagged lets that single-entry lookup
+  // (findFirst by saleId) skip these instead of getting confused by which
+  // one to treat as "the" entry.
+  isPartialSaleCollection Boolean @default(false)
   createdAt DateTime @default(now())
 
   @@index([createdAt])

@@ -8,9 +8,11 @@ import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.ExpensesForRangeResponse
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
+import com.supermarket.inventory.data.remote.dto.OtherSalesForRangeResponse
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
 import com.supermarket.inventory.data.repository.ExpenseRepository
+import com.supermarket.inventory.data.repository.OtherSaleRepository
 import com.supermarket.inventory.data.repository.SalesRepository
 import com.supermarket.inventory.data.repository.StatsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +34,7 @@ data class StatsUiState(
     val margins: List<MarginItemDto> = emptyList(),
     val salesForDay: List<SaleDto> = emptyList(),
     val expensesForRange: ExpensesForRangeResponse? = null,
+    val otherSalesForRange: OtherSalesForRangeResponse? = null,
     val periodRevenue: String = "0",
     val periodCost: String = "0",
     val periodProfit: String = "0",
@@ -43,6 +46,7 @@ class StatsViewModel @Inject constructor(
     private val statsRepository: StatsRepository,
     private val salesRepository: SalesRepository,
     private val expenseRepository: ExpenseRepository,
+    private val otherSaleRepository: OtherSaleRepository,
 ) : ViewModel() {
 
     var uiState by mutableStateOf(StatsUiState())
@@ -80,6 +84,7 @@ class StatsViewModel @Inject constructor(
 
             var salesForDay: List<SaleDto> = emptyList()
             var expensesForRange: ExpensesForRangeResponse? = null
+            var otherSalesForRange: OtherSalesForRangeResponse? = null
             var revenue = "0"
             var cost = "0"
             var profit = "0"
@@ -102,6 +107,10 @@ class StatsViewModel @Inject constructor(
                     is ApiResult.Success -> expensesForRange = expensesResult.data
                     is ApiResult.Error -> Unit
                 }
+                when (val otherSalesResult = otherSaleRepository.getForRange("day", dayStart)) {
+                    is ApiResult.Success -> otherSalesForRange = otherSalesResult.data
+                    is ApiResult.Error -> Unit
+                }
             } else {
                 val monthStart = uiState.selectedDate.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant().toString()
                 val monthEnd = uiState.selectedDate.withDayOfMonth(uiState.selectedDate.lengthOfMonth())
@@ -117,6 +126,10 @@ class StatsViewModel @Inject constructor(
                 }
                 when (val expensesResult = expenseRepository.getExpensesForRange("month", monthStart)) {
                     is ApiResult.Success -> expensesForRange = expensesResult.data
+                    is ApiResult.Error -> Unit
+                }
+                when (val otherSalesResult = otherSaleRepository.getForRange("month", monthStart)) {
+                    is ApiResult.Success -> otherSalesForRange = otherSalesResult.data
                     is ApiResult.Error -> Unit
                 }
             }
@@ -136,6 +149,7 @@ class StatsViewModel @Inject constructor(
                 margins = margins,
                 salesForDay = salesForDay,
                 expensesForRange = expensesForRange,
+                otherSalesForRange = otherSalesForRange,
                 periodRevenue = revenue,
                 periodCost = cost,
                 periodProfit = profit,

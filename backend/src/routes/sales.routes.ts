@@ -9,28 +9,72 @@ export const salesRouter = Router();
 // Keeps the cash register in sync with a sale's payment state: a
 // PAID (non-deferred) sale credits its amount to the till automatically
 // (cash actually changed hands at checkout), while a DEFERRED one doesn't
-// until it's collected. Called on create, collect, and edit so the same
-// logic handles "went from deferred to paid" and "amount changed" without
-// duplicating entries - it finds the one entry already linked to this sale
-// (if any) via saleId and updates or removes it instead of blindly adding.
+// until it's collected. Called on create and edit so the same logic
+// handles "went from deferred to paid" and "amount changed" without
+// duplicating entries - it finds the one *sync* entry already linked to
+// this sale (if any) via saleId and updates or removes it instead of
+// blindly adding. Explicitly excludes isPartialSaleCollection entries
+// (collectSaleAmount's own ledger rows) from that lookup, and only ever
+// syncs totalAmount-amountCollected - the part partial payments haven't
+// already covered - so a sale that's been partially collected and then
+// force-flipped to PAID via a direct edit doesn't get double-credited.
 async function syncSaleCashEntry(
   tx: Prisma.TransactionClient,
   saleId: string,
   paymentStatus: "PAID" | "DEFERRED",
-  totalAmount: Prisma.Decimal
+  totalAmount: Prisma.Decimal,
+  amountCollected: Prisma.Decimal
 ): Promise<void> {
-  const existing = await tx.cashRegisterEntry.findFirst({ where: { saleId } });
-  if (paymentStatus === "PAID") {
+  const existing = await tx.cashRegisterEntry.findFirst({ where: { saleId, isPartialSaleCollection: false } });
+  const syncAmount = totalAmount.sub(amountCollected);
+  if (paymentStatus === "PAID" && syncAmount.gt(0)) {
     if (existing) {
-      if (!existing.amount.equals(totalAmount)) {
-        await tx.cashRegisterEntry.update({ where: { id: existing.id }, data: { amount: totalAmount } });
+      if (!existing.amount.equals(syncAmount)) {
+        await tx.cashRegisterEntry.update({ where: { id: existing.id }, data: { amount: syncAmount } });
       }
     } else {
-      await tx.cashRegisterEntry.create({ data: { amount: totalAmount, note: `Sale ${saleId}`, saleId } });
+      await tx.cashRegisterEntry.create({ data: { amount: syncAmount, note: `Sale ${saleId}`, saleId } });
     }
   } else if (existing) {
     await tx.cashRegisterEntry.delete({ where: { id: existing.id } });
   }
+}
+
+// Records a real cash payment toward a DEFERRED sale's outstanding balance
+// - full or partial. Each call adds its own cash-register entry (flagged
+// isPartialSaleCollection so syncSaleCashEntry's lookup for the sale's own
+// create/edit sync entry never touches these), and the sale flips to PAID
+// once the running total reaches its totalAmount.
+async function collectSaleAmount(
+  tx: Prisma.TransactionClient,
+  sale: { id: string; totalAmount: Prisma.Decimal; amountCollected: Prisma.Decimal },
+  amount: Prisma.Decimal
+) {
+  const remaining = sale.totalAmount.sub(sale.amountCollected);
+  if (amount.lte(0) || amount.gt(remaining)) {
+    throw new HttpError(400, `Amount must be between 0 and the remaining balance (${remaining.toString()})`);
+  }
+
+  const newAmountCollected = sale.amountCollected.add(amount);
+  const isFullyCollected = newAmountCollected.gte(sale.totalAmount);
+
+  await tx.cashRegisterEntry.create({
+    data: {
+      amount,
+      note: `Payment received for sale ${sale.id}`,
+      saleId: sale.id,
+      isPartialSaleCollection: true,
+    },
+  });
+
+  return tx.sale.update({
+    where: { id: sale.id },
+    data: {
+      amountCollected: newAmountCollected,
+      ...(isFullyCollected ? { paymentStatus: "PAID" as const, collectedAt: new Date() } : {}),
+    },
+    include: { items: { include: { product: true } } },
+  });
 }
 
 const saleInput = z.object({
@@ -136,7 +180,7 @@ salesRouter.post(
           },
           include: { items: { include: { product: true } } },
         });
-        await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount);
+        await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount, created.amountCollected);
         return created;
       });
       res.status(201).json(sale);
@@ -205,7 +249,7 @@ salesRouter.post(
         });
       }
 
-      await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount);
+      await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount, created.amountCollected);
 
       return created;
     });
@@ -214,24 +258,45 @@ salesRouter.post(
   })
 );
 
-// Marks a DEFERRED sale as collected - cash is now actually received, so
-// this is the point syncSaleCashEntry credits the register, not sale
-// creation. Re-collecting an already-PAID sale just re-stamps collectedAt
-// rather than erroring (harmless, and syncSaleCashEntry is a no-op since
-// its linked entry already exists with the right amount).
+// Marks a DEFERRED sale as fully collected in one go - equivalent to a
+// collect-partial for the entire remaining balance. Re-collecting an
+// already-fully-collected sale just re-stamps collectedAt rather than
+// erroring (harmless).
 salesRouter.post(
   "/:id/collect",
   asyncHandler(async (req, res) => {
     const sale = await prisma.$transaction(async (tx) => {
       const existing = await tx.sale.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Sale not found");
-      const updated = await tx.sale.update({
-        where: { id: existing.id },
-        data: { paymentStatus: "PAID", collectedAt: new Date() },
-        include: { items: { include: { product: true } } },
-      });
-      await syncSaleCashEntry(tx, updated.id, "PAID", updated.totalAmount);
-      return updated;
+
+      const remaining = existing.totalAmount.sub(existing.amountCollected);
+      if (remaining.lte(0)) {
+        return tx.sale.update({
+          where: { id: existing.id },
+          data: { paymentStatus: "PAID", collectedAt: new Date() },
+          include: { items: { include: { product: true } } },
+        });
+      }
+      return collectSaleAmount(tx, existing, remaining);
+    });
+    res.json(sale);
+  })
+);
+
+const collectPartialInput = z.object({ amount: z.number().positive() });
+
+// Records a real partial payment toward a DEFERRED sale's outstanding
+// balance - e.g. a customer paying down part of their tab rather than the
+// whole thing at once. See collectSaleAmount.
+salesRouter.post(
+  "/:id/collect-partial",
+  asyncHandler(async (req, res) => {
+    const { amount } = collectPartialInput.parse(req.body);
+    const sale = await prisma.$transaction(async (tx) => {
+      const existing = await tx.sale.findUnique({ where: { id: req.params.id } });
+      if (!existing) throw new HttpError(404, "Sale not found");
+      if (existing.paymentStatus !== "DEFERRED") throw new HttpError(400, "Sale is not deferred");
+      return collectSaleAmount(tx, existing, new Prisma.Decimal(amount));
     });
     res.json(sale);
   })
@@ -336,7 +401,7 @@ salesRouter.put(
           });
         }
 
-        await syncSaleCashEntry(tx, sale.id, sale.paymentStatus, sale.totalAmount);
+        await syncSaleCashEntry(tx, sale.id, sale.paymentStatus, sale.totalAmount, sale.amountCollected);
 
         return sale;
       },

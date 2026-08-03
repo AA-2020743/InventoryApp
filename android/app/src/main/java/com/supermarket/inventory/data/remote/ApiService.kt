@@ -109,6 +109,9 @@ interface ApiService {
     @POST("api/sales/{id}/collect")
     suspend fun collectSale(@Path("id") id: String): SaleDto
 
+    @POST("api/sales/{id}/collect-partial")
+    suspend fun collectSalePartial(@Path("id") id: String, @Body request: CollectPartialRequest): SaleDto
+
     // Expenses
     @GET("api/expenses")
     suspend fun getExpenses(): List<ExpenseDto>
@@ -127,6 +130,28 @@ interface ApiService {
 
     @DELETE("api/expenses/{id}")
     suspend fun deleteExpense(@Path("id") id: String)
+
+    // Other sales (miscellaneous profit entries)
+    @GET("api/other-sales")
+    suspend fun getOtherSales(): List<OtherSaleDto>
+
+    @GET("api/other-sales/categories")
+    suspend fun getOtherSaleCategories(): List<String>
+
+    @GET("api/other-sales/for-range")
+    suspend fun getOtherSalesForRange(
+        @Query("period") period: String,
+        @Query("date") date: String? = null,
+    ): OtherSalesForRangeResponse
+
+    @POST("api/other-sales")
+    suspend fun createOtherSale(@Body input: OtherSaleInput): OtherSaleDto
+
+    @PUT("api/other-sales/{id}")
+    suspend fun updateOtherSale(@Path("id") id: String, @Body input: OtherSaleInput): OtherSaleDto
+
+    @DELETE("api/other-sales/{id}")
+    suspend fun deleteOtherSale(@Path("id") id: String)
 
     // Assets
     @GET("api/assets")

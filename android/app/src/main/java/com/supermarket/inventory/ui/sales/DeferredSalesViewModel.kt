@@ -47,6 +47,12 @@ class DeferredSalesViewModel @Inject constructor(
         }
     }
 
+    suspend fun collectPartial(id: String, amount: Double): ApiResult<SaleDto> {
+        val result = salesRepository.collectSalePartial(id, amount)
+        if (result is ApiResult.Success) load()
+        return result
+    }
+
     suspend fun addManualDeferredSale(amount: Double, customerName: String?) =
         salesRepository.createManualDeferredSale(amount, customerName)
 }

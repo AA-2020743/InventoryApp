@@ -147,6 +147,9 @@
     <string name="deferred_sale_add">Add deferred sale</string>
     <string name="deferred_sale_amount">Amount owed</string>
     <string name="deferred_sale_invalid_amount">Enter a valid amount</string>
+    <string name="deferred_sale_remaining">Remaining: %1$s</string>
+    <string name="deferred_sale_collect_partial">Collect partial</string>
+    <string name="deferred_sale_partial_exceeds_remaining">Amount exceeds the remaining balance</string>
     <string name="deferred_sale_customer">Customer: %1$s</string>
     <string name="deferred_sale_customer_unknown">Customer not recorded</string>
     <string name="deferred_sale_mark_collected">Mark collected</string>
@@ -180,6 +183,17 @@
     <string name="expense_date">Date</string>
     <string name="expense_deficit_badge">Deficit: %1$s</string>
 
+    <!-- Other sales -->
+    <string name="other_sales_title">Other sales</string>
+    <string name="other_sales_empty">No other sales yet. Tap + to add one.</string>
+    <string name="other_sale_add">Add other sale</string>
+    <string name="other_sale_edit">Edit other sale</string>
+    <string name="other_sale_amount">Amount</string>
+    <string name="other_sale_category">Category (optional)</string>
+    <string name="other_sale_notes">Notes (optional)</string>
+    <string name="other_sale_date">Date</string>
+    <string name="other_sale_uncategorized">Uncategorized</string>
+
     <!-- Stats -->
     <string name="stats_title">Statistics</string>
     <string name="stats_top_products">Top-selling items</string>
@@ -204,6 +218,9 @@
     <string name="stats_expenses_total">Total: %1$s</string>
     <string name="stats_expenses_deficit">Deficit: %1$s</string>
     <string name="stats_no_expenses_this_period">No expenses this period</string>
+    <string name="stats_other_sales_title">Other sales</string>
+    <string name="stats_other_sales_total">Total: %1$s</string>
+    <string name="stats_no_other_sales_this_period">No other sales this period</string>
     <string name="stats_other">Other</string>
 
     <!-- Settings -->

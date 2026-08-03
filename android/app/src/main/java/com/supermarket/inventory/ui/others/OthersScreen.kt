@@ -22,12 +22,14 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.ui.cashregister.CashRegisterTabContent
 import com.supermarket.inventory.ui.invoices.AssetsTabContent
 import com.supermarket.inventory.ui.invoices.InvoicesTabContent
+import com.supermarket.inventory.ui.othersales.OtherSalesTabContent
 import com.supermarket.inventory.ui.sales.DeferredSalesTabContent
 
 private enum class OthersTab(val titleRes: Int) {
     INVOICES(R.string.invoices_title),
     ASSETS(R.string.assets_title),
     DEFERRED_SALES(R.string.deferred_sales_title),
+    OTHER_SALES(R.string.other_sales_title),
     CASH_REGISTER(R.string.cash_register_title),
 }
 
@@ -59,6 +61,7 @@ fun OthersScreen() {
                     OthersTab.INVOICES -> InvoicesTabContent()
                     OthersTab.ASSETS -> AssetsTabContent()
                     OthersTab.DEFERRED_SALES -> DeferredSalesTabContent()
+                    OthersTab.OTHER_SALES -> OtherSalesTabContent()
                     OthersTab.CASH_REGISTER -> CashRegisterTabContent()
                 }
             }
