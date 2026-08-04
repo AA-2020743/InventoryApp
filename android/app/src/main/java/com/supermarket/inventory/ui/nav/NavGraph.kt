@@ -100,10 +100,10 @@ fun InventoryNavHost(sessionManager: SessionManager) {
     ) { padding ->
         val backStackEntry by navController.currentBackStackEntryAsState()
         // Sell no longer has its own bottom tab - this is the only entry
-        // point into selling, so it's shown on every remaining tab and
-        // jumps straight into scanning (or, as a fallback, searching).
-        val sellFabVisibleRoutes = setOf(Routes.DASHBOARD, Routes.INVENTORY, Routes.EXPENSES, Routes.INVOICES, Routes.STATS)
-        val sellFabVisible = backStackEntry?.destination?.route in sellFabVisibleRoutes
+        // point into selling, surfaced just on the main Dashboard summary
+        // so it doesn't clutter the other tabs. Jumps straight into
+        // scanning (or, as a fallback, searching).
+        val sellFabVisible = backStackEntry?.destination?.route == Routes.DASHBOARD
 
         Box(Modifier.padding(padding).fillMaxSize()) {
             NavHost(
