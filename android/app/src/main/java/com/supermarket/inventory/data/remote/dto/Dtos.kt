@@ -157,6 +157,13 @@ data class SaleDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class SalesForRangeResponse(
+    val period: String,
+    val date: String,
+    val items: List<SaleDto>,
+)
+
+@JsonClass(generateAdapter = true)
 data class CollectPartialRequest(val amount: Double)
 
 @JsonClass(generateAdapter = true)

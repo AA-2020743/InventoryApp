@@ -94,6 +94,13 @@ interface ApiService {
         @Query("paymentStatus") paymentStatus: String? = null,
     ): List<SaleDto>
 
+    @GET("api/sales/for-range")
+    suspend fun getSalesForRange(
+        @Query("period") period: String,
+        @Query("date") date: String? = null,
+        @Query("limit") limit: Int? = null,
+    ): SalesForRangeResponse
+
     @GET("api/sales/{id}")
     suspend fun getSale(@Path("id") id: String): SaleDto
 

@@ -90,13 +90,16 @@ class StatsViewModel @Inject constructor(
             var profit = "0"
 
             if (uiState.period == StatsPeriod.DAY) {
-                val dayStart = uiState.selectedDate.atStartOfDay(ZoneOffset.UTC).toInstant().toString()
-                val dayEnd = uiState.selectedDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toString()
-                when (val salesResult = salesRepository.getSales(from = dayStart, to = dayEnd, limit = 200)) {
+                // A bare "yyyy-MM-dd" carries no timezone of its own - the
+                // backend resolves the actual day boundaries against the
+                // business's Egypt timezone (see utils/dates.ts server-side),
+                // so this list can't drift with the phone's own clock/tz.
+                val dayStart = uiState.selectedDate.toString()
+                when (val salesResult = salesRepository.getSalesForRange(period = "day", date = dayStart, limit = 200)) {
                     is ApiResult.Success -> {
-                        salesForDay = salesResult.data
-                        val totalRevenue = salesResult.data.sumOf { it.totalAmount.toDoubleOrNull() ?: 0.0 }
-                        val totalCost = salesResult.data.sumOf { it.totalCost.toDoubleOrNull() ?: 0.0 }
+                        salesForDay = salesResult.data.items
+                        val totalRevenue = salesResult.data.items.sumOf { it.totalAmount.toDoubleOrNull() ?: 0.0 }
+                        val totalCost = salesResult.data.items.sumOf { it.totalCost.toDoubleOrNull() ?: 0.0 }
                         revenue = totalRevenue.toString()
                         cost = totalCost.toString()
                         profit = (totalRevenue - totalCost).toString()

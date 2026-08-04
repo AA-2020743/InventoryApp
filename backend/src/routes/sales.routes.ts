@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
+import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
 
 export const salesRouter = Router();
 
@@ -128,6 +129,34 @@ salesRouter.get(
       take: limit,
     });
     res.json(sales);
+  })
+);
+
+// GET /api/sales/for-range?period=day|month&date= - the sales list for a
+// specific calendar day or month, boundaries pinned to the business's
+// timezone (see utils/dates.ts) rather than whatever instant the client
+// happened to compute - this is what the Stats screen's day/month sales
+// list uses instead of raw /?from=&to=, so a sale right after midnight in
+// Cairo always lands under the right day regardless of the phone's own
+// clock/timezone settings. Registered before /:id so "for-range" isn't
+// swallowed as an id param.
+salesRouter.get(
+  "/for-range",
+  asyncHandler(async (req, res) => {
+    const period = req.query.period === "month" ? "month" : "day";
+    const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
+    const from = period === "month" ? startOfMonth(dateParam) : startOfDay(dateParam);
+    const to = period === "month" ? startOfNextMonth(dateParam) : startOfNextDay(dateParam);
+    const limit = req.query.limit ? Number(req.query.limit) : 200;
+
+    const sales = await prisma.sale.findMany({
+      where: { createdAt: { gte: from, lt: to } },
+      include: { items: { include: { product: true } } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+
+    res.json({ period, date: dateOnlyKey(dateParam).toISOString().slice(0, 10), items: sales });
   })
 );
 

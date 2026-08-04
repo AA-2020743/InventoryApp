@@ -8,6 +8,7 @@ import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.SaleEditInput
 import com.supermarket.inventory.data.remote.dto.SaleInput
 import com.supermarket.inventory.data.remote.dto.SaleItemInput
+import com.supermarket.inventory.data.remote.dto.SalesForRangeResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,6 +23,13 @@ class SalesRepository @Inject constructor(private val api: ApiService) {
     ): ApiResult<List<SaleDto>> = apiCall { api.getSales(from, to, limit, paymentStatus) }
 
     suspend fun getSale(id: String): ApiResult<SaleDto> = apiCall { api.getSale(id) }
+
+    // Sales list for a calendar day/month, boundaries resolved server-side
+    // against the business's Egypt timezone (see backend utils/dates.ts) -
+    // pass a plain "yyyy-MM-dd" date so no client timezone assumption is
+    // baked into the request at all.
+    suspend fun getSalesForRange(period: String, date: String, limit: Int? = null): ApiResult<SalesForRangeResponse> =
+        apiCall { api.getSalesForRange(period, date, limit) }
 
     suspend fun createSale(
         items: List<Pair<String, Double>>,
