@@ -260,10 +260,13 @@ const spoilSchema = z.object({
 });
 
 // Removes spoiled/damaged stock from inventory and books its original cost
-// as a regular Expense - same always-deduct-from-register + deficit-on-
-// shortfall mechanism as any other expense (see applyCashDeduction), so it
-// shows up in the Expenses tab, day/month expense totals, and the overall
-// deficit exactly like a normal expense would.
+// as a plain Expense record (shows up in the Expenses tab and day/month
+// expense totals) - deliberately does NOT run it through
+// applyCashDeduction/the cash register. No cash actually changes hands when
+// stock spoils (unlike paying a supplier or a bill), and the loss is
+// already fully reflected the moment quantity drops out of inventoryValue;
+// also deducting/deficit-tracking the same amount against the cash
+// register would double-count it in netValuation.
 productsRouter.post(
   "/:id/spoil",
   asyncHandler(async (req, res) => {
@@ -296,10 +299,8 @@ productsRouter.post(
       const expense = await tx.expense.create({
         data: { name: expenseName, amount: cost, notes: notes ?? null },
       });
-      const deficit = await applyCashDeduction(tx, { expenseId: expense.id }, cost, expenseName);
-      const updatedExpense = await tx.expense.update({ where: { id: expense.id }, data: { deficitAmount: deficit } });
 
-      return { product: updatedProduct, expense: updatedExpense };
+      return { product: updatedProduct, expense };
     });
 
     res.json(result);
