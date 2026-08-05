@@ -157,6 +157,11 @@ private fun SellFabMiniAction(icon: ImageVector, label: String, onClick: () -> U
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
             shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
         ) {
             Text(
                 label,
