@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -55,13 +56,15 @@ import com.supermarket.inventory.R
 // owner doesn't have to navigate anywhere just to tap scan.
 // A gentle breathing pulse hints it's there without demanding attention.
 // Tapping it opens the scanner directly; tapping it again (it morphs into
-// a close button) reveals a "search" fallback for when a barcode won't
-// scan, jumping to Sell with the manual-entry field already focused.
+// a close button) reveals two fallback actions: "search" for when a barcode
+// won't scan (jumps to Sell with the manual-entry field already focused),
+// and "spoiled product" for pulling damaged/expired stock out of inventory.
 @Composable
 fun BoxScope.SellFab(
     visible: Boolean,
     onScan: () -> Unit,
     onSearch: () -> Unit,
+    onSpoil: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     LaunchedEffect(visible) { if (!visible) expanded = false }
@@ -94,6 +97,12 @@ fun BoxScope.SellFab(
             ) {
                 AnimatedVisibility(visible = expanded, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                     Column(horizontalAlignment = Alignment.End) {
+                        SellFabMiniAction(
+                            icon = Icons.Filled.DeleteForever,
+                            label = stringResource(R.string.sell_fab_spoil),
+                            onClick = { expanded = false; onSpoil() },
+                        )
+                        Spacer(Modifier.height(12.dp))
                         SellFabMiniAction(
                             icon = Icons.Filled.Search,
                             label = stringResource(R.string.sell_fab_search),

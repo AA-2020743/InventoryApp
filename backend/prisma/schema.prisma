@@ -66,6 +66,7 @@ enum InventoryTransactionType {
   SALE
   ADJUSTMENT
   SALE_CORRECTION
+  SPOILAGE
 }
 
 // Audit trail of every stock movement, so current quantity is always
@@ -120,6 +121,10 @@ model SupplierInvoice {
   // mechanism (see applyCashDeduction).
   deficitAmount Decimal       @default(0) @db.Decimal(12, 2)
   notes         String?
+  // A photo of the physical invoice/receipt, uploaded via the generic
+  // /api/uploads/image endpoint (see uploads.routes.ts) - stores the
+  // returned relative URL, same convention as Product.imageUrl.
+  imageUrl      String?
   createdAt     DateTime      @default(now())
 
   inventoryTransactions InventoryTransaction[]

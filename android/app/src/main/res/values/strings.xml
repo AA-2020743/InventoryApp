@@ -13,6 +13,7 @@
     <!-- Common -->
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
     <string name="action_delete">Delete</string>
     <string name="action_edit">Edit</string>
     <string name="action_add">Add</string>
@@ -21,6 +22,16 @@
     <string name="action_scan">Scan</string>
     <string name="sell_fab_scan">Scan to sell</string>
     <string name="sell_fab_search">Search to sell</string>
+    <string name="sell_fab_spoil">Spoiled product</string>
+    <string name="spoiled_product_title">Spoiled Product</string>
+    <string name="spoiled_product_in_stock">In stock: %1$s</string>
+    <string name="spoiled_product_quantity_label">Quantity</string>
+    <string name="spoiled_product_quantity_grams_label">Grams</string>
+    <string name="spoiled_product_notes_label">Notes (optional)</string>
+    <string name="spoiled_product_confirm">Mark as spoiled</string>
+    <string name="spoiled_product_success">Removed from inventory and booked as an expense</string>
+    <string name="spoiled_product_invalid_quantity">Enter a valid quantity</string>
+    <string name="spoiled_product_insufficient_stock">Not enough stock available</string>
     <string name="action_confirm">Confirm</string>
     <string name="confirm_delete_named_title">Delete “%1$s”?</string>
     <string name="confirm_delete_message">This can\'t be undone.</string>
@@ -140,6 +151,9 @@
     <string name="invoice_status_paid">Paid</string>
     <string name="invoice_mark_paid">Mark as paid</string>
     <string name="invoice_overdue">Overdue</string>
+    <string name="invoice_attach_photo">Attach photo</string>
+    <string name="invoice_attachment">Invoice photo</string>
+    <string name="invoice_remove_attachment">Remove photo</string>
     <string name="invoice_due_soon">Due soon</string>
 
     <!-- Deferred sales -->

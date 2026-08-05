@@ -13,6 +13,7 @@
     <!-- Common -->
     <string name="action_save">حفظ</string>
     <string name="action_cancel">إلغاء</string>
+    <string name="action_close">إغلاق</string>
     <string name="action_delete">حذف</string>
     <string name="action_edit">تعديل</string>
     <string name="action_add">إضافة</string>
@@ -21,6 +22,16 @@
     <string name="action_scan">مسح</string>
     <string name="sell_fab_scan">مسح للبيع</string>
     <string name="sell_fab_search">بحث للبيع</string>
+    <string name="sell_fab_spoil">منتج تالف</string>
+    <string name="spoiled_product_title">منتج تالف</string>
+    <string name="spoiled_product_in_stock">المتوفر بالمخزون: %1$s</string>
+    <string name="spoiled_product_quantity_label">الكمية</string>
+    <string name="spoiled_product_quantity_grams_label">الجرامات</string>
+    <string name="spoiled_product_notes_label">ملاحظات (اختياري)</string>
+    <string name="spoiled_product_confirm">تحديد كتالف</string>
+    <string name="spoiled_product_success">تمت إزالته من المخزون وتسجيله كمصروف</string>
+    <string name="spoiled_product_invalid_quantity">أدخل كمية صحيحة</string>
+    <string name="spoiled_product_insufficient_stock">الكمية المتوفرة غير كافية</string>
     <string name="action_confirm">تأكيد</string>
     <string name="confirm_delete_named_title">هل تريد حذف "%1$s"؟</string>
     <string name="confirm_delete_message">لا يمكن التراجع عن هذا الإجراء.</string>
@@ -140,6 +151,9 @@
     <string name="invoice_status_paid">مدفوعة</string>
     <string name="invoice_mark_paid">تحديد كمدفوعة</string>
     <string name="invoice_overdue">متأخرة</string>
+    <string name="invoice_attach_photo">إرفاق صورة</string>
+    <string name="invoice_attachment">صورة الفاتورة</string>
+    <string name="invoice_remove_attachment">إزالة الصورة</string>
     <string name="invoice_due_soon">مستحقة قريبًا</string>
 
     <!-- Deferred sales -->

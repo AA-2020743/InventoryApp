@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.supermarket.inventory.R
-import java.io.File
+import com.supermarket.inventory.ui.common.copyUriToCacheFile
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -442,15 +442,4 @@ private fun AdjustDialog(onDismiss: () -> Unit, onConfirm: (Double, String) -> U
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
-}
-
-private fun copyUriToCacheFile(context: android.content.Context, uri: Uri): File? {
-    return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-        val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
-        inputStream.use { input -> file.outputStream().use { output -> input.copyTo(output) } }
-        file
-    } catch (_: Exception) {
-        null
-    }
 }

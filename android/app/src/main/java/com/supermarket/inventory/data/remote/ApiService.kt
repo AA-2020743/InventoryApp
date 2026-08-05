@@ -46,6 +46,9 @@ interface ApiService {
     @POST("api/products/{id}/adjust")
     suspend fun adjustProduct(@Path("id") id: String, @Body request: AdjustRequest): ProductDto
 
+    @POST("api/products/{id}/spoil")
+    suspend fun spoilProduct(@Path("id") id: String, @Body request: SpoilRequest): SpoilResponse
+
     @GET("api/products/{id}/transactions")
     suspend fun getProductTransactions(@Path("id") id: String): List<InventoryTransactionDto>
 

@@ -254,6 +254,58 @@ productsRouter.post(
   })
 );
 
+const spoilSchema = z.object({
+  quantity: z.number().positive(),
+  notes: z.string().trim().optional().nullable(),
+});
+
+// Removes spoiled/damaged stock from inventory and books its original cost
+// as a regular Expense - same always-deduct-from-register + deficit-on-
+// shortfall mechanism as any other expense (see applyCashDeduction), so it
+// shows up in the Expenses tab, day/month expense totals, and the overall
+// deficit exactly like a normal expense would.
+productsRouter.post(
+  "/:id/spoil",
+  asyncHandler(async (req, res) => {
+    const { quantity, notes } = spoilSchema.parse(req.body);
+
+    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!product) throw new HttpError(404, "Product not found");
+    if (quantity > product.quantity.toNumber()) {
+      throw new HttpError(400, "Spoiled quantity exceeds current stock");
+    }
+
+    const cost = product.purchaseCost.mul(quantity);
+    const expenseName = `Spoiled: ${product.name}`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedProduct = await tx.product.update({
+        where: { id: product.id },
+        data: { quantity: { decrement: quantity } },
+      });
+      await tx.inventoryTransaction.create({
+        data: {
+          productId: product.id,
+          type: "SPOILAGE",
+          quantityChange: new Prisma.Decimal(quantity).neg(),
+          unitCost: product.purchaseCost,
+          note: notes ?? expenseName,
+        },
+      });
+
+      const expense = await tx.expense.create({
+        data: { name: expenseName, amount: cost, notes: notes ?? null },
+      });
+      const deficit = await applyCashDeduction(tx, { expenseId: expense.id }, cost, expenseName);
+      const updatedExpense = await tx.expense.update({ where: { id: expense.id }, data: { deficitAmount: deficit } });
+
+      return { product: updatedProduct, expense: updatedExpense };
+    });
+
+    res.json(result);
+  })
+);
+
 productsRouter.get(
   "/:id/transactions",
   asyncHandler(async (req, res) => {

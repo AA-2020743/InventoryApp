@@ -1,5 +1,8 @@
 package com.supermarket.inventory.ui.invoices
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,12 +11,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,13 +52,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.supermarket.inventory.R
+import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.SupplierDto
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
+import com.supermarket.inventory.ui.common.copyUriToCacheFile
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
 import com.supermarket.inventory.ui.theme.LossRed
@@ -67,6 +82,7 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     var showManageSuppliers by remember { mutableStateOf(false) }
     var invoiceToEdit by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceToDelete by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
+    var invoiceImageToView by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -88,6 +104,7 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                             onMarkPaid = { viewModel.markPaid(invoice.id) },
                             onEdit = { invoiceToEdit = invoice },
                             onDelete = { invoiceToDelete = invoice },
+                            onViewImage = { invoice.imageUrl?.let { invoiceImageToView = viewModel.fullImageUrl(it) } },
                         )
                         Spacer(Modifier.height(8.dp))
                     }
@@ -139,10 +156,34 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             dismissButton = { TextButton(onClick = { invoiceToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
+
+    invoiceImageToView?.let { url ->
+        AlertDialog(
+            onDismissRequest = { invoiceImageToView = null },
+            title = { Text(stringResource(R.string.invoice_attachment)) },
+            text = {
+                AsyncImage(
+                    model = url,
+                    contentDescription = stringResource(R.string.invoice_attachment),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { invoiceImageToView = null }) { Text(stringResource(R.string.action_close)) }
+            },
+        )
+    }
 }
 
 @Composable
-private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun InvoiceRow(
+    invoice: SupplierInvoiceDto,
+    onMarkPaid: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onViewImage: () -> Unit,
+) {
     val now = Instant.now()
     val dueInstant = try { Instant.parse(invoice.dueDate) } catch (_: Exception) { now }
     val isOverdue = invoice.status == "PENDING" && dueInstant.isBefore(now)
@@ -168,6 +209,9 @@ private fun InvoiceRow(invoice: SupplierInvoiceDto, onMarkPaid: () -> Unit, onEd
                     }
                 }
                 Text(formatAmount(invoice.amount), style = MaterialTheme.typography.titleMedium)
+                if (invoice.imageUrl != null) {
+                    IconButton(onClick = onViewImage) { Icon(Icons.Filled.Image, contentDescription = stringResource(R.string.invoice_attachment)) }
+                }
                 IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
             }
@@ -213,7 +257,25 @@ private fun InvoiceDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var showQuickAddSupplier by remember { mutableStateOf(false) }
+    var imageUrl by remember { mutableStateOf(invoiceToEdit?.imageUrl) }
+    var isUploadingImage by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            val file = copyUriToCacheFile(context, uri)
+            if (file != null) {
+                isUploadingImage = true
+                scope.launch {
+                    when (val result = viewModel.uploadImage(file)) {
+                        is ApiResult.Success -> { imageUrl = result.data.url; isUploadingImage = false }
+                        is ApiResult.Error -> { error = result.message; isUploadingImage = false }
+                    }
+                }
+            }
+        }
+    }
 
     suspend fun reloadSuppliers(selectId: String? = null) {
         when (val result = viewModel.loadSuppliers()) {
@@ -277,6 +339,29 @@ private fun InvoiceDialog(
                             ?: stringResource(R.string.invoice_due_date),
                     )
                 }
+                Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val currentImageUrl = imageUrl
+                    if (currentImageUrl != null) {
+                        AsyncImage(
+                            model = viewModel.fullImageUrl(currentImageUrl),
+                            contentDescription = stringResource(R.string.invoice_attachment),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = { imageUrl = null }) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.invoice_remove_attachment))
+                        }
+                    } else if (isUploadingImage) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
+                        OutlinedButton(onClick = { imagePicker.launch("image/*") }) {
+                            Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.invoice_attach_photo))
+                        }
+                    }
+                }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
@@ -295,9 +380,9 @@ private fun InvoiceDialog(
                     scope.launch {
                         val dueIso = Instant.ofEpochMilli(due).atZone(ZoneOffset.UTC).toInstant().toString()
                         val result = if (invoiceToEdit != null) {
-                            viewModel.updateInvoice(invoiceToEdit.id, supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null)
+                            viewModel.updateInvoice(invoiceToEdit.id, supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null, imageUrl)
                         } else {
-                            viewModel.createInvoice(supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null)
+                            viewModel.createInvoice(supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null, imageUrl)
                         }
                         when (result) {
                             is com.supermarket.inventory.data.ApiResult.Success -> onDone()

@@ -42,6 +42,7 @@ import com.supermarket.inventory.ui.sales.SalesScreen
 import com.supermarket.inventory.ui.sales.SellFab
 import com.supermarket.inventory.ui.scan.BarcodeScannerScreen
 import com.supermarket.inventory.ui.settings.SettingsScreen
+import com.supermarket.inventory.ui.spoilage.SpoiledProductScreen
 import com.supermarket.inventory.ui.stats.StatsScreen
 
 private const val SCANNED_BARCODE_KEY = "scanned_barcode"
@@ -181,6 +182,15 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     StatsScreen(onEditSale = { saleId -> navController.navigate(Routes.editSale(saleId)) })
                 }
                 composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.SPOILED_PRODUCT) { backStackEntry ->
+                    val scannedBarcode by backStackEntry.scannedBarcodeState()
+                    SpoiledProductScreen(
+                        onScan = { navController.navigate(Routes.scan(ScanPurpose.SPOIL)) },
+                        scannedBarcode = scannedBarcode,
+                        onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
             }
 
             SellFab(
@@ -191,6 +201,9 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                 },
                 onSearch = {
                     navController.navigate(Routes.sales(focusSearch = true)) { launchSingleTop = true }
+                },
+                onSpoil = {
+                    navController.navigate(Routes.SPOILED_PRODUCT)
                 },
             )
         }

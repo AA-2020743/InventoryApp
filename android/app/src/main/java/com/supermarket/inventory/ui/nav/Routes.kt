@@ -15,6 +15,9 @@ object Routes {
     const val EDIT_SALE = "edit_sale/{saleId}"
     const val STATS = "stats"
     const val SETTINGS = "settings"
+    // Reached only from the floating sell button's "spoiled product" action -
+    // its own search/scan bar removes stock and books the cost as an expense.
+    const val SPOILED_PRODUCT = "spoiled_product"
 
     fun editSale(saleId: String) = "edit_sale/$saleId"
 
@@ -33,4 +36,5 @@ object Routes {
 object ScanPurpose {
     const val ADD_PRODUCT = "add_product"
     const val SELL = "sell"
+    const val SPOIL = "spoil"
 }

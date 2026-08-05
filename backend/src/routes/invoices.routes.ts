@@ -14,6 +14,7 @@ const invoiceInput = z.object({
   issueDate: z.coerce.date().optional(),
   dueDate: z.coerce.date(),
   notes: z.string().trim().optional().nullable(),
+  imageUrl: z.string().trim().optional().nullable(),
 });
 
 function paymentNote(invoiceNumber: string | null, supplierName: string): string {

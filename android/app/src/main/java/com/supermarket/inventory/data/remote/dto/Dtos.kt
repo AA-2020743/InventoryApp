@@ -56,6 +56,12 @@ data class RestockRequest(val quantity: Double, val unitCost: Double?, val note:
 data class AdjustRequest(val quantityChange: Double, val note: String)
 
 @JsonClass(generateAdapter = true)
+data class SpoilRequest(val quantity: Double, val notes: String?)
+
+@JsonClass(generateAdapter = true)
+data class SpoilResponse(val product: ProductDto, val expense: ExpenseDto)
+
+@JsonClass(generateAdapter = true)
 data class InventoryTransactionDto(
     val id: String,
     val productId: String,
@@ -93,6 +99,7 @@ data class SupplierInvoiceDto(
     val paidAt: String?,
     val deficitAmount: String,
     val notes: String?,
+    val imageUrl: String?,
     val createdAt: String,
 )
 
@@ -103,6 +110,7 @@ data class InvoiceInput(
     val amount: Double,
     val dueDate: String,
     val notes: String?,
+    val imageUrl: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

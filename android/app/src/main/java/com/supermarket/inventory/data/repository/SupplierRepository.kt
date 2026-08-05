@@ -4,6 +4,10 @@ import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.apiCall
 import com.supermarket.inventory.data.remote.ApiService
 import com.supermarket.inventory.data.remote.dto.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,8 +38,9 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
         amount: Double,
         dueDateIso: String,
         notes: String?,
+        imageUrl: String? = null,
     ): ApiResult<SupplierInvoiceDto> =
-        apiCall { api.createInvoice(InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes)) }
+        apiCall { api.createInvoice(InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes, imageUrl)) }
 
     suspend fun updateInvoice(
         id: String,
@@ -44,11 +49,18 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
         amount: Double,
         dueDateIso: String,
         notes: String?,
+        imageUrl: String? = null,
     ): ApiResult<SupplierInvoiceDto> =
-        apiCall { api.updateInvoice(id, InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes)) }
+        apiCall { api.updateInvoice(id, InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes, imageUrl)) }
 
     suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id) }
 
     suspend fun deleteInvoice(id: String): ApiResult<Unit> = apiCall { api.deleteInvoice(id) }
+
+    suspend fun uploadImage(file: File): ApiResult<UploadImageResponse> = apiCall {
+        val body = file.asRequestBody("image/*".toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("image", file.name, body)
+        api.uploadImage(part)
+    }
 }

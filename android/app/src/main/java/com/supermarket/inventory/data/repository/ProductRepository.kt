@@ -73,6 +73,9 @@ class ProductRepository @Inject constructor(
     suspend fun adjust(id: String, quantityChange: Double, note: String): ApiResult<ProductDto> =
         apiCall { api.adjustProduct(id, AdjustRequest(quantityChange, note)) }
 
+    suspend fun spoil(id: String, quantity: Double, notes: String?): ApiResult<SpoilResponse> =
+        apiCall { api.spoilProduct(id, SpoilRequest(quantity, notes)) }
+
     suspend fun getTransactions(id: String): ApiResult<List<InventoryTransactionDto>> =
         apiCall { api.getProductTransactions(id) }
 
