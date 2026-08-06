@@ -23,7 +23,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -186,13 +190,40 @@ fun SalesScreen(
                         }
                         if (state.isDeferred) {
                             Spacer(Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = state.customerName,
-                                onValueChange = viewModel::onCustomerNameChange,
-                                label = { Text(stringResource(R.string.sales_customer_name_label)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            var customerExpanded by remember { mutableStateOf(false) }
+                            val filteredCustomers = state.customerSuggestions.filter {
+                                state.customerName.isBlank() || it.contains(state.customerName, ignoreCase = true)
+                            }
+                            ExposedDropdownMenuBox(
+                                expanded = customerExpanded && filteredCustomers.isNotEmpty(),
+                                onExpandedChange = { customerExpanded = it },
+                            ) {
+                                OutlinedTextField(
+                                    value = state.customerName,
+                                    onValueChange = {
+                                        viewModel.onCustomerNameChange(it)
+                                        customerExpanded = true
+                                    },
+                                    label = { Text(stringResource(R.string.sales_customer_name_label)) },
+                                    singleLine = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = customerExpanded) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                )
+                                DropdownMenu(
+                                    expanded = customerExpanded && filteredCustomers.isNotEmpty(),
+                                    onDismissRequest = { customerExpanded = false },
+                                ) {
+                                    filteredCustomers.forEach { suggestion ->
+                                        DropdownMenuItem(
+                                            text = { Text(suggestion) },
+                                            onClick = {
+                                                viewModel.onCustomerNameChange(suggestion)
+                                                customerExpanded = false
+                                            },
+                                        )
+                                    }
+                                }
+                            }
                         }
                         Spacer(Modifier.height(8.dp))
                         Button(

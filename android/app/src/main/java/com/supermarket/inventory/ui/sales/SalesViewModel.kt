@@ -42,6 +42,7 @@ data class SalesUiState(
     val pendingWeightProduct: ProductDto? = null,
     val isDeferred: Boolean = false,
     val customerName: String = "",
+    val customerSuggestions: List<String> = emptyList(),
 ) {
     val total: BigDecimal get() = cart.fold(BigDecimal.ZERO) { acc, item -> acc.add(item.subtotal) }
 }
@@ -68,6 +69,16 @@ class SalesViewModel @Inject constructor(
         viewModelScope.launch {
             pendingSaleRepository.pendingCount.collect { count ->
                 uiState = uiState.copy(pendingSyncCount = count)
+            }
+        }
+        loadCustomerSuggestions()
+    }
+
+    private fun loadCustomerSuggestions() {
+        viewModelScope.launch {
+            when (val result = salesRepository.getCustomerNames()) {
+                is ApiResult.Success -> uiState = uiState.copy(customerSuggestions = result.data)
+                is ApiResult.Error -> Unit
             }
         }
     }

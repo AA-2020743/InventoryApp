@@ -1,5 +1,6 @@
 package com.supermarket.inventory.ui.sales
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,12 +17,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -51,6 +60,19 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
 
+    // Sales sharing the same (non-blank) customer name are one running tab
+    // in the owner's eyes even though each checkout/manual entry is its own
+    // Sale record underneath - grouped here into a single merged row per
+    // customer, sorted alphabetically. A blank/missing customer name can't
+    // be assumed to be the same person twice, so those stay ungrouped.
+    val namedGroups = remember(state.sales) {
+        state.sales
+            .filter { !it.customerName.isNullOrBlank() }
+            .groupBy { it.customerName!!.trim() }
+            .toSortedMap()
+    }
+    val unnamedSales = remember(state.sales) { state.sales.filter { it.customerName.isNullOrBlank() } }
+
     Box(Modifier.fillMaxSize()) {
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -61,7 +83,20 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(12.dp),
             ) {
-                items(state.sales, key = { it.id }) { sale ->
+                items(namedGroups.entries.toList(), key = { it.key }) { (customerName, sales) ->
+                    CustomerDeferredGroupCard(
+                        customerName = customerName,
+                        sales = sales,
+                        onCollectAll = {
+                            viewModel.viewModelScope.launch { viewModel.collectGroup(sales.map { it.id }) }
+                        },
+                        onCollectPartial = { amount ->
+                            viewModel.viewModelScope.launch { viewModel.collectPartialGroup(sales, amount) }
+                        },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(unnamedSales, key = { it.id }) { sale ->
                     DeferredSaleRow(
                         sale = sale,
                         onCollect = { viewModel.collect(sale.id) },
@@ -81,6 +116,7 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
 
     if (showAddDialog) {
         AddDeferredSaleDialog(
+            customerSuggestions = state.customerSuggestions,
             onDismiss = { showAddDialog = false },
             onSave = { amount, customerName ->
                 viewModel.viewModelScope.launch {
@@ -91,6 +127,93 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
                 }
                 showAddDialog = false
             },
+        )
+    }
+}
+
+// A customer's merged tab: one headline total (the sum of every underlying
+// deferred sale's remaining balance) with "collect" actions that apply
+// across all of them, and an expandable log of the individual entries that
+// add up to it - so adding a new deferred amount for a repeat customer
+// just grows this one total instead of piling up separate rows.
+@Composable
+private fun CustomerDeferredGroupCard(
+    customerName: String,
+    sales: List<SaleDto>,
+    onCollectAll: () -> Unit,
+    onCollectPartial: (Double) -> Unit,
+) {
+    val totalRemaining = sales.sumOf { sale ->
+        val total = sale.totalAmount.toDoubleOrNull() ?: 0.0
+        val collected = sale.amountCollected.toDoubleOrNull() ?: 0.0
+        (total - collected).coerceAtLeast(0.0)
+    }
+    var expanded by remember { mutableStateOf(false) }
+    var showPartialDialog by remember { mutableStateOf(false) }
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(customerName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.deferred_sale_remaining, formatAmount(totalRemaining.toString())),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
+                    )
+                }
+            }
+            if (expanded) {
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    stringResource(R.string.deferred_sale_history_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                sales.sortedByDescending { it.createdAt }.forEach { sale -> DeferredHistoryLogRow(sale) }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { showPartialDialog = true }) { Text(stringResource(R.string.deferred_sale_collect_partial)) }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onCollectAll) { Text(stringResource(R.string.deferred_sale_mark_collected)) }
+            }
+        }
+    }
+
+    if (showPartialDialog) {
+        PartialCollectDialog(
+            remaining = totalRemaining,
+            onDismiss = { showPartialDialog = false },
+            onConfirm = { amount -> onCollectPartial(amount); showPartialDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun DeferredHistoryLogRow(sale: SaleDto) {
+    val total = sale.totalAmount.toDoubleOrNull() ?: 0.0
+    val collected = sale.amountCollected.toDoubleOrNull() ?: 0.0
+    val remaining = (total - collected).coerceAtLeast(0.0)
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(formatIsoDateTime(sale.createdAt), style = MaterialTheme.typography.bodySmall)
+        Text(
+            if (collected > 0) {
+                stringResource(R.string.deferred_sale_history_entry_partial, formatAmount(sale.totalAmount), formatAmount(remaining.toString()))
+            } else {
+                formatAmount(sale.totalAmount)
+            },
+            style = MaterialTheme.typography.bodySmall,
         )
     }
 }
@@ -110,8 +233,7 @@ private fun DeferredSaleRow(sale: SaleDto, onCollect: () -> Unit, onCollectParti
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                sale.customerName?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.deferred_sale_customer, it) }
-                    ?: stringResource(R.string.deferred_sale_customer_unknown),
+                stringResource(R.string.deferred_sale_customer_unknown),
                 style = MaterialTheme.typography.bodySmall,
             )
             if (collected > 0) {
@@ -188,13 +310,23 @@ private fun PartialCollectDialog(remaining: Double, onDismiss: () -> Unit, onCon
 // to specific inventory - without going through the Sell screen's checkout
 // flow. It's still created as a DEFERRED sale server-side, so it shows up
 // in revenue/receivables (and the dashboard's net valuation) the same way
-// a normal deferred sale would.
+// a normal deferred sale would - and, once created, merges into that
+// customer's existing group on this screen if they already have one.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddDeferredSaleDialog(onDismiss: () -> Unit, onSave: (Double, String?) -> Unit) {
+private fun AddDeferredSaleDialog(
+    customerSuggestions: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (Double, String?) -> Unit,
+) {
     var amount by remember { mutableStateOf("") }
     var customerName by remember { mutableStateOf("") }
+    var customerExpanded by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val invalidAmountMessage = stringResource(R.string.deferred_sale_invalid_amount)
+    val filteredCustomers = customerSuggestions.filter {
+        customerName.isBlank() || it.contains(customerName, ignoreCase = true)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -208,13 +340,31 @@ private fun AddDeferredSaleDialog(onDismiss: () -> Unit, onSave: (Double, String
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                 )
-                OutlinedTextField(
-                    value = customerName,
-                    onValueChange = { customerName = it },
-                    label = { Text(stringResource(R.string.sales_customer_name_label)) },
-                    singleLine = true,
+                ExposedDropdownMenuBox(
+                    expanded = customerExpanded && filteredCustomers.isNotEmpty(),
+                    onExpandedChange = { customerExpanded = it },
                     modifier = Modifier.padding(top = 8.dp),
-                )
+                ) {
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it; customerExpanded = true },
+                        label = { Text(stringResource(R.string.sales_customer_name_label)) },
+                        singleLine = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = customerExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    DropdownMenu(
+                        expanded = customerExpanded && filteredCustomers.isNotEmpty(),
+                        onDismissRequest = { customerExpanded = false },
+                    ) {
+                        filteredCustomers.forEach { suggestion ->
+                            DropdownMenuItem(
+                                text = { Text(suggestion) },
+                                onClick = { customerName = suggestion; customerExpanded = false },
+                            )
+                        }
+                    }
+                }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             }
         },

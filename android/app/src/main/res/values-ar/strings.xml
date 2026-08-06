@@ -33,6 +33,8 @@
     <string name="spoiled_product_invalid_quantity">أدخل كمية صحيحة</string>
     <string name="spoiled_product_insufficient_stock">الكمية المتوفرة غير كافية</string>
     <string name="action_confirm">تأكيد</string>
+    <string name="action_expand">توسيع</string>
+    <string name="action_collapse">طي</string>
     <string name="confirm_delete_named_title">هل تريد حذف "%1$s"؟</string>
     <string name="confirm_delete_message">لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="error_generic">حدث خطأ ما. الرجاء المحاولة مرة أخرى.</string>
@@ -165,8 +167,9 @@
     <string name="deferred_sale_remaining">المتبقي: %1$s</string>
     <string name="deferred_sale_collect_partial">تحصيل جزئي</string>
     <string name="deferred_sale_partial_exceeds_remaining">المبلغ يتجاوز الرصيد المتبقي</string>
-    <string name="deferred_sale_customer">العميل: %1$s</string>
     <string name="deferred_sale_customer_unknown">لم يُسجَّل اسم العميل</string>
+    <string name="deferred_sale_history_title">السجل</string>
+    <string name="deferred_sale_history_entry_partial">%1$s (المتبقي %2$s)</string>
     <string name="deferred_sale_mark_collected">تحديد كمُحصَّل</string>
 
     <!-- Cash register -->

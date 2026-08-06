@@ -160,6 +160,25 @@ salesRouter.get(
   })
 );
 
+// Distinct customer names already used on a deferred sale, so the app can
+// suggest them while recording a new one instead of the owner having to
+// remember/retype exact spelling - typing a new one just creates it
+// implicitly (customerName is a plain field on Sale, not a separate managed
+// entity), same convention as Product.category. Registered before /:id so
+// "customers" isn't swallowed as an id param.
+salesRouter.get(
+  "/customers",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.sale.findMany({
+      where: { customerName: { not: null } },
+      distinct: ["customerName"],
+      select: { customerName: true },
+      orderBy: { customerName: "asc" },
+    });
+    res.json(rows.map((r) => r.customerName).filter((c): c is string => !!c && c.trim() !== ""));
+  })
+);
+
 salesRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {

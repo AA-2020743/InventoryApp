@@ -33,6 +33,8 @@
     <string name="spoiled_product_invalid_quantity">Enter a valid quantity</string>
     <string name="spoiled_product_insufficient_stock">Not enough stock available</string>
     <string name="action_confirm">Confirm</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
     <string name="confirm_delete_named_title">Delete “%1$s”?</string>
     <string name="confirm_delete_message">This can\'t be undone.</string>
     <string name="error_generic">Something went wrong. Please try again.</string>
@@ -165,8 +167,9 @@
     <string name="deferred_sale_remaining">Remaining: %1$s</string>
     <string name="deferred_sale_collect_partial">Collect partial</string>
     <string name="deferred_sale_partial_exceeds_remaining">Amount exceeds the remaining balance</string>
-    <string name="deferred_sale_customer">Customer: %1$s</string>
     <string name="deferred_sale_customer_unknown">Customer not recorded</string>
+    <string name="deferred_sale_history_title">History</string>
+    <string name="deferred_sale_history_entry_partial">%1$s (%2$s left)</string>
     <string name="deferred_sale_mark_collected">Mark collected</string>
 
     <!-- Cash register -->

@@ -104,6 +104,9 @@ interface ApiService {
         @Query("limit") limit: Int? = null,
     ): SalesForRangeResponse
 
+    @GET("api/sales/customers")
+    suspend fun getCustomerNames(): List<String>
+
     @GET("api/sales/{id}")
     suspend fun getSale(@Path("id") id: String): SaleDto
 

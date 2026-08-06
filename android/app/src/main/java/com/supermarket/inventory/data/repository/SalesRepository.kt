@@ -24,6 +24,11 @@ class SalesRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun getSale(id: String): ApiResult<SaleDto> = apiCall { api.getSale(id) }
 
+    // Distinct customer names already used on a deferred sale, for the
+    // autocomplete when entering a new one - same convention as
+    // ProductRepository's category suggestions.
+    suspend fun getCustomerNames(): ApiResult<List<String>> = apiCall { api.getCustomerNames() }
+
     // Sales list for a calendar day/month, boundaries resolved server-side
     // against the business's Egypt timezone (see backend utils/dates.ts) -
     // pass a plain "yyyy-MM-dd" date so no client timezone assumption is
