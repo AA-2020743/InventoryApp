@@ -12,12 +12,22 @@ import java.util.Locale
 // locale-derived one.
 private const val CURRENCY_SUFFIX = "LE"
 
+// Forces a run of Western digits/sign/currency text to render as one fixed
+// left-to-right unit even when it sits inside an RTL (Arabic) paragraph -
+// without this, a negative amount's "-" visually jumps to the wrong side
+// (e.g. "67,341.40-" instead of "-67,341.40") because plain digits/minus
+// have no strong directionality of their own and the bidi algorithm
+// resolves them against the surrounding RTL text instead.
+private const val LRI = "⁦" // Left-to-Right Isolate
+private const val PDI = "⁩" // Pop Directional Isolate
+private fun ltrIsolate(text: String) = "$LRI$text$PDI"
+
 fun formatAmount(value: String, locale: Locale = Locale.getDefault()): String = try {
     val format = NumberFormat.getNumberInstance(locale).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
     }
-    "${format.format(BigDecimal(value))} $CURRENCY_SUFFIX"
+    ltrIsolate("${format.format(BigDecimal(value))} $CURRENCY_SUFFIX")
 } catch (_: Exception) {
     value
 }
@@ -27,7 +37,7 @@ fun formatPercent(value: String, locale: Locale = Locale.getDefault()): String =
         minimumFractionDigits = 0
         maximumFractionDigits = 1
     }
-    format.format(BigDecimal(value))
+    ltrIsolate(format.format(BigDecimal(value)))
 } catch (_: Exception) {
     value
 }
@@ -38,7 +48,7 @@ fun formatQuantity(value: String, locale: Locale = Locale.getDefault()): String 
         minimumFractionDigits = 0
         maximumFractionDigits = 3
     }
-    format.format(decimal)
+    ltrIsolate(format.format(decimal))
 } catch (_: Exception) {
     value
 }
