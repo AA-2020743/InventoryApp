@@ -248,18 +248,24 @@ private fun MonthCard(month: DashboardPeriodDto) {
             Spacer(Modifier.height(8.dp))
             StatLine(stringResource(R.string.dashboard_expenses), formatAmount(month.expenses))
             Spacer(Modifier.height(8.dp))
-            StatLine(
-                stringResource(R.string.dashboard_profit),
-                formatAmount(month.profit),
-                valueColor = color,
-                valueStyle = MaterialTheme.typography.titleMedium,
-            )
+            // Deficit (expenses the cash register couldn't fully cover) and
+            // profit aren't opposites of the same figure - a month can be
+            // profitable and still have a deficit, or vice versa - but
+            // showing both at once reads as redundant/contradictory, so the
+            // deficit takes priority as the more urgent number whenever
+            // there is one, and profit only shows when there isn't.
             if (deficit > 0) {
-                Spacer(Modifier.height(8.dp))
                 StatLine(
                     stringResource(R.string.dashboard_deficit),
                     formatAmount(month.deficit),
                     valueColor = LossRed,
+                    valueStyle = MaterialTheme.typography.titleMedium,
+                )
+            } else {
+                StatLine(
+                    stringResource(R.string.dashboard_profit),
+                    formatAmount(month.profit),
+                    valueColor = color,
                     valueStyle = MaterialTheme.typography.titleMedium,
                 )
             }
