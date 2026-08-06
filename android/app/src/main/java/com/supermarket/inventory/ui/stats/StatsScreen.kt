@@ -358,6 +358,12 @@ private fun MarginsTab(state: StatsUiState) {
 @Composable
 private fun PeriodSummaryCard(state: StatsUiState) {
     val profit = state.periodProfit.toDoubleOrNull() ?: 0.0
+    val revenue = state.periodRevenue.toDoubleOrNull() ?: 0.0
+    // Overall margin for the period - profit relative to revenue, the same
+    // ratio as each product's static marginPercent on the Margins tab, but
+    // computed from what was actually sold this day/month rather than a
+    // per-product list price.
+    val marginPercent = if (revenue > 0) (profit / revenue) * 100 else 0.0
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -365,12 +371,20 @@ private fun PeriodSummaryCard(state: StatsUiState) {
                     Text(stringResource(R.string.dashboard_revenue), style = MaterialTheme.typography.bodySmall)
                     Text(formatAmount(state.periodRevenue), style = MaterialTheme.typography.titleMedium)
                 }
-                Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
                     Text(stringResource(R.string.dashboard_profit), style = MaterialTheme.typography.bodySmall)
                     Text(
                         formatAmount(state.periodProfit),
                         style = MaterialTheme.typography.titleMedium,
                         color = if (profit < 0) LossRed else ProfitGreen,
+                    )
+                }
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                    Text(stringResource(R.string.stats_average_margin), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${formatPercent(marginPercent.toString())}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (marginPercent < 0) LossRed else ProfitGreen,
                     )
                 }
             }

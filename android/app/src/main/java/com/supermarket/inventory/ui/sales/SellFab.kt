@@ -55,10 +55,11 @@ import com.supermarket.inventory.R
 // shortcut is the only entry point, reachable from every other tab, so the
 // owner doesn't have to navigate anywhere just to tap scan.
 // A gentle breathing pulse hints it's there without demanding attention.
-// Tapping it opens the scanner directly; tapping it again (it morphs into
-// a close button) reveals two fallback actions: "search" for when a barcode
-// won't scan (jumps to Sell with the manual-entry field already focused),
-// and "spoiled product" for pulling damaged/expired stock out of inventory.
+// A single tap expands it into three labeled actions (Spoiled product,
+// Search, Scan) without firing any of them. A second tap on the same main
+// button (it morphs into a close button while expanded) is the fast path -
+// it jumps straight to search, since typing/picking a product tends to be
+// quicker to get right than lining up a scan for a fast double-tap.
 @Composable
 fun BoxScope.SellFab(
     visible: Boolean,
@@ -77,7 +78,7 @@ fun BoxScope.SellFab(
     ) {
         Box {
             // A full-area scrim while expanded - tapping anywhere outside
-            // the two mini actions collapses the cluster instead of firing
+            // the mini actions collapses the cluster instead of firing
             // whatever's underneath.
             if (expanded) {
                 Box(
@@ -135,7 +136,7 @@ fun BoxScope.SellFab(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { if (expanded) { expanded = false; onScan() } else expanded = true },
+                            onClick = { if (expanded) { expanded = false; onSearch() } else expanded = true },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {

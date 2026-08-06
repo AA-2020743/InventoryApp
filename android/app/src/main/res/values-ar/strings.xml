@@ -224,6 +224,7 @@
     <string name="stats_sort_profit">حسب الربح</string>
     <string name="stats_quantity_sold">تم بيع %1$s</string>
     <string name="stats_margin_percent">هامش ربح %1$s%%</string>
+    <string name="stats_average_margin">متوسط الهامش</string>
     <string name="stats_by_category">المبيعات حسب الفئة</string>
     <string name="stats_by_item">المبيعات حسب الصنف</string>
     <string name="stats_uncategorized">غير مصنف</string>
