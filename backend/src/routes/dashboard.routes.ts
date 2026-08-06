@@ -41,7 +41,6 @@ dashboardRouter.get(
       upcoming,
       deferredSales,
       cashRegisterBalance,
-      settings,
     ] = await Promise.all([
       prisma.product.findMany({ where: { active: true } }),
       prisma.asset.findMany(),
@@ -61,7 +60,6 @@ dashboardRouter.get(
       }),
       prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
       getCashRegisterBalance(),
-      prisma.businessSettings.findUnique({ where: { id: "singleton" } }),
     ]);
 
     const inventoryValue = products.reduce(
@@ -104,13 +102,15 @@ dashboardRouter.get(
       .add(cashRegisterBalance)
       .sub(pendingInvoicesTotal);
 
-    // If the owner set a starting capital figure, the business having
-    // fallen below it is itself a deficit - it's eaten into what it
-    // started with, on top of any unpaid shortfall tracked above.
-    const startingValue = settings?.startingValue ?? new Prisma.Decimal(0);
-    const startingValueDeficit = Prisma.Decimal.max(startingValue.sub(currentNetWorth), 0);
-
-    const allTimeDeficitTotal = unpaidShortfallTotal.add(startingValueDeficit);
+    // netValuation is deliberately just currentNetWorth minus real unpaid
+    // obligations (unpaidShortfallTotal) - NOT also compared against the
+    // owner's starting-capital figure. Folding "how far below starting
+    // value are we" into this same subtraction double-counts the same gap:
+    // being below starting value already shows up as a lower currentNetWorth
+    // on its own, so subtracting (startingValue - currentNetWorth) again on
+    // top of that computes 2×currentNetWorth − startingValue instead of the
+    // actual net worth, going far more negative than reality.
+    const allTimeDeficitTotal = unpaidShortfallTotal;
     const netValuation = currentNetWorth.sub(allTimeDeficitTotal);
 
     const sumRevenue = (sales: { totalAmount: Prisma.Decimal }[]) =>
