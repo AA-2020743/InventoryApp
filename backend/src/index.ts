@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "node:path";
 import fs from "node:fs";
 import { env } from "./env";
@@ -27,6 +28,7 @@ fs.mkdirSync(env.uploadsDir, { recursive: true });
 
 const app = express();
 
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.resolve(env.uploadsDir)));

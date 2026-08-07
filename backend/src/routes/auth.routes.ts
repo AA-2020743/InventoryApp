@@ -1,12 +1,25 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 
 export const authRouter = Router();
+
+// Single-owner app with one valid credential pair - the only thing a login
+// rate limit needs to stop is brute-forcing the password, not distinguish
+// legitimate traffic patterns. Keyed by IP (express-rate-limit's default),
+// which is what actually bounds an attacker's guess rate here.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Try again later." },
+});
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -15,6 +28,7 @@ const loginSchema = z.object({
 
 authRouter.post(
   "/login",
+  loginLimiter,
   asyncHandler(async (req, res) => {
     const { email, password } = loginSchema.parse(req.body);
 
