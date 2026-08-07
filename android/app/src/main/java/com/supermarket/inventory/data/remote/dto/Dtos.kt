@@ -223,6 +223,7 @@ data class DashboardSummaryDto(
     val inventoryValue: String,
     val assetsValue: String,
     val deferredReceivablesTotal: String,
+    val debtReceivableTotal: String,
     val cashRegisterBalance: String,
     val pendingInvoicesTotal: String,
     val allTimeDeficitTotal: String,
@@ -304,6 +305,29 @@ data class AssetInput(
     val category: String?,
     val notes: String?,
 )
+
+@JsonClass(generateAdapter = true)
+data class DebtDto(
+    val id: String,
+    val workerName: String,
+    val amount: String,
+    val amountRepaid: String,
+    val status: String,
+    val deficitAmount: String,
+    val notes: String?,
+    val repaidAt: String?,
+    val createdAt: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class DebtInput(
+    val workerName: String,
+    val amount: Double,
+    val notes: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class DebtRepayPartialRequest(val amount: Double)
 
 @JsonClass(generateAdapter = true)
 data class CashRegisterEntryDto(

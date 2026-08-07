@@ -36,10 +36,12 @@ dashboardRouter.get(
       allTimeExpenseDeficitAgg,
       allTimeInvoiceDeficitAgg,
       allTimeRestockDeficitAgg,
+      allTimeDebtDeficitAgg,
       todaySales,
       monthSales,
       upcoming,
       deferredSales,
+      outstandingDebts,
       cashRegisterBalance,
     ] = await Promise.all([
       prisma.product.findMany({ where: { active: true } }),
@@ -50,6 +52,7 @@ dashboardRouter.get(
       prisma.expense.aggregate({ _sum: { deficitAmount: true } }),
       prisma.supplierInvoice.aggregate({ _sum: { deficitAmount: true } }),
       prisma.inventoryTransaction.aggregate({ where: { type: "RESTOCK" }, _sum: { deficitAmount: true } }),
+      prisma.debt.aggregate({ _sum: { deficitAmount: true } }),
       prisma.sale.findMany({ where: { createdAt: { gte: todayStart } } }),
       prisma.sale.findMany({ where: { createdAt: { gte: monthStart } } }),
       prisma.supplierInvoice.findMany({
@@ -59,6 +62,7 @@ dashboardRouter.get(
         },
       }),
       prisma.sale.findMany({ where: { paymentStatus: "DEFERRED" } }),
+      prisma.debt.findMany({ where: { status: "OUTSTANDING" } }),
       getCashRegisterBalance(),
     ]);
 
@@ -80,6 +84,14 @@ dashboardRouter.get(
       (acc, s) => acc.add(s.totalAmount.sub(s.amountCollected)),
       new Prisma.Decimal(0)
     );
+    // Money lent to workers, still owed back - a receivable the same way
+    // deferredReceivablesTotal is, but kept as its own distinct figure per
+    // the owner's request rather than merged into it, since it's a
+    // different kind of debt (an advance to staff, not a customer sale).
+    const debtReceivableTotal = outstandingDebts.reduce(
+      (acc, d) => acc.add(d.amount.sub(d.amountRepaid)),
+      new Prisma.Decimal(0)
+    );
 
     const monthExpensesTotal = amountInRange(monthExpenses, monthStart, monthEnd);
     const monthDeficitTotal = deficitInRange(monthExpenses, monthStart, monthEnd);
@@ -92,13 +104,15 @@ dashboardRouter.get(
     // shortfall is still missing today.
     const unpaidShortfallTotal = (allTimeExpenseDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0))
       .add(allTimeInvoiceDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0))
-      .add(allTimeRestockDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0));
+      .add(allTimeRestockDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0))
+      .add(allTimeDebtDeficitAgg._sum.deficitAmount ?? new Prisma.Decimal(0));
 
     // What the business is actually holding right now, before factoring in
     // either kind of deficit below.
     const currentNetWorth = inventoryValue
       .add(assetsValue)
       .add(deferredReceivablesTotal)
+      .add(debtReceivableTotal)
       .add(cashRegisterBalance)
       .sub(pendingInvoicesTotal);
 
@@ -141,6 +155,7 @@ dashboardRouter.get(
       inventoryValue,
       assetsValue,
       deferredReceivablesTotal,
+      debtReceivableTotal,
       cashRegisterBalance,
       pendingInvoicesTotal,
       allTimeDeficitTotal,

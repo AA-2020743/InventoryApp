@@ -55,6 +55,7 @@
     <string name="dashboard_assets_value">Assets value</string>
     <string name="dashboard_pending_invoices">Pending supplier invoices</string>
     <string name="dashboard_deferred_receivables">Owed by customers</string>
+    <string name="dashboard_debt_receivables">Owed by workers (debts)</string>
     <string name="dashboard_cash_register">Cash register</string>
     <string name="dashboard_net_valuation">Net valuation</string>
     <string name="dashboard_today">Today</string>
@@ -171,6 +172,21 @@
     <string name="deferred_sale_history_title">History</string>
     <string name="deferred_sale_history_entry_partial">%1$s (%2$s left)</string>
     <string name="deferred_sale_mark_collected">Mark collected</string>
+
+    <!-- Debts (cash lent to workers) -->
+    <string name="debts_title">Debts</string>
+    <string name="debts_empty">No outstanding debts</string>
+    <string name="debt_add">Add debt</string>
+    <string name="debt_amount">Amount lent</string>
+    <string name="debt_worker_name_label">Worker name</string>
+    <string name="debt_worker_name_required">Enter a worker name</string>
+    <string name="debt_invalid_amount">Enter a valid amount</string>
+    <string name="debt_remaining">Remaining: %1$s</string>
+    <string name="debt_repay_partial">Repay partial</string>
+    <string name="debt_repay_all">Repay all</string>
+    <string name="debt_partial_exceeds_remaining">Amount exceeds the remaining balance</string>
+    <string name="debt_history_title">History</string>
+    <string name="debt_history_entry_partial">%1$s (%2$s left)</string>
 
     <!-- Cash register -->
     <string name="cash_register_title">Cash register</string>

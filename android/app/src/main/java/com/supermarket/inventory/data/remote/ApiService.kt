@@ -179,6 +179,25 @@ interface ApiService {
     @DELETE("api/assets/{id}")
     suspend fun deleteAsset(@Path("id") id: String)
 
+    // Debts (money lent to workers)
+    @GET("api/debts")
+    suspend fun getDebts(@Query("status") status: String? = null): List<DebtDto>
+
+    @GET("api/debts/workers")
+    suspend fun getWorkerNames(): List<String>
+
+    @POST("api/debts")
+    suspend fun createDebt(@Body input: DebtInput): DebtDto
+
+    @POST("api/debts/{id}/repay")
+    suspend fun repayDebt(@Path("id") id: String): DebtDto
+
+    @POST("api/debts/{id}/repay-partial")
+    suspend fun repayDebtPartial(@Path("id") id: String, @Body request: DebtRepayPartialRequest): DebtDto
+
+    @DELETE("api/debts/{id}")
+    suspend fun deleteDebt(@Path("id") id: String)
+
     // Cash register
     @GET("api/cash-register")
     suspend fun getCashRegister(): CashRegisterResponse

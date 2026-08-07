@@ -301,6 +301,16 @@ private fun ValuationCard(summary: DashboardSummaryDto) {
             Spacer(Modifier.height(8.dp))
             StatLine(stringResource(R.string.dashboard_deferred_receivables), formatAmount(summary.deferredReceivablesTotal))
             Spacer(Modifier.height(8.dp))
+            // Called out in its own accent color (distinct from the plain
+            // deferred-receivables line above) since it's a different kind
+            // of receivable - cash lent to a worker, not a customer sale -
+            // even though both add to net valuation the same way.
+            StatLine(
+                stringResource(R.string.dashboard_debt_receivables),
+                formatAmount(summary.debtReceivableTotal),
+                valueColor = MaterialTheme.colorScheme.tertiary,
+            )
+            Spacer(Modifier.height(8.dp))
             StatLine(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal))
             Spacer(Modifier.height(8.dp))
             StatLine(

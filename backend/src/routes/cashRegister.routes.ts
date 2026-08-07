@@ -26,7 +26,7 @@ export async function getCashRegisterBalance(
 // record's deficit.
 export async function applyCashDeduction(
   tx: Prisma.TransactionClient,
-  link: { expenseId: string } | { invoiceId: string } | { inventoryTransactionId: string },
+  link: { expenseId: string } | { invoiceId: string } | { inventoryTransactionId: string } | { debtId: string },
   amount: Prisma.Decimal,
   note: string
 ): Promise<Prisma.Decimal> {

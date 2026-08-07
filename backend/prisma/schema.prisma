@@ -224,6 +224,43 @@ model Asset {
   updatedAt DateTime @updatedAt
 }
 
+enum DebtStatus {
+  OUTSTANDING
+  REPAID
+}
+
+// Cash lent by the business to a worker - the opposite direction of a
+// deferred sale (money leaves the till immediately here, rather than
+// arriving later), but tracked the same way: a receivable owed back,
+// grouped/collected per-person on the Others -> Debt tab exactly like
+// Deferred Sales groups by customer. Deliberately kept off revenue/profit
+// entirely (it's neither a sale nor an expense) - it only ever affects the
+// dashboard's net-worth composition (cash vs. receivable), and the total
+// net valuation doesn't move: the full `amount` is booked as a receivable
+// the moment the debt is created, while only what the till could actually
+// cover leaves cashRegisterBalance (see applyCashDeduction) - any gap
+// between the two is `deficitAmount`, folded into allTimeDeficitTotal so
+// the receivable-vs-cash-vs-deficit math nets to zero either way.
+model Debt {
+  id           String     @id @default(uuid())
+  workerName   String
+  amount       Decimal    @db.Decimal(12, 2)
+  // Running total repaid so far via partial repayments (see repayDebtAmount
+  // in debts.routes.ts) - mirrors Sale.amountCollected. Reaches `amount`
+  // exactly when status flips to REPAID.
+  amountRepaid Decimal    @default(0) @db.Decimal(12, 2)
+  status       DebtStatus @default(OUTSTANDING)
+  // Set once at creation if the till couldn't fully cover disbursing this
+  // debt - same always-deduct + deficit-on-shortfall mechanism as Expense/
+  // SupplierInvoice/restock. Never touched by repayments afterward.
+  deficitAmount Decimal   @default(0) @db.Decimal(12, 2)
+  notes        String?
+  repaidAt     DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([createdAt])
+}
+
 // Signed ledger of physical cash movements (mirrors InventoryTransaction's
 // audit-log pattern) - the register's current balance is always the sum
 // of every entry, never stored/mutated directly, so it's reconstructable
@@ -256,6 +293,15 @@ model CashRegisterEntry {
   // (findFirst by saleId) skip these instead of getting confused by which
   // one to treat as "the" entry.
   isPartialSaleCollection Boolean @default(false)
+  // Set for the entry auto-created when a Debt is disbursed (negative,
+  // via applyCashDeduction) or repaid (positive, via repayDebtAmount),
+  // mirroring saleId/expenseId.
+  debtId String?
+  // True only for a debt-repayment entry (mirrors isPartialSaleCollection)
+  // - a debt can have many of these over time (one per repayment), unlike
+  // the single disbursement entry, so lookups for "the disbursement entry"
+  // can skip these.
+  isPartialDebtRepayment Boolean @default(false)
   createdAt DateTime @default(now())
 
   @@index([createdAt])

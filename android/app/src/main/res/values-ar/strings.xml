@@ -55,6 +55,7 @@
     <string name="dashboard_assets_value">قيمة الأصول</string>
     <string name="dashboard_pending_invoices">فواتير الموردين المستحقة</string>
     <string name="dashboard_deferred_receivables">مستحق على العملاء</string>
+    <string name="dashboard_debt_receivables">مستحق على العمال (سُلف)</string>
     <string name="dashboard_cash_register">صندوق النقدية</string>
     <string name="dashboard_net_valuation">صافي القيمة</string>
     <string name="dashboard_today">اليوم</string>
@@ -171,6 +172,21 @@
     <string name="deferred_sale_history_title">السجل</string>
     <string name="deferred_sale_history_entry_partial">%1$s (المتبقي %2$s)</string>
     <string name="deferred_sale_mark_collected">تحديد كمُحصَّل</string>
+
+    <!-- Debts (cash lent to workers) -->
+    <string name="debts_title">السُلف</string>
+    <string name="debts_empty">لا توجد سُلف مستحقة</string>
+    <string name="debt_add">إضافة سُلفة</string>
+    <string name="debt_amount">المبلغ المُقرَض</string>
+    <string name="debt_worker_name_label">اسم العامل</string>
+    <string name="debt_worker_name_required">أدخل اسم العامل</string>
+    <string name="debt_invalid_amount">أدخل مبلغًا صحيحًا</string>
+    <string name="debt_remaining">المتبقي: %1$s</string>
+    <string name="debt_repay_partial">سداد جزئي</string>
+    <string name="debt_repay_all">سداد الكل</string>
+    <string name="debt_partial_exceeds_remaining">المبلغ يتجاوز الرصيد المتبقي</string>
+    <string name="debt_history_title">السجل</string>
+    <string name="debt_history_entry_partial">%1$s (المتبقي %2$s)</string>
 
     <!-- Cash register -->
     <string name="cash_register_title">صندوق النقدية</string>
