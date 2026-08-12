@@ -17,16 +17,19 @@ The project has two parts:
 
 ## Screenshots
 
-<!--
-  Add your own screenshots here once you have the app running on a device —
-  drop image files into a `docs/screenshots/` folder and reference them
-  below, e.g.:
+The mockups below are illustrations built from the app's actual layout,
+strings, and Material 3 color scheme (`ui/theme/Color.kt`) — not captures
+from a running device (this dev environment has no Android SDK/emulator).
+Swap them out for real device screenshots whenever convenient, using the
+same filenames in `docs/screenshots/`.
 
-  | Dashboard | Sell screen | Others tab |
-  |---|---|---|
-  | ![Dashboard](docs/screenshots/dashboard.png) | ![Sell](docs/screenshots/sell.png) | ![Others](docs/screenshots/others.png) |
--->
-*(No screenshots yet — add PNGs to `docs/screenshots/` and link them here.)*
+| Dashboard | Sell | Others → Deferred sales |
+|---|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Sell](docs/screenshots/sell.png) | ![Deferred sales](docs/screenshots/others_deferred_sales.png) |
+
+| Others → Debts | Dashboard (dark, Arabic/RTL) |
+|---|---|
+| ![Debts](docs/screenshots/others_debts.png) | ![Dashboard dark Arabic](docs/screenshots/dashboard_dark_arabic.png) |
 
 ## Features
 
