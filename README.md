@@ -12,7 +12,7 @@ The project has two parts:
   PostgreSQL API. Single owner account (JWT auth), self-hosted on your own
   VPS. See [`backend/README.md`](backend/README.md).
 - **[`android/`](android/)** — Native Android app (Kotlin + Jetpack Compose)
-  that talks to the backend. English/Arabic with RTL, light/dark theme. See
+  that talks to the backend. Light/dark theme. See
   [`android/README.md`](android/README.md).
 
 ## Screenshots
@@ -27,9 +27,9 @@ same filenames in `docs/screenshots/`.
 |---|---|---|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Sell](docs/screenshots/sell.png) | ![Deferred sales](docs/screenshots/others_deferred_sales.png) |
 
-| Others → Debts | Dashboard (dark, Arabic/RTL) |
+| Others → Debts | Dashboard (dark mode) |
 |---|---|
-| ![Debts](docs/screenshots/others_debts.png) | ![Dashboard dark Arabic](docs/screenshots/dashboard_dark_arabic.png) |
+| ![Debts](docs/screenshots/others_debts.png) | ![Dashboard dark mode](docs/screenshots/dashboard_dark.png) |
 
 ## Features
 
@@ -119,8 +119,6 @@ always-deduct way) live on their own tab outside Others.
 - Background low-stock / upcoming-invoice checks (WorkManager) raise local
   notifications — no push server (FCM) needed, since this talks to a
   single self-hosted backend.
-- English/Arabic localization with full RTL layout support and an in-app
-  language switch.
 - Light/dark theme toggle.
 
 ## Quickstart
