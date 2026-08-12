@@ -67,8 +67,17 @@ class ProductRepository @Inject constructor(
 
     suspend fun delete(id: String): ApiResult<Unit> = apiCall { api.deleteProduct(id) }
 
-    suspend fun restock(id: String, quantity: Double, unitCost: Double?, note: String?): ApiResult<ProductDto> =
-        apiCall { api.restockProduct(id, RestockRequest(quantity, unitCost, note)) }
+    suspend fun restock(
+        id: String,
+        quantity: Double,
+        unitCost: Double?,
+        note: String?,
+        financing: String? = null,
+        supplierInvoiceId: String? = null,
+        newInvoice: NewInvoiceForRestockInput? = null,
+    ): ApiResult<ProductDto> = apiCall {
+        api.restockProduct(id, RestockRequest(quantity, unitCost, note, financing, supplierInvoiceId, newInvoice))
+    }
 
     suspend fun adjust(id: String, quantityChange: Double, note: String): ApiResult<ProductDto> =
         apiCall { api.adjustProduct(id, AdjustRequest(quantityChange, note)) }

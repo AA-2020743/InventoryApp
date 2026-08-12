@@ -14,6 +14,7 @@
     <string name="action_save">حفظ</string>
     <string name="action_cancel">إلغاء</string>
     <string name="action_close">إغلاق</string>
+    <string name="action_error">خطأ</string>
     <string name="action_delete">حذف</string>
     <string name="action_edit">تعديل</string>
     <string name="action_add">إضافة</string>
@@ -107,6 +108,11 @@
     <string name="restock_quantity">الكمية المستلمة</string>
     <string name="restock_packages_received">عدد العبوات المستلمة</string>
     <string name="restock_unit_cost">تكلفة الوحدة الجديدة (اختياري)</string>
+    <string name="restock_financing_label">طريقة الدفع</string>
+    <string name="restock_financing_cash">نقدًا</string>
+    <string name="restock_financing_deferred">آجل (فاتورة مورد)</string>
+    <string name="restock_financing_existing_invoice">ربط بفاتورة موجودة</string>
+    <string name="restock_financing_new_invoice">إنشاء فاتورة جديدة</string>
     <string name="adjust_title">تعديل المخزون</string>
     <string name="adjust_quantity">التغيير في الكمية (+/-)</string>
     <string name="adjust_reason">السبب</string>

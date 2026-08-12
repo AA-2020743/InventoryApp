@@ -174,6 +174,20 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             },
         )
     }
+
+    // markPaid() is a one-tap action on the row with no dialog of its own
+    // to show a failure in (e.g. the till can't cover it) - surfaced here
+    // instead.
+    state.error?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            title = { Text(stringResource(R.string.action_error)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_close)) }
+            },
+        )
+    }
 }
 
 @Composable

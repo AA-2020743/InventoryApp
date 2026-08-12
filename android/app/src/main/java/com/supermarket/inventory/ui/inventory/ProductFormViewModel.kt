@@ -8,16 +8,37 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.SessionManager
+import com.supermarket.inventory.data.remote.dto.NewInvoiceForRestockInput
 import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.remote.dto.ProductInput
+import com.supermarket.inventory.data.remote.dto.SupplierDto
+import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
+import com.supermarket.inventory.data.repository.InvoiceRepository
 import com.supermarket.inventory.data.repository.OpenFoodFactsRepository
 import com.supermarket.inventory.data.repository.ProductRepository
+import com.supermarket.inventory.data.repository.SupplierRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
 enum class ThresholdMode { UNITS, PACKAGES }
+
+// How a restock (or a new product's initial stock) gets paid for - mirrors
+// the backend's financing choice (products.routes.ts). Cash always uses the
+// till (rejected server-side if it can't cover the cost); Deferred must
+// resolve to a supplier invoice, either one already pending or new details
+// to create one inline.
+sealed class RestockFinancing {
+    object Cash : RestockFinancing()
+    data class ExistingInvoice(val invoiceId: String) : RestockFinancing()
+    data class NewInvoice(
+        val supplierId: String,
+        val invoiceNumber: String = "",
+        val dueDateIso: String? = null,
+        val notes: String = "",
+    ) : RestockFinancing()
+}
 
 data class ProductFormUiState(
     val productId: String? = null,
@@ -51,6 +72,12 @@ data class ProductFormUiState(
     val isUploadingImage: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
+    // Only consulted when creating a brand-new product with quantity > 0 -
+    // editing never re-finances existing stock (quantity changes there go
+    // through adjust(), which doesn't touch cash/invoices at all).
+    val financing: RestockFinancing = RestockFinancing.Cash,
+    val suppliers: List<SupplierDto> = emptyList(),
+    val pendingInvoices: List<SupplierInvoiceDto> = emptyList(),
 ) {
     val unitsPerPackageValue: Double get() = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
 }
@@ -60,6 +87,8 @@ class ProductFormViewModel @Inject constructor(
     private val repository: ProductRepository,
     private val sessionManager: SessionManager,
     private val openFoodFactsRepository: OpenFoodFactsRepository,
+    private val supplierRepository: SupplierRepository,
+    private val invoiceRepository: InvoiceRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -68,6 +97,7 @@ class ProductFormViewModel @Inject constructor(
 
     init {
         loadCategories()
+        loadFinancingOptions()
         val productId = savedStateHandle.get<String>("productId")
         val initialBarcode = savedStateHandle.get<String>("barcode")
         if (productId != null) {
@@ -88,6 +118,30 @@ class ProductFormViewModel @Inject constructor(
         }
     }
 
+    // Suppliers + pending invoices for the deferred-financing picker (both
+    // creating a new product's initial stock and restocking an existing
+    // one can be deferred). Non-essential if it fails - the picker just
+    // shows empty and the owner can still fall back to cash or add a
+    // supplier/invoice from the Others tab first.
+    private fun loadFinancingOptions() {
+        viewModelScope.launch {
+            when (val result = supplierRepository.getSuppliers()) {
+                is ApiResult.Success -> uiState = uiState.copy(suppliers = result.data)
+                is ApiResult.Error -> Unit
+            }
+        }
+        viewModelScope.launch {
+            when (val result = invoiceRepository.getInvoices(status = "PENDING")) {
+                is ApiResult.Success -> uiState = uiState.copy(pendingInvoices = result.data)
+                is ApiResult.Error -> Unit
+            }
+        }
+    }
+
+    fun onFinancingChange(financing: RestockFinancing) {
+        uiState = uiState.copy(financing = financing, error = null)
+    }
+
     // Best-effort prefill from Open Food Facts for a brand-new product;
     // silently does nothing if the barcode isn't found there (common for
     // local/loose goods) - manual entry remains the primary path.
@@ -104,13 +158,17 @@ class ProductFormViewModel @Inject constructor(
     private fun loadProduct(id: String) {
         viewModelScope.launch {
             when (val result = repository.getProduct(id)) {
-                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories)
+                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories, uiState.suppliers, uiState.pendingInvoices)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
             }
         }
     }
 
-    private fun ProductDto.toUiState(availableCategories: List<String>): ProductFormUiState {
+    private fun ProductDto.toUiState(
+        availableCategories: List<String>,
+        suppliers: List<SupplierDto>,
+        pendingInvoices: List<SupplierInvoiceDto>,
+    ): ProductFormUiState {
         val perPackage = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
         val thresholdUnits = lowStockThreshold.toDoubleOrNull() ?: 0.0
         val isPackaged = perPackage > 1.0
@@ -121,6 +179,8 @@ class ProductFormViewModel @Inject constructor(
             imageUrl = imageUrl,
             category = category.orEmpty(),
             availableCategories = availableCategories,
+            suppliers = suppliers,
+            pendingInvoices = pendingInvoices,
             unit = unit,
             purchaseCost = purchaseCost,
             sellingPrice = sellingPrice,
@@ -225,6 +285,14 @@ class ProductFormViewModel @Inject constructor(
             uiState.lowStockThreshold.toDoubleOrNull() ?: 0.0
         }
 
+        // Only a brand-new product with real initial stock needs a
+        // financing decision - editing never re-finances existing stock.
+        val financingArgs = if (!isEditing && enteredQuantity > 0) {
+            resolveFinancing(uiState.financing) ?: return
+        } else {
+            null
+        }
+
         viewModelScope.launch {
             uiState = uiState.copy(isSaving = true, error = null)
             val input = ProductInput(
@@ -239,6 +307,9 @@ class ProductFormViewModel @Inject constructor(
                 sellingPrice = price,
                 quantity = quantityForUpdate,
                 lowStockThreshold = threshold,
+                financing = financingArgs?.financing,
+                supplierInvoiceId = financingArgs?.supplierInvoiceId,
+                newInvoice = financingArgs?.newInvoice,
             )
             val result = if (isEditing) {
                 repository.update(uiState.productId!!, input)
@@ -262,13 +333,52 @@ class ProductFormViewModel @Inject constructor(
         }
     }
 
-    fun restock(quantity: Double, unitCost: Double?) {
+    fun restock(quantity: Double, unitCost: Double?, financing: RestockFinancing) {
         val id = uiState.productId ?: return
+        val args = resolveFinancing(financing) ?: return
         viewModelScope.launch {
-            uiState = uiState.copy(isSaving = true)
-            when (val result = repository.restock(id, quantity, unitCost, "Restock")) {
-                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories)
+            uiState = uiState.copy(isSaving = true, error = null)
+            when (
+                val result = repository.restock(
+                    id, quantity, unitCost, "Restock",
+                    args.financing, args.supplierInvoiceId, args.newInvoice,
+                )
+            ) {
+                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories, uiState.suppliers, uiState.pendingInvoices)
                 is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = result.message)
+            }
+        }
+    }
+
+    private data class FinancingArgs(
+        val financing: String,
+        val supplierInvoiceId: String?,
+        val newInvoice: NewInvoiceForRestockInput?,
+    )
+
+    // Validates and converts a RestockFinancing choice into what the API
+    // needs, or sets a user-facing error and returns null if the choice is
+    // incomplete (e.g. Deferred picked but no invoice selected/created, or
+    // a new invoice's due date wasn't set yet).
+    private fun resolveFinancing(financing: RestockFinancing): FinancingArgs? = when (financing) {
+        is RestockFinancing.Cash -> FinancingArgs("CASH", null, null)
+        is RestockFinancing.ExistingInvoice -> FinancingArgs("DEFERRED", financing.invoiceId, null)
+        is RestockFinancing.NewInvoice -> {
+            val dueDate = financing.dueDateIso
+            if (dueDate == null) {
+                uiState = uiState.copy(error = "Pick a due date for the new supplier invoice")
+                null
+            } else {
+                FinancingArgs(
+                    "DEFERRED",
+                    null,
+                    NewInvoiceForRestockInput(
+                        supplierId = financing.supplierId,
+                        invoiceNumber = financing.invoiceNumber.ifBlank { null },
+                        dueDate = dueDate,
+                        notes = financing.notes.ifBlank { null },
+                    ),
+                )
             }
         }
     }
@@ -278,7 +388,7 @@ class ProductFormViewModel @Inject constructor(
         viewModelScope.launch {
             uiState = uiState.copy(isSaving = true)
             when (val result = repository.adjust(id, quantityChange, reason)) {
-                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories)
+                is ApiResult.Success -> uiState = result.data.toUiState(uiState.availableCategories, uiState.suppliers, uiState.pendingInvoices)
                 is ApiResult.Error -> uiState = uiState.copy(isSaving = false, error = result.message)
             }
         }

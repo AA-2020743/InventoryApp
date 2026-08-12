@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.R
+import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.ExpenseDto
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
@@ -78,6 +79,7 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
     var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
     var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
     var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
+    var expenseEditError by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(StatsTab.OVERVIEW) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val otherLabel = stringResource(R.string.stats_other)
@@ -193,13 +195,15 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
             initialName = expense.name,
             initialAmount = expense.amount,
             initialDateIso = expense.date,
-            onDismiss = { expenseToEdit = null },
+            error = expenseEditError,
+            onDismiss = { expenseToEdit = null; expenseEditError = null },
             onSave = { name, amount, date ->
                 viewModel.viewModelScope.launch {
-                    viewModel.updateExpense(expense.id, name, amount, date, expense.notes)
-                    viewModel.load()
+                    when (val result = viewModel.updateExpense(expense.id, name, amount, date, expense.notes)) {
+                        is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; expenseEditError = null }
+                        is ApiResult.Error -> expenseEditError = result.message
+                    }
                 }
-                expenseToEdit = null
             },
         )
     }

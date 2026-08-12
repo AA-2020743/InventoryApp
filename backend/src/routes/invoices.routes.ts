@@ -103,22 +103,27 @@ invoicesRouter.put(
       const updated = await tx.supplierInvoice.update({ where: { id: req.params.id }, data });
       if (updated.status !== "PAID") return updated;
 
-      const deficit = await applyCashDeduction(
+      await applyCashDeduction(
         tx,
         { invoiceId: updated.id },
         updated.amount,
         paymentNote(updated.invoiceNumber, existing.supplier.name)
       );
-      return tx.supplierInvoice.update({ where: { id: updated.id }, data: { deficitAmount: deficit } });
+      // Reached only if applyCashDeduction succeeded (fully paid), so any
+      // deficit this invoice carried from before this edit no longer
+      // applies - clear it rather than leaving a stale value behind.
+      if (updated.deficitAmount.gt(0)) {
+        return tx.supplierInvoice.update({ where: { id: updated.id }, data: { deficitAmount: 0 } });
+      }
+      return updated;
     });
     res.json(invoice);
   })
 );
 
-// Always tries to pay the invoice out of the till in full - there's no
-// "pay from cash register?" choice anymore, mirroring expenses. Any
-// shortfall is recorded as a deficit rather than pushing the register
-// negative.
+// Pays the invoice out of the till in full - there's no "pay from cash
+// register?" choice anymore, mirroring expenses. Rejected outright (before
+// the invoice is touched) if the register can't cover it.
 invoicesRouter.post(
   "/:id/pay",
   asyncHandler(async (req, res) => {
@@ -127,17 +132,16 @@ invoicesRouter.post(
     if (existing.status === "PAID") throw new HttpError(400, "Invoice is already paid");
 
     const invoice = await prisma.$transaction(async (tx) => {
-      const updated = await tx.supplierInvoice.update({
-        where: { id: req.params.id },
-        data: { status: "PAID", paidAt: new Date() },
-      });
-      const deficit = await applyCashDeduction(
+      await applyCashDeduction(
         tx,
         { invoiceId: existing.id },
         existing.amount,
         paymentNote(existing.invoiceNumber, existing.supplier.name)
       );
-      return tx.supplierInvoice.update({ where: { id: existing.id }, data: { deficitAmount: deficit } });
+      return tx.supplierInvoice.update({
+        where: { id: req.params.id },
+        data: { status: "PAID", paidAt: new Date() },
+      });
     });
     res.json(invoice);
   })

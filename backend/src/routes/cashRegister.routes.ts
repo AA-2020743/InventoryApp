@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
-import { asyncHandler } from "../middleware/errorHandler";
+import { asyncHandler, HttpError } from "../middleware/errorHandler";
 
 export const cashRegisterRouter = Router();
 
@@ -17,30 +17,35 @@ export async function getCashRegisterBalance(
   return entries.reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
 }
 
-// Shared by expenses, supplier-invoice payments, and non-invoiced restocks
-// - the places that always try to pay themselves out of the till
-// immediately: reverses any prior entry linked via `link` (so an edit
-// recomputes cleanly instead of stacking), then pays as much of `amount`
-// as the register can cover - never pushing the balance negative - and
-// returns whatever's left over so the caller can persist it as that
-// record's deficit.
+// Shared by expenses, supplier-invoice payments, non-invoiced restocks, and
+// debts - the places that pay themselves out of the till immediately:
+// reverses any prior entry linked via `link` (so an edit recomputes
+// cleanly instead of stacking), then requires the register to actually
+// cover the full `amount` - if it can't, the whole operation is rejected
+// rather than partially paying and booking the rest as a shortfall, so the
+// register can never be pushed negative and nothing gets recorded as paid
+// unless the cash was really there.
 export async function applyCashDeduction(
   tx: Prisma.TransactionClient,
   link: { expenseId: string } | { invoiceId: string } | { inventoryTransactionId: string } | { debtId: string },
   amount: Prisma.Decimal,
   note: string
-): Promise<Prisma.Decimal> {
+): Promise<void> {
   const existing = await tx.cashRegisterEntry.findFirst({ where: link });
   if (existing) {
     await tx.cashRegisterEntry.delete({ where: { id: existing.id } });
   }
 
   const balance = Prisma.Decimal.max(await getCashRegisterBalance(tx), 0);
-  const paid = Prisma.Decimal.min(balance, amount);
-  if (paid.gt(0)) {
-    await tx.cashRegisterEntry.create({ data: { amount: paid.neg(), note, ...link } });
+  if (amount.gt(balance)) {
+    throw new HttpError(
+      400,
+      `Insufficient cash register balance: this needs ${amount.toFixed(2)} but only ${balance.toFixed(2)} is available.`
+    );
   }
-  return amount.sub(paid);
+  if (amount.gt(0)) {
+    await tx.cashRegisterEntry.create({ data: { amount: amount.neg(), note, ...link } });
+  }
 }
 
 cashRegisterRouter.get(

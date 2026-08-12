@@ -140,6 +140,7 @@ class DebtsViewModel @Inject constructor(
 fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
+    var addError by remember { mutableStateOf<String?>(null) }
 
     val groups = remember(state.debts) {
         state.debts.groupBy { it.workerName.trim() }.toSortedMap()
@@ -171,7 +172,7 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
             }
         }
         FloatingActionButton(
-            onClick = { showAddDialog = true },
+            onClick = { addError = null; showAddDialog = true },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.debt_add)) }
     }
@@ -179,15 +180,15 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
     if (showAddDialog) {
         AddDebtDialog(
             workerSuggestions = state.workerSuggestions,
+            error = addError,
             onDismiss = { showAddDialog = false },
             onSave = { amount, workerName ->
                 viewModel.viewModelScope.launch {
-                    when (viewModel.addDebt(workerName, amount)) {
-                        is ApiResult.Success -> viewModel.load()
-                        is ApiResult.Error -> Unit
+                    when (val result = viewModel.addDebt(workerName, amount)) {
+                        is ApiResult.Success -> { viewModel.load(); showAddDialog = false }
+                        is ApiResult.Error -> addError = result.message
                     }
                 }
-                showAddDialog = false
             },
         )
     }
@@ -328,13 +329,17 @@ private fun PartialRepayDialog(remaining: Double, onDismiss: () -> Unit, onConfi
 @Composable
 private fun AddDebtDialog(
     workerSuggestions: List<String>,
+    error: String?,
     onDismiss: () -> Unit,
     onSave: (Double, String) -> Unit,
 ) {
     var amount by remember { mutableStateOf("") }
     var workerName by remember { mutableStateOf("") }
     var workerExpanded by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    // Client-side validation (empty amount, missing name) takes priority
+    // over a stale server error from a previous attempt.
+    var localError by remember { mutableStateOf<String?>(null) }
+    val displayedError = localError ?: error
     val invalidAmountMessage = stringResource(R.string.debt_invalid_amount)
     val missingWorkerMessage = stringResource(R.string.debt_worker_name_required)
     val filteredWorkers = workerSuggestions.filter {
@@ -378,16 +383,16 @@ private fun AddDebtDialog(
                         }
                     }
                 }
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
+                displayedError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 val amountValue = amount.toDoubleOrNull()
                 when {
-                    amountValue == null || amountValue <= 0 -> error = invalidAmountMessage
-                    workerName.isBlank() -> error = missingWorkerMessage
-                    else -> onSave(amountValue, workerName.trim())
+                    amountValue == null || amountValue <= 0 -> localError = invalidAmountMessage
+                    workerName.isBlank() -> localError = missingWorkerMessage
+                    else -> { localError = null; onSave(amountValue, workerName.trim()) }
                 }
             }) { Text(stringResource(R.string.action_save)) }
         },

@@ -59,8 +59,8 @@ expensesRouter.post(
     const data = expenseInput.parse(req.body);
     const expense = await prisma.$transaction(async (tx) => {
       const created = await tx.expense.create({ data });
-      const deficit = await applyCashDeduction(tx, { expenseId: created.id }, created.amount, `Expense: ${created.name}`);
-      return tx.expense.update({ where: { id: created.id }, data: { deficitAmount: deficit } });
+      await applyCashDeduction(tx, { expenseId: created.id }, created.amount, `Expense: ${created.name}`);
+      return created;
     });
     res.status(201).json(expense);
   })
@@ -74,8 +74,14 @@ expensesRouter.put(
       const existing = await tx.expense.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Expense not found");
       const updated = await tx.expense.update({ where: { id: req.params.id }, data });
-      const deficit = await applyCashDeduction(tx, { expenseId: updated.id }, updated.amount, `Expense: ${updated.name}`);
-      return tx.expense.update({ where: { id: updated.id }, data: { deficitAmount: deficit } });
+      await applyCashDeduction(tx, { expenseId: updated.id }, updated.amount, `Expense: ${updated.name}`);
+      // Reached only if applyCashDeduction succeeded (fully paid), so any
+      // deficit this expense carried from before this edit no longer
+      // applies - clear it rather than leaving a stale value behind.
+      if (updated.deficitAmount.gt(0)) {
+        return tx.expense.update({ where: { id: updated.id }, data: { deficitAmount: 0 } });
+      }
+      return updated;
     });
     res.json(expense);
   })

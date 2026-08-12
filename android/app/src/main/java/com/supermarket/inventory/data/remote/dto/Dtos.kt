@@ -34,6 +34,17 @@ data class ProductDto(
     val updatedAt: String,
 )
 
+// Details for creating a brand-new supplier invoice inline while restocking
+// on deferred payment, instead of picking an existing pending one - the
+// backend creates it in the same transaction and links it to the restock.
+@JsonClass(generateAdapter = true)
+data class NewInvoiceForRestockInput(
+    val supplierId: String,
+    val invoiceNumber: String? = null,
+    val dueDate: String,
+    val notes: String? = null,
+)
+
 @JsonClass(generateAdapter = true)
 data class ProductInput(
     val barcode: String?,
@@ -47,10 +58,24 @@ data class ProductInput(
     val sellingPrice: Double,
     val quantity: Double,
     val lowStockThreshold: Double,
+    // Only meaningful when quantity > 0 (there's initial stock to pay for).
+    // "CASH" deducts from the till immediately (rejected if it can't cover
+    // the cost); "DEFERRED" skips the till and links the stock to a
+    // supplier invoice via supplierInvoiceId or newInvoice instead.
+    val financing: String? = null,
+    val supplierInvoiceId: String? = null,
+    val newInvoice: NewInvoiceForRestockInput? = null,
 )
 
 @JsonClass(generateAdapter = true)
-data class RestockRequest(val quantity: Double, val unitCost: Double?, val note: String?)
+data class RestockRequest(
+    val quantity: Double,
+    val unitCost: Double?,
+    val note: String?,
+    val financing: String? = null,
+    val supplierInvoiceId: String? = null,
+    val newInvoice: NewInvoiceForRestockInput? = null,
+)
 
 @JsonClass(generateAdapter = true)
 data class AdjustRequest(val quantityChange: Double, val note: String)

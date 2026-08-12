@@ -99,6 +99,8 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     var showAddDialog by remember { mutableStateOf(false) }
     var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
     var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
+    var addError by remember { mutableStateOf<String?>(null) }
+    var editError by remember { mutableStateOf<String?>(null) }
 
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.expenses_title)) }) }) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
@@ -114,7 +116,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                 }
             }
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = { addError = null; showAddDialog = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.expense_add)) }
         }
@@ -126,13 +128,15 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             initialName = "",
             initialAmount = "",
             initialDateIso = null,
+            error = addError,
             onDismiss = { showAddDialog = false },
             onSave = { name, amount, date ->
                 viewModel.viewModelScope.launch {
-                    viewModel.create(name, amount, date)
-                    viewModel.load()
+                    when (val result = viewModel.create(name, amount, date)) {
+                        is ApiResult.Success -> { viewModel.load(); showAddDialog = false }
+                        is ApiResult.Error -> addError = result.message
+                    }
                 }
-                showAddDialog = false
             },
         )
     }
@@ -143,13 +147,15 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             initialName = expense.name,
             initialAmount = expense.amount,
             initialDateIso = expense.date,
-            onDismiss = { expenseToEdit = null },
+            error = editError,
+            onDismiss = { expenseToEdit = null; editError = null },
             onSave = { name, amount, date ->
                 viewModel.viewModelScope.launch {
-                    viewModel.update(expense.id, name, amount, date, expense.notes)
-                    viewModel.load()
+                    when (val result = viewModel.update(expense.id, name, amount, date, expense.notes)) {
+                        is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; editError = null }
+                        is ApiResult.Error -> editError = result.message
+                    }
                 }
-                expenseToEdit = null
             },
         )
     }
@@ -207,6 +213,7 @@ fun ExpenseDialog(
     initialName: String,
     initialAmount: String,
     initialDateIso: String?,
+    error: String? = null,
     onDismiss: () -> Unit,
     onSave: (String, Double, String?) -> Unit,
 ) {
@@ -242,6 +249,7 @@ fun ExpenseDialog(
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.padding(top = 4.dp)) {
                     Text(formatIsoDate(Instant.ofEpochMilli(dateMillis).toString()))
                 }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             }
         },
         confirmButton = {

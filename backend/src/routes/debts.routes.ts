@@ -92,13 +92,8 @@ debtsRouter.post(
       const created = await tx.debt.create({
         data: { workerName, amount: amountDecimal, notes: notes ?? null },
       });
-      const deficit = await applyCashDeduction(
-        tx,
-        { debtId: created.id },
-        amountDecimal,
-        `Lent to ${workerName}`
-      );
-      return tx.debt.update({ where: { id: created.id }, data: { deficitAmount: deficit } });
+      await applyCashDeduction(tx, { debtId: created.id }, amountDecimal, `Lent to ${workerName}`);
+      return created;
     });
 
     res.status(201).json(debt);

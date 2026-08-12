@@ -21,7 +21,14 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +38,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,7 +55,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.supermarket.inventory.R
+import com.supermarket.inventory.data.remote.dto.SupplierDto
+import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.ui.common.copyUriToCacheFile
+import com.supermarket.inventory.ui.common.formatAmount
+import com.supermarket.inventory.ui.common.formatIsoDate
+import java.time.Instant
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -296,6 +310,20 @@ fun ProductFormScreen(
                 }
             }
 
+            // Only a brand-new product with real initial stock needs to say
+            // how it's paid for - editing an existing product never
+            // re-finances its stock (quantity edits go through adjust(),
+            // which doesn't touch cash or invoices).
+            if (state.productId == null && (state.quantity.toDoubleOrNull() ?: 0.0) > 0) {
+                FinancingChoiceFields(
+                    financing = state.financing,
+                    onFinancingChange = viewModel::onFinancingChange,
+                    suppliers = state.suppliers,
+                    pendingInvoices = state.pendingInvoices,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
             }
@@ -331,9 +359,11 @@ fun ProductFormScreen(
         RestockDialog(
             isPackaged = state.isPackaged,
             unitsPerPackage = state.unitsPerPackageValue,
+            suppliers = state.suppliers,
+            pendingInvoices = state.pendingInvoices,
             onDismiss = { showRestockDialog = false },
-            onConfirm = { qty, cost ->
-                viewModel.restock(qty, cost)
+            onConfirm = { qty, cost, financing ->
+                viewModel.restock(qty, cost, financing)
                 showRestockDialog = false
             },
         )
@@ -369,11 +399,14 @@ fun ProductFormScreen(
 private fun RestockDialog(
     isPackaged: Boolean,
     unitsPerPackage: Double,
+    suppliers: List<SupplierDto>,
+    pendingInvoices: List<SupplierInvoiceDto>,
     onDismiss: () -> Unit,
-    onConfirm: (Double, Double?) -> Unit,
+    onConfirm: (Double, Double?, RestockFinancing) -> Unit,
 ) {
     var quantity by remember { mutableStateOf("") }
     var unitCost by remember { mutableStateOf("") }
+    var financing by remember { mutableStateOf<RestockFinancing>(RestockFinancing.Cash) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.restock_title)) },
@@ -394,6 +427,13 @@ private fun RestockDialog(
                     singleLine = true,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+                FinancingChoiceFields(
+                    financing = financing,
+                    onFinancingChange = { financing = it },
+                    suppliers = suppliers,
+                    pendingInvoices = pendingInvoices,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
             }
         },
         confirmButton = {
@@ -401,12 +441,183 @@ private fun RestockDialog(
                 val entered = quantity.toDoubleOrNull()
                 if (entered != null && entered > 0) {
                     val units = if (isPackaged) entered * unitsPerPackage else entered
-                    onConfirm(units, unitCost.toDoubleOrNull())
+                    onConfirm(units, unitCost.toDoubleOrNull(), financing)
                 }
             }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+}
+
+// Cash vs deferred-to-a-supplier-invoice choice, shared between creating a
+// new product's initial stock and restocking an existing one. Deferred
+// needs an invoice to land on - either one already pending, picked from a
+// dropdown, or a brand new one described inline (supplier + due date).
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FinancingChoiceFields(
+    financing: RestockFinancing,
+    onFinancingChange: (RestockFinancing) -> Unit,
+    suppliers: List<SupplierDto>,
+    pendingInvoices: List<SupplierInvoiceDto>,
+    modifier: Modifier = Modifier,
+) {
+    val isDeferred = financing !is RestockFinancing.Cash
+    Column(modifier) {
+        Text(stringResource(R.string.restock_financing_label), style = MaterialTheme.typography.labelMedium)
+        Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = !isDeferred,
+                onClick = { onFinancingChange(RestockFinancing.Cash) },
+                label = { Text(stringResource(R.string.restock_financing_cash)) },
+            )
+            FilterChip(
+                selected = isDeferred,
+                onClick = {
+                    if (!isDeferred) {
+                        onFinancingChange(
+                            pendingInvoices.firstOrNull()?.let { RestockFinancing.ExistingInvoice(it.id) }
+                                ?: RestockFinancing.NewInvoice(supplierId = suppliers.firstOrNull()?.id ?: "")
+                        )
+                    }
+                },
+                label = { Text(stringResource(R.string.restock_financing_deferred)) },
+            )
+        }
+
+        if (isDeferred) {
+            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (pendingInvoices.isNotEmpty()) {
+                    FilterChip(
+                        selected = financing is RestockFinancing.ExistingInvoice,
+                        onClick = { onFinancingChange(RestockFinancing.ExistingInvoice(pendingInvoices.first().id)) },
+                        label = { Text(stringResource(R.string.restock_financing_existing_invoice)) },
+                    )
+                }
+                FilterChip(
+                    selected = financing is RestockFinancing.NewInvoice,
+                    onClick = { onFinancingChange(RestockFinancing.NewInvoice(supplierId = suppliers.firstOrNull()?.id ?: "")) },
+                    label = { Text(stringResource(R.string.restock_financing_new_invoice)) },
+                )
+            }
+
+            when (financing) {
+                is RestockFinancing.ExistingInvoice -> ExistingInvoicePicker(
+                    pendingInvoices = pendingInvoices,
+                    selectedId = financing.invoiceId,
+                    onSelect = { onFinancingChange(RestockFinancing.ExistingInvoice(it)) },
+                )
+                is RestockFinancing.NewInvoice -> NewInvoiceFields(
+                    value = financing,
+                    suppliers = suppliers,
+                    onChange = onFinancingChange,
+                )
+                is RestockFinancing.Cash -> Unit
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExistingInvoicePicker(
+    pendingInvoices: List<SupplierInvoiceDto>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = pendingInvoices.find { it.id == selectedId }
+    val label = selected?.let {
+        "${it.supplier?.name ?: it.supplierId} — ${formatAmount(it.amount)}"
+    } ?: ""
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.padding(top = 8.dp),
+    ) {
+        OutlinedTextField(
+            value = label,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.restock_financing_existing_invoice)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(),
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            pendingInvoices.forEach { invoice ->
+                DropdownMenuItem(
+                    text = { Text("${invoice.supplier?.name ?: invoice.supplierId} — ${formatAmount(invoice.amount)}") },
+                    onClick = { onSelect(invoice.id); expanded = false },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NewInvoiceFields(
+    value: RestockFinancing.NewInvoice,
+    suppliers: List<SupplierDto>,
+    onChange: (RestockFinancing.NewInvoice) -> Unit,
+) {
+    var supplierExpanded by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+    val selectedSupplier = suppliers.find { it.id == value.supplierId }
+
+    Column(Modifier.padding(top = 8.dp)) {
+        ExposedDropdownMenuBox(expanded = supplierExpanded, onExpandedChange = { supplierExpanded = it }) {
+            OutlinedTextField(
+                value = selectedSupplier?.name ?: "",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(R.string.invoice_supplier)) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = supplierExpanded) },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+            )
+            DropdownMenu(expanded = supplierExpanded, onDismissRequest = { supplierExpanded = false }) {
+                suppliers.forEach { supplier ->
+                    DropdownMenuItem(
+                        text = { Text(supplier.name) },
+                        onClick = { onChange(value.copy(supplierId = supplier.id)); supplierExpanded = false },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = value.invoiceNumber,
+            onValueChange = { onChange(value.copy(invoiceNumber = it)) },
+            label = { Text(stringResource(R.string.invoice_number)) },
+            singleLine = true,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.padding(top = 8.dp)) {
+            Text(
+                value.dueDateIso?.let { formatIsoDate(it) } ?: stringResource(R.string.invoice_due_date)
+            )
+        }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = datePickerState.selectedDateMillis
+                    if (millis != null) {
+                        val iso = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toInstant().toString()
+                        onChange(value.copy(dueDateIso = iso))
+                    }
+                    showDatePicker = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.action_cancel)) } },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 @Composable

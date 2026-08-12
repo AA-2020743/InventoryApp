@@ -51,11 +51,15 @@ class InvoicesViewModel @Inject constructor(
 
     fun markPaid(id: String) {
         viewModelScope.launch {
-            when (invoiceRepository.markPaid(id)) {
+            when (val result = invoiceRepository.markPaid(id)) {
                 is ApiResult.Success -> load()
-                is ApiResult.Error -> Unit
+                is ApiResult.Error -> uiState = uiState.copy(error = result.message)
             }
         }
+    }
+
+    fun dismissError() {
+        uiState = uiState.copy(error = null)
     }
 
     suspend fun loadSuppliers() = supplierRepository.getSuppliers()

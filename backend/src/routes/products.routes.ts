@@ -7,6 +7,77 @@ import { applyCashDeduction } from "./cashRegister.routes";
 
 export const productsRouter = Router();
 
+// How a restock (or a new product's initial stock) is paid for: CASH pays
+// out of the till immediately (rejected outright if the till can't cover
+// it - see applyCashDeduction), DEFERRED skips the till entirely and links
+// the stock to a supplier invoice instead, whose own PENDING/PAID
+// lifecycle governs when cash actually leaves for it. Not provided
+// explicitly by older callers - inferred as DEFERRED when an invoice to
+// link is present, CASH otherwise, so the field stays optional.
+const newInvoiceForRestockSchema = z.object({
+  supplierId: z.string().uuid(),
+  invoiceNumber: z.string().trim().optional().nullable(),
+  dueDate: z.coerce.date(),
+  notes: z.string().trim().optional().nullable(),
+});
+
+const financingFields = {
+  financing: z.enum(["CASH", "DEFERRED"]).optional(),
+  supplierInvoiceId: z.string().uuid().optional(),
+  newInvoice: newInvoiceForRestockSchema.optional(),
+};
+
+// Resolves how a restock's cost is financed: CASH deducts from the till
+// (via applyCashDeduction, hard-blocking on insufficient funds); DEFERRED
+// must link to a PENDING supplier invoice - either one that already
+// exists, or one created here on the fly - and returns its id so the
+// caller can stamp it onto the InventoryTransaction instead of touching
+// cash at all.
+async function resolveRestockFinancing(
+  tx: Prisma.TransactionClient,
+  input: {
+    financing?: "CASH" | "DEFERRED";
+    supplierInvoiceId?: string;
+    newInvoice?: z.infer<typeof newInvoiceForRestockSchema>;
+  },
+  cost: Prisma.Decimal
+): Promise<{ financing: "CASH" | "DEFERRED"; supplierInvoiceId?: string }> {
+  const financing = input.financing ?? (input.supplierInvoiceId || input.newInvoice ? "DEFERRED" : "CASH");
+
+  if (financing === "CASH") {
+    return { financing };
+  }
+
+  if (input.supplierInvoiceId) {
+    const invoice = await tx.supplierInvoice.findUnique({ where: { id: input.supplierInvoiceId } });
+    if (!invoice) throw new HttpError(404, "Supplier invoice not found");
+    if (invoice.status !== "PENDING") {
+      throw new HttpError(400, "Can only link a deferred restock to a pending invoice");
+    }
+    return { financing, supplierInvoiceId: invoice.id };
+  }
+
+  if (input.newInvoice) {
+    const supplier = await tx.supplier.findUnique({ where: { id: input.newInvoice.supplierId } });
+    if (!supplier) throw new HttpError(404, "Supplier not found");
+    const created = await tx.supplierInvoice.create({
+      data: {
+        supplierId: input.newInvoice.supplierId,
+        invoiceNumber: input.newInvoice.invoiceNumber ?? null,
+        amount: cost,
+        dueDate: input.newInvoice.dueDate,
+        notes: input.newInvoice.notes ?? null,
+      },
+    });
+    return { financing, supplierInvoiceId: created.id };
+  }
+
+  throw new HttpError(
+    400,
+    "Deferred restocks need a supplier invoice to link to - either an existing pending one or details to create a new one"
+  );
+}
+
 const productInput = z.object({
   barcode: z.string().trim().min(1).optional().nullable(),
   name: z.string().trim().min(1),
@@ -19,6 +90,7 @@ const productInput = z.object({
   sellingPrice: z.number().nonnegative(),
   quantity: z.number().nonnegative().default(0),
   lowStockThreshold: z.number().nonnegative().default(0),
+  ...financingFields,
 });
 
 // GET /api/products?search=&category=&lowStockOnly=true&activeOnly=true
@@ -92,20 +164,24 @@ productsRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const data = productInput.parse(req.body);
+    const { financing, supplierInvoiceId, newInvoice, ...productFields } = data;
 
-    if (!data.barcode && !data.imageUrl) {
+    if (!productFields.barcode && !productFields.imageUrl) {
       throw new HttpError(400, "Products without a barcode must have a fallback image");
     }
 
     const product = await prisma.$transaction(async (tx) => {
       const created = await tx.product.create({
         data: {
-          ...data,
-          barcode: data.barcode ?? null,
+          ...productFields,
+          barcode: productFields.barcode ?? null,
         },
       });
 
       if (created.quantity.gt(0)) {
+        const cost = created.purchaseCost.mul(created.quantity);
+        const resolved = await resolveRestockFinancing(tx, data, cost);
+
         const txn = await tx.inventoryTransaction.create({
           data: {
             productId: created.id,
@@ -113,18 +189,13 @@ productsRouter.post(
             quantityChange: created.quantity,
             unitCost: created.purchaseCost,
             note: "Initial stock on product creation",
+            supplierInvoiceId: resolved.supplierInvoiceId,
           },
         });
-        // Paying for initial stock always tries the till first, same as
-        // any other restock not tied to a supplier invoice.
-        const cost = created.purchaseCost.mul(created.quantity);
-        const deficit = await applyCashDeduction(
-          tx,
-          { inventoryTransactionId: txn.id },
-          cost,
-          `Initial stock: ${created.name}`
-        );
-        await tx.inventoryTransaction.update({ where: { id: txn.id }, data: { deficitAmount: deficit } });
+
+        if (resolved.financing === "CASH") {
+          await applyCashDeduction(tx, { inventoryTransactionId: txn.id }, cost, `Initial stock: ${created.name}`);
+        }
       }
 
       return created;
@@ -138,12 +209,20 @@ productsRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
     const data = productInput.partial().parse(req.body);
+    // financing/supplierInvoiceId/newInvoice only make sense for initial
+    // stock at creation time - editing a product's own fields never
+    // touches quantity or how it was paid for, so strip them here rather
+    // than passing them into Product.update (not real Product columns).
+    const { financing: _financing, supplierInvoiceId: _supplierInvoiceId, newInvoice: _newInvoice, ...productFields } = data;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new HttpError(404, "Product not found");
 
     const product = await prisma.product.update({
       where: { id: req.params.id },
-      data: { ...data, barcode: data.barcode === undefined ? undefined : data.barcode ?? null },
+      data: {
+        ...productFields,
+        barcode: productFields.barcode === undefined ? undefined : productFields.barcode ?? null,
+      },
     });
     res.json(product);
   })
@@ -164,13 +243,14 @@ const restockSchema = z.object({
   quantity: z.number().positive(),
   unitCost: z.number().nonnegative().optional(),
   note: z.string().optional(),
-  supplierInvoiceId: z.string().uuid().optional(),
+  ...financingFields,
 });
 
 productsRouter.post(
   "/:id/restock",
   asyncHandler(async (req, res) => {
-    const { quantity, unitCost, note, supplierInvoiceId } = restockSchema.parse(req.body);
+    const data = restockSchema.parse(req.body);
+    const { quantity, unitCost, note } = data;
 
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) throw new HttpError(404, "Product not found");
@@ -178,6 +258,9 @@ productsRouter.post(
     const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
 
     const updated = await prisma.$transaction(async (tx) => {
+      const cost = effectiveUnitCost.mul(quantity);
+      const resolved = await resolveRestockFinancing(tx, data, cost);
+
       const updatedProduct = await tx.product.update({
         where: { id: product.id },
         data: {
@@ -192,22 +275,12 @@ productsRouter.post(
           quantityChange: quantity,
           unitCost: effectiveUnitCost,
           note,
-          supplierInvoiceId,
+          supplierInvoiceId: resolved.supplierInvoiceId,
         },
       });
 
-      // Only when this restock isn't tied to a supplier invoice - that
-      // invoice's own PENDING/PAID lifecycle already governs when cash
-      // leaves the register for it, so deducting here too would double-pay.
-      if (!supplierInvoiceId) {
-        const cost = effectiveUnitCost.mul(quantity);
-        const deficit = await applyCashDeduction(
-          tx,
-          { inventoryTransactionId: txn.id },
-          cost,
-          `Restock: ${product.name}`
-        );
-        await tx.inventoryTransaction.update({ where: { id: txn.id }, data: { deficitAmount: deficit } });
+      if (resolved.financing === "CASH") {
+        await applyCashDeduction(tx, { inventoryTransactionId: txn.id }, cost, `Restock: ${product.name}`);
       }
 
       return updatedProduct;
