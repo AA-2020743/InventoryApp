@@ -255,7 +255,31 @@ productsRouter.post(
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) throw new HttpError(404, "Product not found");
 
+    // The cash/invoice side always reflects what was actually paid for
+    // *this* restock (quantity at the price entered now) - never the
+    // blended figure below, which is a valuation concept, not a real
+    // transaction amount.
     const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
+
+    // A restock at a different price doesn't overwrite the cost of stock
+    // already on hand - it blends in proportionally (quantity-weighted
+    // average), same as standard inventory costing. E.g. 10 units @ $5
+    // already in stock + 10 new units @ $7 -> purchaseCost becomes $6 for
+    // all 20, not $7 for all 20. Degenerates to just the new cost when
+    // there's no existing stock (quantity was 0).
+    const newQuantityDecimal = new Prisma.Decimal(quantity);
+    const blendedPurchaseCost =
+      unitCost !== undefined
+        ? (() => {
+            const totalQuantity = product.quantity.add(newQuantityDecimal);
+            return totalQuantity.gt(0)
+              ? product.quantity
+                  .mul(product.purchaseCost)
+                  .add(newQuantityDecimal.mul(effectiveUnitCost))
+                  .div(totalQuantity)
+              : effectiveUnitCost;
+          })()
+        : undefined;
 
     const updated = await prisma.$transaction(async (tx) => {
       const cost = effectiveUnitCost.mul(quantity);
@@ -265,7 +289,7 @@ productsRouter.post(
         where: { id: product.id },
         data: {
           quantity: { increment: quantity },
-          ...(unitCost !== undefined ? { purchaseCost: unitCost } : {}),
+          ...(blendedPurchaseCost !== undefined ? { purchaseCost: blendedPurchaseCost } : {}),
         },
       });
       const txn = await tx.inventoryTransaction.create({
