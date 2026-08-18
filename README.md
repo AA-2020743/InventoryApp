@@ -1,7 +1,7 @@
-# Supermarket Inventory App
+# Inventory App
 
 A full inventory, sales, and financial management system built for a small
-supermarket, run by a single owner. Barcode-driven stock tracking, point-of-
+business owner, run by a single owner. Barcode-driven stock tracking, point-of-
 sale checkout, supplier invoices, worker debts, deferred customer sales, a
 manual cash register, and a live net-worth dashboard — all self-hosted on
 your own server, with a native Android app as the front end.
