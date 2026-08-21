@@ -81,6 +81,16 @@
     <string name="inventory_low_stock_badge">مخزون منخفض</string>
     <string name="inventory_all_categories">الكل</string>
     <string name="inventory_empty">لا توجد منتجات بعد. اضغط + للإضافة.</string>
+    <string name="inventory_report_button">تقرير</string>
+    <string name="inventory_report_title">تقرير المخزون</string>
+    <string name="inventory_report_total_value">إجمالي قيمة المخزون</string>
+    <string name="inventory_report_item_count">%1$d منتج في المخزون</string>
+    <string name="inventory_report_row_detail">%1$s %2$s × %3$s للوحدة</string>
+    <string name="inventory_report_sort_value">حسب القيمة</string>
+    <string name="inventory_report_sort_category">حسب الفئة</string>
+    <string name="inventory_report_sort_name">حسب الاسم</string>
+    <string name="inventory_report_sort_quantity">حسب الكمية</string>
+    <string name="inventory_report_empty">لا توجد منتجات نشطة لعرض تقرير عنها بعد.</string>
     <string name="product_name">الاسم</string>
     <string name="product_barcode">الباركود</string>
     <string name="product_category">الفئة</string>

@@ -81,6 +81,16 @@
     <string name="inventory_low_stock_badge">Low stock</string>
     <string name="inventory_all_categories">All</string>
     <string name="inventory_empty">No products yet. Tap + to add one.</string>
+    <string name="inventory_report_button">Report</string>
+    <string name="inventory_report_title">Inventory report</string>
+    <string name="inventory_report_total_value">Total inventory value</string>
+    <string name="inventory_report_item_count">%1$d products in stock</string>
+    <string name="inventory_report_row_detail">%1$s %2$s × %3$s each</string>
+    <string name="inventory_report_sort_value">By value</string>
+    <string name="inventory_report_sort_category">By category</string>
+    <string name="inventory_report_sort_name">By name</string>
+    <string name="inventory_report_sort_quantity">By quantity</string>
+    <string name="inventory_report_empty">No active products to report on yet.</string>
     <string name="product_name">Name</string>
     <string name="product_barcode">Barcode</string>
     <string name="product_category">Category</string>

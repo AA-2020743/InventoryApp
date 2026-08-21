@@ -34,6 +34,7 @@ import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.ui.dashboard.DashboardScreen
 import com.supermarket.inventory.ui.expenses.ExpensesScreen
 import com.supermarket.inventory.ui.inventory.InventoryListScreen
+import com.supermarket.inventory.ui.inventory.InventoryReportScreen
 import com.supermarket.inventory.ui.inventory.ProductFormScreen
 import com.supermarket.inventory.ui.login.LoginScreen
 import com.supermarket.inventory.ui.others.OthersScreen
@@ -126,9 +127,13 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                         onEditProduct = { id -> navController.navigate(Routes.productForm(productId = id)) },
                         onAddProductWithBarcode = { barcode -> navController.navigate(Routes.productForm(barcode = barcode)) },
                         onScanToAdd = { navController.navigate(Routes.scan(ScanPurpose.ADD_PRODUCT)) },
+                        onOpenReport = { navController.navigate(Routes.INVENTORY_REPORT) },
                         scannedBarcode = scannedBarcode,
                         onScannedBarcodeConsumed = { backStackEntry.clearScannedBarcode() },
                     )
+                }
+                composable(Routes.INVENTORY_REPORT) {
+                    InventoryReportScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = Routes.PRODUCT_FORM,

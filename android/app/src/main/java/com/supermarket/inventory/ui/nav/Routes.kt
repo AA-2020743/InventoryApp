@@ -4,6 +4,7 @@ object Routes {
     const val LOGIN = "login"
     const val DASHBOARD = "dashboard"
     const val INVENTORY = "inventory"
+    const val INVENTORY_REPORT = "inventory_report"
     const val PRODUCT_FORM = "product_form?productId={productId}&barcode={barcode}"
     const val SCAN = "scan/{purpose}"
     // focusSearch: set when navigating here from the floating sell button's
