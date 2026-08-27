@@ -49,11 +49,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.R
-import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.CategoryTotalDto
-import com.supermarket.inventory.data.remote.dto.ExpenseDto
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
@@ -63,10 +60,8 @@ import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.common.topSlicesWithOther
-import com.supermarket.inventory.ui.expenses.ExpenseDialog
 import com.supermarket.inventory.ui.theme.LossRed
 import com.supermarket.inventory.ui.theme.ProfitGreen
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -83,9 +78,6 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
     val state = viewModel.uiState
     var showDatePicker by remember { mutableStateOf(false) }
     var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
-    var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
-    var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
-    var expenseEditError by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(StatsTab.OVERVIEW) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val otherLabel = stringResource(R.string.stats_other)
@@ -146,8 +138,6 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
                         state = state,
                         onEditSale = onEditSale,
                         onDeleteSaleRequest = { saleToDelete = it },
-                        onEditExpenseRequest = { expenseToEdit = it },
-                        onDeleteExpenseRequest = { expenseToDelete = it },
                     )
                     StatsTab.TOP_PRODUCTS -> TopProductsTab(
                         state = state,
@@ -194,53 +184,18 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
             dismissButton = { TextButton(onClick = { saleToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
-
-    expenseToEdit?.let { expense ->
-        ExpenseDialog(
-            title = stringResource(R.string.expense_edit),
-            initialName = expense.name,
-            initialAmount = expense.amount,
-            initialCategory = expense.category ?: "",
-            initialDateIso = expense.date,
-            categorySuggestions = state.expenseCategories,
-            error = expenseEditError,
-            onDismiss = { expenseToEdit = null; expenseEditError = null },
-            onSave = { name, amount, category, date ->
-                viewModel.viewModelScope.launch {
-                    when (val result = viewModel.updateExpense(expense.id, name, amount, category, date, expense.notes)) {
-                        is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; expenseEditError = null }
-                        is ApiResult.Error -> expenseEditError = result.message
-                    }
-                }
-            },
-        )
-    }
-
-    expenseToDelete?.let { expense ->
-        AlertDialog(
-            onDismissRequest = { expenseToDelete = null },
-            title = { Text(stringResource(R.string.confirm_delete_named_title, expense.name)) },
-            text = { Text(stringResource(R.string.confirm_delete_message)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.deleteExpense(expense.id); expenseToDelete = null }) {
-                    Text(stringResource(R.string.action_delete))
-                }
-            },
-            dismissButton = { TextButton(onClick = { expenseToDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
-        )
-    }
 }
 
-// Expenses+deficit for the selected day/month are shown right after the
-// summary card - before the sold items list - so the owner can see both
-// without scrolling past a long list of sales first.
+// Expenses and other sales are summarized here as totals plus a
+// per-category breakdown only - deliberately not as a row-per-entry list.
+// The category breakdown already carries an entry count per category,
+// which is what the owner needs from this screen; the individual records
+// (and editing them) live on their own Expenses / Other Sales tabs.
 @Composable
 private fun OverviewTab(
     state: StatsUiState,
     onEditSale: (String) -> Unit,
     onDeleteSaleRequest: (SaleDto) -> Unit,
-    onEditExpenseRequest: (ExpenseDto) -> Unit,
-    onDeleteExpenseRequest: (ExpenseDto) -> Unit,
 ) {
     LazyColumn(contentPadding = PaddingValues(12.dp)) {
         item { PeriodSummaryCard(state) }
@@ -259,9 +214,6 @@ private fun OverviewTab(
             }
             if (expenses.items.isEmpty()) {
                 item { Text(stringResource(R.string.stats_no_expenses_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
-            }
-            items(expenses.items, key = { it.id }) { expense ->
-                DayExpenseRow(expense, onEdit = { onEditExpenseRequest(expense) }, onDelete = { onDeleteExpenseRequest(expense) })
             }
         }
         state.otherSalesForRange?.let { otherSales ->
@@ -288,7 +240,6 @@ private fun OverviewTab(
             if (otherSales.items.isEmpty()) {
                 item { Text(stringResource(R.string.stats_no_other_sales_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
             }
-            items(otherSales.items, key = { it.id }) { entry -> OtherSaleStatsRow(entry) }
         }
         if (state.period == StatsPeriod.DAY) {
             item { Spacer(Modifier.height(16.dp)) }
@@ -372,24 +323,6 @@ private fun CategoryBreakdownCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun OtherSaleStatsRow(entry: com.supermarket.inventory.data.remote.dto.OtherSaleDto) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column {
-                Text(
-                    entry.category?.takeIf { it.isNotBlank() } ?: stringResource(R.string.other_sale_uncategorized),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                entry.notes?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                }
-            }
-            Text(formatAmount(entry.amount), style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -516,28 +449,6 @@ private fun MarginRow(item: MarginItemDto) {
                 stringResource(R.string.stats_margin_percent, formatPercent(item.marginPercent)),
                 style = MaterialTheme.typography.bodyLarge,
             )
-        }
-    }
-}
-
-@Composable
-private fun DayExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
-    val deficit = expense.deficitAmount.toDoubleOrNull() ?: 0.0
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(expense.name, style = MaterialTheme.typography.bodyLarge)
-                if (deficit > 0) {
-                    Text(
-                        stringResource(R.string.expense_deficit_badge, formatAmount(expense.deficitAmount)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            Text(formatAmount(expense.amount), style = MaterialTheme.typography.bodyLarge)
-            IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
         }
     }
 }
