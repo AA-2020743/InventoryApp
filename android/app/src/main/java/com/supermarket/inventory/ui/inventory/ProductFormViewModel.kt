@@ -262,7 +262,15 @@ class ProductFormViewModel @Inject constructor(
     fun save() {
         val cost = uiState.purchaseCost.toDoubleOrNull()
         val price = uiState.sellingPrice.toDoubleOrNull()
-        val perPackage = uiState.unitsPerPackageValue
+        // A units-per-package count only means anything while the packaging
+        // toggle is on; with it off the product is sold as plain single
+        // units, so persist 1 no matter what's still sitting in the (now
+        // hidden) field. Without this, switching packaging off left the old
+        // count on the record, and since toUiState() infers the toggle back
+        // from it (isPackaged = unitsPerPackage > 1), reopening the form
+        // turned packaging straight back on - the setting could never be
+        // switched off once set.
+        val perPackage = if (uiState.isPackaged) uiState.unitsPerPackageValue else 1.0
         val isEditing = uiState.productId != null
 
         if (uiState.name.isBlank()) {
