@@ -1,5 +1,6 @@
 package com.supermarket.inventory.ui.expenses
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,7 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -108,6 +112,10 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
 fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
+    // Set when the add dialog was opened from a category quick-add chip, so
+    // the dialog starts with that category filled in and only the name and
+    // amount are left to enter.
+    var prefilledCategory by remember { mutableStateOf("") }
     var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
     var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
     var addError by remember { mutableStateOf<String?>(null) }
@@ -115,19 +123,49 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
 
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.expenses_title)) }) }) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
-            when {
-                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.expenses.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.expenses_empty))
+            Column(Modifier.fillMaxSize()) {
+                // One chip per category already in use - most expenses are
+                // another instance of something spent on before, so these
+                // skip straight past picking/retyping the category.
+                if (state.categories.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.expense_quick_add),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(start = 12.dp, top = 12.dp),
+                    )
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(state.categories, key = { it }) { category ->
+                            AssistChip(
+                                onClick = { prefilledCategory = category; addError = null; showAddDialog = true },
+                                label = { Text(category) },
+                                leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            )
+                        }
+                    }
                 }
-                else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
-                    items(state.expenses, key = { it.id }) { expense ->
-                        ExpenseRow(expense, onEdit = { expenseToEdit = expense }, onDelete = { expenseToDelete = expense })
+                // weight(1f) rather than fillMaxSize(): the chip row above
+                // already consumed part of the column, so the list takes
+                // what's left instead of overflowing past the bottom.
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when {
+                        state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        state.expenses.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.expenses_empty))
+                        }
+                        else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
+                            items(state.expenses, key = { it.id }) { expense ->
+                                ExpenseRow(expense, onEdit = { expenseToEdit = expense }, onDelete = { expenseToDelete = expense })
+                            }
+                        }
                     }
                 }
             }
             FloatingActionButton(
-                onClick = { addError = null; showAddDialog = true },
+                onClick = { prefilledCategory = ""; addError = null; showAddDialog = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.expense_add)) }
         }
@@ -138,7 +176,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             title = stringResource(R.string.expense_add),
             initialName = "",
             initialAmount = "",
-            initialCategory = "",
+            initialCategory = prefilledCategory,
             initialDateIso = null,
             categorySuggestions = state.categories,
             error = addError,

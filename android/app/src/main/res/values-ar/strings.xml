@@ -233,6 +233,7 @@
     <string name="expense_amount">المبلغ</string>
     <string name="expense_date">التاريخ</string>
     <string name="expense_category">الفئة (اختياري)</string>
+    <string name="expense_quick_add">إضافة سريعة</string>
     <string name="expense_deficit_badge">العجز: %1$s</string>
 
     <!-- Other sales -->

@@ -233,6 +233,7 @@
     <string name="expense_amount">Amount</string>
     <string name="expense_date">Date</string>
     <string name="expense_category">Category (optional)</string>
+    <string name="expense_quick_add">Quick add</string>
     <string name="expense_deficit_badge">Deficit: %1$s</string>
 
     <!-- Other sales -->
