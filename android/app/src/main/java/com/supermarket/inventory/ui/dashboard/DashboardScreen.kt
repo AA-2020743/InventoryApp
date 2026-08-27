@@ -246,6 +246,11 @@ private fun MonthCard(month: DashboardPeriodDto) {
             Spacer(Modifier.height(12.dp))
             StatLine(stringResource(R.string.dashboard_revenue), formatAmount(month.revenue))
             Spacer(Modifier.height(8.dp))
+            // Already counted inside revenue above - shown separately so the
+            // owner can see how much of the month came from miscellaneous
+            // income rather than checkout sales.
+            StatLine(stringResource(R.string.dashboard_other_sales), formatAmount(month.otherSales))
+            Spacer(Modifier.height(8.dp))
             StatLine(stringResource(R.string.dashboard_expenses), formatAmount(month.expenses))
             Spacer(Modifier.height(8.dp))
             // Deficit (expenses the cash register couldn't fully cover) and

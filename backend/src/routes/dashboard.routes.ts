@@ -139,9 +139,15 @@ dashboardRouter.get(
         .filter((o) => o.date >= from && o.date < to)
         .reduce((acc, o) => acc.add(o.amount), new Prisma.Decimal(0));
 
-    const todayRevenue = sumRevenue(todaySales).add(sumOtherSalesInRange(todayStart, todayEnd));
+    // Broken out as its own figure (on top of already being folded into
+    // revenue above) so the owner can see how much of the period's revenue
+    // came from miscellaneous income rather than checkout sales.
+    const todayOtherSalesTotal = sumOtherSalesInRange(todayStart, todayEnd);
+    const monthOtherSalesTotal = sumOtherSalesInRange(monthStart, monthEnd);
+
+    const todayRevenue = sumRevenue(todaySales).add(todayOtherSalesTotal);
     const todayCost = sumCost(todaySales);
-    const monthRevenue = sumRevenue(monthSales).add(sumOtherSalesInRange(monthStart, monthEnd));
+    const monthRevenue = sumRevenue(monthSales).add(monthOtherSalesTotal);
     const monthCost = sumCost(monthSales);
 
     const todayProfit = todayRevenue.sub(todayCost).sub(todayExpensesTotal);
@@ -166,6 +172,7 @@ dashboardRouter.get(
         profit: todayProfit,
         expenses: todayExpensesTotal,
         deficit: todayDeficitTotal,
+        otherSales: todayOtherSalesTotal,
       },
       month: {
         revenue: monthRevenue,
@@ -173,6 +180,7 @@ dashboardRouter.get(
         profit: monthProfit,
         expenses: monthExpensesTotal,
         deficit: monthDeficitTotal,
+        otherSales: monthOtherSalesTotal,
       },
       alerts: {
         lowStockCount,

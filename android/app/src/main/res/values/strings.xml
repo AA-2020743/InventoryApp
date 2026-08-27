@@ -66,6 +66,7 @@
     <string name="dashboard_profit">Profit</string>
     <string name="dashboard_loss">Loss</string>
     <string name="dashboard_expenses">Expenses</string>
+    <string name="dashboard_other_sales">Other sales</string>
     <string name="dashboard_deficit">Deficit</string>
     <string name="dashboard_overall_deficit">Overall deficit (all time)</string>
     <string name="dashboard_needs_attention">Needs attention</string>
@@ -231,6 +232,7 @@
     <string name="expense_name">Name (e.g. Cashier salary)</string>
     <string name="expense_amount">Amount</string>
     <string name="expense_date">Date</string>
+    <string name="expense_category">Category (optional)</string>
     <string name="expense_deficit_badge">Deficit: %1$s</string>
 
     <!-- Other sales -->
@@ -240,6 +242,7 @@
     <string name="other_sale_edit">Edit other sale</string>
     <string name="other_sale_amount">Amount</string>
     <string name="other_sale_category">Category (optional)</string>
+    <string name="other_sale_quick_add">Quick add</string>
     <string name="other_sale_notes">Notes (optional)</string>
     <string name="other_sale_date">Date</string>
     <string name="other_sale_uncategorized">Uncategorized</string>
@@ -271,6 +274,9 @@
     <string name="stats_no_expenses_this_period">No expenses this period</string>
     <string name="stats_other_sales_title">Other sales</string>
     <string name="stats_other_sales_total">Total: %1$s</string>
+    <string name="stats_expenses_by_category">Expenses by category</string>
+    <string name="stats_other_sales_by_category">Other sales by category</string>
+    <string name="stats_category_count">%1$d entries</string>
     <string name="stats_no_other_sales_this_period">No other sales this period</string>
     <string name="stats_other">Other</string>
 

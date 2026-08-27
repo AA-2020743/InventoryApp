@@ -1,16 +1,20 @@
 package com.supermarket.inventory.ui.stats
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -41,12 +45,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
+import com.supermarket.inventory.data.remote.dto.CategoryTotalDto
 import com.supermarket.inventory.data.remote.dto.ExpenseDto
 import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
@@ -194,12 +200,14 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
             title = stringResource(R.string.expense_edit),
             initialName = expense.name,
             initialAmount = expense.amount,
+            initialCategory = expense.category ?: "",
             initialDateIso = expense.date,
+            categorySuggestions = state.expenseCategories,
             error = expenseEditError,
             onDismiss = { expenseToEdit = null; expenseEditError = null },
-            onSave = { name, amount, date ->
+            onSave = { name, amount, category, date ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.updateExpense(expense.id, name, amount, date, expense.notes)) {
+                    when (val result = viewModel.updateExpense(expense.id, name, amount, category, date, expense.notes)) {
                         is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; expenseEditError = null }
                         is ApiResult.Error -> expenseEditError = result.message
                     }
@@ -240,6 +248,15 @@ private fun OverviewTab(
             item { Spacer(Modifier.height(16.dp)) }
             item { Text(stringResource(R.string.stats_expenses_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp)) }
             item { ExpensesSummaryRow(expenses.total, expenses.deficit) }
+            if (expenses.byCategory.isNotEmpty()) {
+                item {
+                    CategoryBreakdownCard(
+                        title = stringResource(R.string.stats_expenses_by_category),
+                        breakdown = expenses.byCategory,
+                        accent = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
             if (expenses.items.isEmpty()) {
                 item { Text(stringResource(R.string.stats_no_expenses_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
             }
@@ -256,6 +273,15 @@ private fun OverviewTab(
                         stringResource(R.string.stats_other_sales_total, formatAmount(otherSales.total)),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
+            if (otherSales.byCategory.isNotEmpty()) {
+                item {
+                    CategoryBreakdownCard(
+                        title = stringResource(R.string.stats_other_sales_by_category),
+                        breakdown = otherSales.byCategory,
+                        accent = ProfitGreen,
                     )
                 }
             }
@@ -289,6 +315,62 @@ private fun ExpensesSummaryRow(total: String, deficit: String) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+        }
+    }
+}
+
+// Per-category totals for the selected day/month, biggest first (the server
+// already sorts them that way). Each row carries a proportional bar sized
+// against the largest category, so which categories dominate the period
+// reads at a glance instead of having to compare numbers line by line.
+@Composable
+private fun CategoryBreakdownCard(
+    title: String,
+    breakdown: List<CategoryTotalDto>,
+    accent: androidx.compose.ui.graphics.Color,
+) {
+    val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
+    val maxTotal = breakdown.maxOfOrNull { it.total.toDoubleOrNull() ?: 0.0 } ?: 0.0
+
+    Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Column(Modifier.padding(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
+            breakdown.forEach { row ->
+                val value = row.total.toDoubleOrNull() ?: 0.0
+                val fraction = if (maxTotal > 0) (value / maxTotal).toFloat().coerceIn(0f, 1f) else 0f
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            row.category?.takeIf { it.isNotBlank() } ?: uncategorizedLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            stringResource(R.string.stats_category_count, row.count),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                        )
+                        Text(formatAmount(row.total), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Box(
+                        Modifier
+                            .padding(top = 4.dp)
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(fraction)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(accent),
+                        )
+                    }
+                }
             }
         }
     }

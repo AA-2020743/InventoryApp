@@ -66,6 +66,7 @@
     <string name="dashboard_profit">الأرباح</string>
     <string name="dashboard_loss">الخسارة</string>
     <string name="dashboard_expenses">المصروفات</string>
+    <string name="dashboard_other_sales">مبيعات أخرى</string>
     <string name="dashboard_deficit">العجز</string>
     <string name="dashboard_overall_deficit">إجمالي العجز (كل الوقت)</string>
     <string name="dashboard_needs_attention">يتطلب انتباهك</string>
@@ -231,6 +232,7 @@
     <string name="expense_name">الاسم (مثال: راتب الكاشير)</string>
     <string name="expense_amount">المبلغ</string>
     <string name="expense_date">التاريخ</string>
+    <string name="expense_category">الفئة (اختياري)</string>
     <string name="expense_deficit_badge">العجز: %1$s</string>
 
     <!-- Other sales -->
@@ -240,6 +242,7 @@
     <string name="other_sale_edit">تعديل البيع الآخر</string>
     <string name="other_sale_amount">المبلغ</string>
     <string name="other_sale_category">الفئة (اختياري)</string>
+    <string name="other_sale_quick_add">إضافة سريعة</string>
     <string name="other_sale_notes">ملاحظات (اختياري)</string>
     <string name="other_sale_date">التاريخ</string>
     <string name="other_sale_uncategorized">غير مصنف</string>
@@ -271,6 +274,9 @@
     <string name="stats_no_expenses_this_period">لا توجد مصروفات في هذه الفترة</string>
     <string name="stats_other_sales_title">مبيعات أخرى</string>
     <string name="stats_other_sales_total">الإجمالي: %1$s</string>
+    <string name="stats_expenses_by_category">المصروفات حسب الفئة</string>
+    <string name="stats_other_sales_by_category">المبيعات الأخرى حسب الفئة</string>
+    <string name="stats_category_count">%1$d عملية</string>
     <string name="stats_no_other_sales_this_period">لا توجد مبيعات أخرى في هذه الفترة</string>
     <string name="stats_other">أخرى</string>
 

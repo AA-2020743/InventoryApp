@@ -1,5 +1,6 @@
 package com.supermarket.inventory.ui.othersales
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,7 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -106,23 +110,57 @@ class OtherSalesViewModel @Inject constructor(private val repository: OtherSaleR
 fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
+    // Set when the add dialog was opened via a category quick-add chip, so
+    // the dialog starts with that category already filled in and the owner
+    // only has to enter the amount.
+    var prefilledCategory by remember { mutableStateOf("") }
     var entryToEdit by remember { mutableStateOf<OtherSaleDto?>(null) }
     var entryToDelete by remember { mutableStateOf<OtherSaleDto?>(null) }
 
     Box(Modifier.fillMaxSize()) {
-        when {
-            state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.other_sales_empty))
+        Column(Modifier.fillMaxSize()) {
+            // One chip per category already in use - the common case is
+            // logging another entry of a kind that's been logged before, so
+            // these skip straight past picking/retyping the category.
+            if (state.categories.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.other_sale_quick_add),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 12.dp, top = 12.dp),
+                )
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.categories, key = { it }) { category ->
+                        AssistChip(
+                            onClick = { prefilledCategory = category; showAddDialog = true },
+                            label = { Text(category) },
+                            leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        )
+                    }
+                }
             }
-            else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
-                items(state.entries, key = { it.id }) { entry ->
-                    OtherSaleRow(entry, onEdit = { entryToEdit = entry }, onDelete = { entryToDelete = entry })
+            // weight(1f) rather than fillMaxSize(): the chip row above already
+            // consumed part of the column, so the list has to take what's
+            // left over instead of asking for the full height and overflowing.
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    state.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.other_sales_empty))
+                    }
+                    else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
+                        items(state.entries, key = { it.id }) { entry ->
+                            OtherSaleRow(entry, onEdit = { entryToEdit = entry }, onDelete = { entryToDelete = entry })
+                        }
+                    }
                 }
             }
         }
         FloatingActionButton(
-            onClick = { showAddDialog = true },
+            onClick = { prefilledCategory = ""; showAddDialog = true },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.other_sale_add)) }
     }
@@ -131,7 +169,7 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
         OtherSaleDialog(
             title = stringResource(R.string.other_sale_add),
             initialAmount = "",
-            initialCategory = "",
+            initialCategory = prefilledCategory,
             initialNotes = "",
             initialDateIso = null,
             categorySuggestions = state.categories,

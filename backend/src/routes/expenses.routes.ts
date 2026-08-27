@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { totalsByCategory } from "../utils/categoryTotals";
 import { applyCashDeduction } from "./cashRegister.routes";
 
 export const expensesRouter = Router();
@@ -11,6 +12,7 @@ export const expensesRouter = Router();
 const expenseInput = z.object({
   name: z.string().trim().min(1),
   amount: z.number().positive(),
+  category: z.string().trim().optional().nullable(),
   date: z.coerce.date().optional(),
   notes: z.string().trim().optional().nullable(),
 });
@@ -20,6 +22,23 @@ expensesRouter.get(
   asyncHandler(async (_req, res) => {
     const expenses = await prisma.expense.findMany({ orderBy: { date: "desc" } });
     res.json(expenses);
+  })
+);
+
+// Distinct categories already in use, so the app can offer them as a
+// dropdown while adding an expense instead of the owner retyping (and
+// misspelling, which would split one category into two) - mirrors the
+// identical endpoint on other-sales. Typing a new one creates it implicitly.
+expensesRouter.get(
+  "/categories",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.expense.findMany({
+      where: { category: { not: null } },
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" },
+    });
+    res.json(rows.map((r) => r.category).filter((c): c is string => c !== null && c !== ""));
   })
 );
 
@@ -49,6 +68,7 @@ expensesRouter.get(
       items,
       total,
       deficit,
+      byCategory: totalsByCategory(items),
     });
   })
 );

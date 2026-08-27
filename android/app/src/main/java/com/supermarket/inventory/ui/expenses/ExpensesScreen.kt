@@ -19,7 +19,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +58,11 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
-data class ExpensesUiState(val isLoading: Boolean = true, val expenses: List<ExpenseDto> = emptyList())
+data class ExpensesUiState(
+    val isLoading: Boolean = true,
+    val expenses: List<ExpenseDto> = emptyList(),
+    val categories: List<String> = emptyList(),
+)
 
 @HiltViewModel
 class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepository) : ViewModel() {
@@ -71,6 +78,10 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, expenses = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false)
             }
+            when (val catResult = repository.getCategories()) {
+                is ApiResult.Success -> uiState = uiState.copy(categories = catResult.data)
+                is ApiResult.Error -> Unit
+            }
         }
     }
 
@@ -81,11 +92,11 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
         }
     }
 
-    suspend fun create(name: String, amount: Double, date: String?) =
-        repository.createExpense(name, amount, date, null)
+    suspend fun create(name: String, amount: Double, category: String?, date: String?) =
+        repository.createExpense(name, amount, category, date, null)
 
-    suspend fun update(id: String, name: String, amount: Double, date: String?, notes: String?) =
-        repository.updateExpense(id, name, amount, date, notes)
+    suspend fun update(id: String, name: String, amount: Double, category: String?, date: String?, notes: String?) =
+        repository.updateExpense(id, name, amount, category, date, notes)
 }
 
 // Expenses always pay out of the cash register immediately - there's no
@@ -127,12 +138,14 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             title = stringResource(R.string.expense_add),
             initialName = "",
             initialAmount = "",
+            initialCategory = "",
             initialDateIso = null,
+            categorySuggestions = state.categories,
             error = addError,
             onDismiss = { showAddDialog = false },
-            onSave = { name, amount, date ->
+            onSave = { name, amount, category, date ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.create(name, amount, date)) {
+                    when (val result = viewModel.create(name, amount, category, date)) {
                         is ApiResult.Success -> { viewModel.load(); showAddDialog = false }
                         is ApiResult.Error -> addError = result.message
                     }
@@ -146,12 +159,14 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             title = stringResource(R.string.expense_edit),
             initialName = expense.name,
             initialAmount = expense.amount,
+            initialCategory = expense.category ?: "",
             initialDateIso = expense.date,
+            categorySuggestions = state.categories,
             error = editError,
             onDismiss = { expenseToEdit = null; editError = null },
-            onSave = { name, amount, date ->
+            onSave = { name, amount, category, date ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.update(expense.id, name, amount, date, expense.notes)) {
+                    when (val result = viewModel.update(expense.id, name, amount, category, date, expense.notes)) {
                         is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; editError = null }
                         is ApiResult.Error -> editError = result.message
                     }
@@ -184,7 +199,12 @@ fun ExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(expense.name, style = MaterialTheme.typography.titleMedium)
-                Text(formatIsoDate(expense.date), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    expense.category?.takeIf { it.isNotBlank() }
+                        ?.let { "$it · ${formatIsoDate(expense.date)}" }
+                        ?: formatIsoDate(expense.date),
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 if (deficit > 0) {
                     Text(
                         stringResource(R.string.expense_deficit_badge, formatAmount(expense.deficitAmount)),
@@ -212,19 +232,29 @@ fun ExpenseDialog(
     title: String,
     initialName: String,
     initialAmount: String,
+    initialCategory: String,
     initialDateIso: String?,
+    categorySuggestions: List<String>,
     error: String? = null,
     onDismiss: () -> Unit,
-    onSave: (String, Double, String?) -> Unit,
+    onSave: (String, Double, String?, String?) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var amount by remember { mutableStateOf(initialAmount) }
+    var category by remember { mutableStateOf(initialCategory) }
+    var categoryExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var dateMillis by remember {
         mutableStateOf(
             initialDateIso?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
                 ?: System.currentTimeMillis()
         )
+    }
+    // Free text with suggestions rather than a closed list: typing a name
+    // that doesn't exist yet creates that category, same as products and
+    // other sales, so the owner is never blocked by a missing option.
+    val filteredCategories = categorySuggestions.filter {
+        category.isBlank() || it.contains(category, ignoreCase = true)
     }
 
     AlertDialog(
@@ -241,6 +271,30 @@ fun ExpenseDialog(
                     singleLine = true,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+                ExposedDropdownMenuBox(
+                    expanded = categoryExpanded && filteredCategories.isNotEmpty(),
+                    onExpandedChange = { categoryExpanded = it },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = { category = it; categoryExpanded = true },
+                        label = { Text(stringResource(R.string.expense_category)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    DropdownMenu(
+                        expanded = categoryExpanded && filteredCategories.isNotEmpty(),
+                        onDismissRequest = { categoryExpanded = false },
+                    ) {
+                        filteredCategories.forEach { suggestion ->
+                            DropdownMenuItem(
+                                text = { Text(suggestion) },
+                                onClick = { category = suggestion; categoryExpanded = false },
+                            )
+                        }
+                    }
+                }
                 Text(
                     stringResource(R.string.expense_date),
                     style = MaterialTheme.typography.labelSmall,
@@ -256,7 +310,12 @@ fun ExpenseDialog(
             TextButton(onClick = {
                 val amountValue = amount.toDoubleOrNull()
                 if (name.isNotBlank() && amountValue != null) {
-                    onSave(name, amountValue, Instant.ofEpochMilli(dateMillis).toString())
+                    onSave(
+                        name,
+                        amountValue,
+                        category.trim().ifBlank { null },
+                        Instant.ofEpochMilli(dateMillis).toString(),
+                    )
                 }
             }) { Text(stringResource(R.string.action_save)) }
         },

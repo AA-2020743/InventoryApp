@@ -129,6 +129,9 @@ interface ApiService {
     @GET("api/expenses")
     suspend fun getExpenses(): List<ExpenseDto>
 
+    @GET("api/expenses/categories")
+    suspend fun getExpenseCategories(): List<String>
+
     @GET("api/expenses/for-range")
     suspend fun getExpensesForRange(
         @Query("period") period: String,

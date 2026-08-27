@@ -189,12 +189,20 @@ model Expense {
   id            String   @id @default(uuid())
   name          String
   amount        Decimal  @db.Decimal(12, 2)
+  // Optional free-text grouping (rent, salaries, utilities, ...), the same
+  // implicit-taxonomy approach as OtherSale.category and Product.category:
+  // typing a new one creates it, and the distinct values already in use are
+  // offered back as suggestions. Drives the per-category expense totals on
+  // the Stats screen.
+  category      String?
   // The calendar day the expense happened - shown to the owner and counted
   // toward that day's/month's profit and expense totals.
   date          DateTime @default(now())
   deficitAmount Decimal  @default(0) @db.Decimal(12, 2)
   notes         String?
   createdAt     DateTime @default(now())
+
+  @@index([category])
 }
 
 // A miscellaneous profit entry not tied to inventory or a checkout sale

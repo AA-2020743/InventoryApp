@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { totalsByCategory } from "../utils/categoryTotals";
 
 export const otherSalesRouter = Router();
 
@@ -80,6 +81,7 @@ otherSalesRouter.get(
       date: dateOnlyKey(dateParam).toISOString().slice(0, 10),
       items,
       total,
+      byCategory: totalsByCategory(items),
     });
   })
 );

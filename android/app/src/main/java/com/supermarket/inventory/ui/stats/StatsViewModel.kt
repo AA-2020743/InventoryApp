@@ -35,6 +35,9 @@ data class StatsUiState(
     val salesForDay: List<SaleDto> = emptyList(),
     val expensesForRange: ExpensesForRangeResponse? = null,
     val otherSalesForRange: OtherSalesForRangeResponse? = null,
+    // Only needed to seed the inline edit dialog's category dropdown here,
+    // so it's fetched once alongside the period data rather than per-edit.
+    val expenseCategories: List<String> = emptyList(),
     val periodRevenue: String = "0",
     val periodCost: String = "0",
     val periodProfit: String = "0",
@@ -145,6 +148,10 @@ class StatsViewModel @Inject constructor(
                 is ApiResult.Success -> result.data.items
                 is ApiResult.Error -> emptyList()
             }
+            val expenseCategories = when (val result = expenseRepository.getCategories()) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error -> uiState.expenseCategories
+            }
 
             uiState = uiState.copy(
                 isLoading = false,
@@ -153,6 +160,7 @@ class StatsViewModel @Inject constructor(
                 salesForDay = salesForDay,
                 expensesForRange = expensesForRange,
                 otherSalesForRange = otherSalesForRange,
+                expenseCategories = expenseCategories,
                 periodRevenue = revenue,
                 periodCost = cost,
                 periodProfit = profit,
@@ -169,8 +177,8 @@ class StatsViewModel @Inject constructor(
         }
     }
 
-    suspend fun updateExpense(id: String, name: String, amount: Double, date: String?, notes: String?) =
-        expenseRepository.updateExpense(id, name, amount, date, notes)
+    suspend fun updateExpense(id: String, name: String, amount: Double, category: String?, date: String?, notes: String?) =
+        expenseRepository.updateExpense(id, name, amount, category, date, notes)
 
     fun deleteExpense(id: String) {
         viewModelScope.launch {

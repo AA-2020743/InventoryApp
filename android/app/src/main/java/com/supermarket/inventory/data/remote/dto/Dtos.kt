@@ -204,6 +204,7 @@ data class ExpenseDto(
     val id: String,
     val name: String,
     val amount: String,
+    val category: String?,
     val date: String,
     val deficitAmount: String,
     val notes: String?,
@@ -214,8 +215,19 @@ data class ExpenseDto(
 data class ExpenseInput(
     val name: String,
     val amount: Double,
+    val category: String?,
     val date: String?,
     val notes: String?,
+)
+
+// One category's share of a period's expenses or other sales. `category` is
+// null for entries that were never given one - the client renders that as a
+// localized "Uncategorized" label rather than the server picking English.
+@JsonClass(generateAdapter = true)
+data class CategoryTotalDto(
+    val category: String?,
+    val total: String,
+    val count: Int,
 )
 
 @JsonClass(generateAdapter = true)
@@ -225,6 +237,7 @@ data class ExpensesForRangeResponse(
     val items: List<ExpenseDto>,
     val total: String,
     val deficit: String,
+    val byCategory: List<CategoryTotalDto> = emptyList(),
 )
 
 @JsonClass(generateAdapter = true)
@@ -234,6 +247,10 @@ data class DashboardPeriodDto(
     val profit: String,
     val expenses: String,
     val deficit: String,
+    // Share of `revenue` that came from miscellaneous income entries rather
+    // than checkout sales. Defaulted so an older server that doesn't send it
+    // still parses.
+    val otherSales: String = "0",
 )
 
 @JsonClass(generateAdapter = true)
@@ -414,4 +431,5 @@ data class OtherSalesForRangeResponse(
     val date: String,
     val items: List<OtherSaleDto>,
     val total: String,
+    val byCategory: List<CategoryTotalDto> = emptyList(),
 )
