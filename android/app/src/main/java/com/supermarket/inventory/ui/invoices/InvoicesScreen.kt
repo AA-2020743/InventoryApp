@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,10 +66,12 @@ import coil.compose.AsyncImage
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.SupplierDto
+import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.ui.common.copyUriToCacheFile
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
+import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.theme.LossRed
 import com.supermarket.inventory.ui.theme.ProfitGreen
 import com.supermarket.inventory.ui.theme.WarningAmber
@@ -83,6 +88,11 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     var invoiceToEdit by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceToDelete by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
     var invoiceImageToView by remember { mutableStateOf<String?>(null) }
+    // Id of an invoice just created, held so we can offer to book the stock
+    // it paid for right away instead of the owner having to remember later.
+    var justCreatedInvoiceId by remember { mutableStateOf<String?>(null) }
+    // Invoice whose linked-stock sheet is open.
+    var linkedStockInvoice by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -105,6 +115,10 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                             onEdit = { invoiceToEdit = invoice },
                             onDelete = { invoiceToDelete = invoice },
                             onViewImage = { invoice.imageUrl?.let { invoiceImageToView = viewModel.fullImageUrl(it) } },
+                            onViewLinkedStock = {
+                                linkedStockInvoice = invoice
+                                viewModel.openLinkedInventory(invoice.id)
+                            },
                         )
                         Spacer(Modifier.height(8.dp))
                     }
@@ -129,7 +143,46 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             title = stringResource(R.string.invoices_add),
             invoiceToEdit = null,
             onDismiss = { showAddDialog = false },
-            onDone = { showAddDialog = false; viewModel.load() },
+            onDone = { createdId ->
+                showAddDialog = false
+                viewModel.load()
+                // A supplier invoice is by definition stock taken on credit,
+                // so offer to record what it covers while it's fresh.
+                justCreatedInvoiceId = createdId
+            },
+        )
+    }
+
+    // Offered right after an invoice is created: a supplier invoice is stock
+    // bought on credit, so this is the moment to record which products it
+    // covers. Declining just closes it - the same view is reachable later
+    // from the invoice's "Linked stock" button.
+    justCreatedInvoiceId?.let { createdId ->
+        val created = state.invoices.firstOrNull { it.id == createdId }
+        AlertDialog(
+            onDismissRequest = { justCreatedInvoiceId = null },
+            title = { Text(stringResource(R.string.invoice_link_stock_prompt_title)) },
+            text = { Text(stringResource(R.string.invoice_link_stock_prompt_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    justCreatedInvoiceId = null
+                    if (created != null) {
+                        linkedStockInvoice = created
+                        viewModel.openLinkedInventory(created.id)
+                    }
+                }) { Text(stringResource(R.string.invoice_link_stock_now)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { justCreatedInvoiceId = null }) { Text(stringResource(R.string.invoice_link_stock_later)) }
+            },
+        )
+    }
+
+    linkedStockInvoice?.let { invoice ->
+        LinkedStockDialog(
+            viewModel = viewModel,
+            invoice = invoice,
+            onDismiss = { linkedStockInvoice = null; viewModel.closeLinkedInventory() },
         )
     }
 
@@ -139,7 +192,7 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             title = stringResource(R.string.invoice_edit),
             invoiceToEdit = invoice,
             onDismiss = { invoiceToEdit = null },
-            onDone = { invoiceToEdit = null; viewModel.load() },
+            onDone = { _ -> invoiceToEdit = null; viewModel.load() },
         )
     }
 
@@ -190,6 +243,198 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     }
 }
 
+// What an invoice actually paid for: every restock booked against it, plus
+// an inline way to book more. Adding stock here is always a DEFERRED
+// restock - the till isn't touched, because the invoice's own PENDING ->
+// PAID lifecycle is what moves the cash.
+//
+// Only existing products can be topped up from here; a product that doesn't
+// exist yet is created from Inventory -> add product, whose own financing
+// section can point at this same invoice.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LinkedStockDialog(
+    viewModel: InvoicesViewModel,
+    invoice: SupplierInvoiceDto,
+    onDismiss: () -> Unit,
+) {
+    val state = viewModel.uiState
+    val scope = rememberCoroutineScope()
+    var productQuery by remember { mutableStateOf("") }
+    var selectedProduct by remember { mutableStateOf<ProductDto?>(null) }
+    var productExpanded by remember { mutableStateOf(false) }
+    var quantity by remember { mutableStateOf("") }
+    var unitCost by remember { mutableStateOf("") }
+    var addError by remember { mutableStateOf<String?>(null) }
+    var isAdding by remember { mutableStateOf(false) }
+
+    val matches = state.products.filter {
+        productQuery.isBlank() || it.name.contains(productQuery, ignoreCase = true) ||
+            (it.barcode?.contains(productQuery, ignoreCase = true) == true)
+    }.take(20)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.invoice_linked_stock)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                val linked = state.linkedInventory
+                Text(
+                    stringResource(R.string.invoice_amount_label, formatAmount(invoice.amount)),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (linked != null) {
+                    val invoiceAmount = linked.invoiceAmount.toDoubleOrNull() ?: 0.0
+                    val bookedTotal = linked.linkedTotal.toDoubleOrNull() ?: 0.0
+                    Text(
+                        stringResource(R.string.invoice_linked_total_label, formatAmount(linked.linkedTotal)),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    // Rounding on decimal money can leave a sub-cent gap that
+                    // isn't a real discrepancy, so only flag a visible one.
+                    if (kotlin.math.abs(invoiceAmount - bookedTotal) >= 0.01) {
+                        Text(
+                            stringResource(
+                                R.string.invoice_linked_mismatch,
+                                formatAmount((invoiceAmount - bookedTotal).toString()),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = WarningAmber,
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Divider()
+                Spacer(Modifier.height(8.dp))
+
+                when {
+                    state.linkedInventoryLoading -> CircularProgressIndicator()
+                    state.linkedInventoryError != null -> Text(
+                        state.linkedInventoryError,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    linked == null || linked.items.isEmpty() -> Text(
+                        stringResource(R.string.invoice_no_linked_stock),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    else -> linked.items.forEach { line ->
+                        val qty = line.quantityChange.toDoubleOrNull() ?: 0.0
+                        val cost = line.unitCost?.toDoubleOrNull() ?: 0.0
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(line.product?.name ?: line.productId, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    stringResource(
+                                        R.string.invoice_linked_line_detail,
+                                        formatQuantity(line.quantityChange),
+                                        formatAmount(line.unitCost ?: "0"),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(formatAmount((qty * cost).toString()), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Divider()
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.invoice_add_stock), style = MaterialTheme.typography.titleSmall)
+
+                ExposedDropdownMenuBox(
+                    expanded = productExpanded && matches.isNotEmpty(),
+                    onExpandedChange = { productExpanded = it },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = selectedProduct?.name ?: productQuery,
+                        onValueChange = { productQuery = it; selectedProduct = null; productExpanded = true },
+                        label = { Text(stringResource(R.string.invoice_pick_product)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    DropdownMenu(
+                        expanded = productExpanded && matches.isNotEmpty(),
+                        onDismissRequest = { productExpanded = false },
+                    ) {
+                        matches.forEach { product ->
+                            DropdownMenuItem(
+                                text = { Text(product.name) },
+                                onClick = {
+                                    selectedProduct = product
+                                    productQuery = product.name
+                                    // Seed with the product's known cost; the
+                                    // owner overrides it when this invoice
+                                    // charged a different price.
+                                    if (unitCost.isBlank()) unitCost = product.purchaseCost
+                                    productExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { quantity = it },
+                    label = { Text(stringResource(R.string.restock_quantity)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = unitCost,
+                    onValueChange = { unitCost = it },
+                    label = { Text(stringResource(R.string.restock_unit_cost)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                addError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                }
+                TextButton(
+                    enabled = !isAdding,
+                    onClick = {
+                        val product = selectedProduct
+                        val qty = quantity.toDoubleOrNull()
+                        if (product == null || qty == null || qty <= 0) {
+                            addError = null
+                            return@TextButton
+                        }
+                        isAdding = true
+                        addError = null
+                        scope.launch {
+                            val failure = viewModel.addStockToInvoice(
+                                invoiceId = invoice.id,
+                                productId = product.id,
+                                quantity = qty,
+                                unitCost = unitCost.toDoubleOrNull(),
+                            )
+                            isAdding = false
+                            if (failure == null) {
+                                selectedProduct = null
+                                productQuery = ""
+                                quantity = ""
+                                unitCost = ""
+                            } else {
+                                addError = failure
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(top = 4.dp),
+                ) { Text(stringResource(R.string.invoice_add_stock)) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
+}
+
 @Composable
 private fun InvoiceRow(
     invoice: SupplierInvoiceDto,
@@ -197,6 +442,7 @@ private fun InvoiceRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onViewImage: () -> Unit,
+    onViewLinkedStock: () -> Unit,
 ) {
     val now = Instant.now()
     val dueInstant = try { Instant.parse(invoice.dueDate) } catch (_: Exception) { now }
@@ -239,10 +485,17 @@ private fun InvoiceRow(
                 // No "pay from cash register?" choice anymore - marking paid
                 // always tries to pay from the till, recording a deficit if
                 // it comes up short, so this is a direct one-tap action.
-                if (invoice.status == "PENDING") {
-                    TextButton(onClick = onMarkPaid) { Text(stringResource(R.string.invoice_mark_paid)) }
-                } else {
-                    Text(stringResource(R.string.invoice_status_paid), color = ProfitGreen, style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onViewLinkedStock) {
+                        Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.invoice_linked_stock))
+                    }
+                    if (invoice.status == "PENDING") {
+                        TextButton(onClick = onMarkPaid) { Text(stringResource(R.string.invoice_mark_paid)) }
+                    } else {
+                        Text(stringResource(R.string.invoice_status_paid), color = ProfitGreen, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -256,7 +509,7 @@ private fun InvoiceDialog(
     title: String,
     invoiceToEdit: SupplierInvoiceDto?,
     onDismiss: () -> Unit,
-    onDone: () -> Unit,
+    onDone: (String?) -> Unit,
 ) {
     var suppliers by remember { mutableStateOf<List<SupplierDto>>(emptyList()) }
     var selectedSupplier by remember { mutableStateOf<SupplierDto?>(null) }
@@ -399,7 +652,8 @@ private fun InvoiceDialog(
                             viewModel.createInvoice(supplier.id, invoiceNumber.ifBlank { null }, amountValue, dueIso, null, imageUrl)
                         }
                         when (result) {
-                            is com.supermarket.inventory.data.ApiResult.Success -> onDone()
+                            is com.supermarket.inventory.data.ApiResult.Success ->
+                                onDone(if (invoiceToEdit == null) result.data.id else null)
                             is com.supermarket.inventory.data.ApiResult.Error -> { isSaving = false; error = result.message }
                         }
                     }

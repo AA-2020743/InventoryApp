@@ -117,6 +117,18 @@
     <string name="product_delete_confirm">سيتم إزالة المنتج من المخزون ونتائج البحث. ستبقى سجلات المبيعات والمخزون السابقة الخاصة به محفوظة.</string>
     <string name="restock_title">إعادة التخزين</string>
     <string name="restock_quantity">الكمية المستلمة</string>
+    <string name="invoice_linked_stock">المخزون المرتبط</string>
+    <string name="invoice_amount_label">قيمة الفاتورة: %1$s</string>
+    <string name="invoice_linked_total_label">المخزون المسجل عليها: %1$s</string>
+    <string name="invoice_linked_mismatch">غير محتسب: %1$s</string>
+    <string name="invoice_no_linked_stock">لا يوجد مخزون مرتبط بهذه الفاتورة بعد.</string>
+    <string name="invoice_linked_line_detail">%1$s بسعر %2$s للوحدة</string>
+    <string name="invoice_add_stock">إضافة مخزون إلى هذه الفاتورة</string>
+    <string name="invoice_pick_product">المنتج</string>
+    <string name="invoice_link_stock_prompt_title">تم حفظ الفاتورة</string>
+    <string name="invoice_link_stock_prompt_message">هل تريد تسجيل المخزون الذي دفعت ثمنه هذه الفاتورة؟ لن يؤثر ذلك على الخزينة - الفاتورة تغطيه حتى تحددها كمدفوعة.</string>
+    <string name="invoice_link_stock_now">إضافة المخزون الآن</string>
+    <string name="invoice_link_stock_later">لاحقًا</string>
     <string name="restock_packages_received">عدد العبوات المستلمة</string>
     <string name="restock_unit_cost">تكلفة الوحدة الجديدة (اختياري)</string>
     <string name="restock_financing_label">طريقة الدفع</string>
@@ -232,7 +244,6 @@
     <string name="expense_name">الاسم (مثال: راتب الكاشير)</string>
     <string name="expense_amount">المبلغ</string>
     <string name="expense_date">التاريخ</string>
-    <string name="expense_category">الفئة (اختياري)</string>
     <string name="expense_quick_add">إضافة سريعة</string>
     <string name="expense_deficit_badge">العجز: %1$s</string>
 

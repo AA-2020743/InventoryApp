@@ -25,20 +25,22 @@ expensesRouter.get(
   })
 );
 
-// Distinct categories already in use, so the app can offer them as a
-// dropdown while adding an expense instead of the owner retyping (and
-// misspelling, which would split one category into two) - mirrors the
-// identical endpoint on other-sales. Typing a new one creates it implicitly.
+// An expense's name *is* its category ("Rent", "Cashier salary", ...) -
+// there's no separate category concept, since in practice every expense
+// worth grouping is another instance of one that was logged before. This
+// returns the distinct names already in use so the app can offer them as
+// a dropdown and as quick-add chips instead of the owner retyping (and
+// misspelling, which would split one grouping into two). Typing a new
+// name creates that grouping implicitly.
 expensesRouter.get(
-  "/categories",
+  "/names",
   asyncHandler(async (_req, res) => {
     const rows = await prisma.expense.findMany({
-      where: { category: { not: null } },
-      distinct: ["category"],
-      select: { category: true },
-      orderBy: { category: "asc" },
+      distinct: ["name"],
+      select: { name: true },
+      orderBy: { name: "asc" },
     });
-    res.json(rows.map((r) => r.category).filter((c): c is string => c !== null && c !== ""));
+    res.json(rows.map((r) => r.name).filter((n) => n !== ""));
   })
 );
 
@@ -68,7 +70,9 @@ expensesRouter.get(
       items,
       total,
       deficit,
-      byCategory: totalsByCategory(items),
+      // Grouped by name - see the /names endpoint above for why the name
+      // is the category for an expense.
+      byCategory: totalsByCategory(items.map((e) => ({ category: e.name, amount: e.amount }))),
     });
   })
 );

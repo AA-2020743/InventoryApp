@@ -65,7 +65,9 @@ import javax.inject.Inject
 data class ExpensesUiState(
     val isLoading: Boolean = true,
     val expenses: List<ExpenseDto> = emptyList(),
-    val categories: List<String> = emptyList(),
+    // Distinct names already used, offered as dropdown suggestions and as
+    // quick-add chips - an expense's name doubles as its category.
+    val names: List<String> = emptyList(),
 )
 
 @HiltViewModel
@@ -82,8 +84,8 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, expenses = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false)
             }
-            when (val catResult = repository.getCategories()) {
-                is ApiResult.Success -> uiState = uiState.copy(categories = catResult.data)
+            when (val namesResult = repository.getNames()) {
+                is ApiResult.Success -> uiState = uiState.copy(names = namesResult.data)
                 is ApiResult.Error -> Unit
             }
         }
@@ -96,11 +98,11 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
         }
     }
 
-    suspend fun create(name: String, amount: Double, category: String?, date: String?) =
-        repository.createExpense(name, amount, category, date, null)
+    suspend fun create(name: String, amount: Double, date: String?) =
+        repository.createExpense(name, amount, date, null)
 
-    suspend fun update(id: String, name: String, amount: Double, category: String?, date: String?, notes: String?) =
-        repository.updateExpense(id, name, amount, category, date, notes)
+    suspend fun update(id: String, name: String, amount: Double, date: String?, notes: String?) =
+        repository.updateExpense(id, name, amount, date, notes)
 }
 
 // Expenses always pay out of the cash register immediately - there's no
@@ -112,10 +114,10 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
 fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
     var showAddDialog by remember { mutableStateOf(false) }
-    // Set when the add dialog was opened from a category quick-add chip, so
-    // the dialog starts with that category filled in and only the name and
-    // amount are left to enter.
-    var prefilledCategory by remember { mutableStateOf("") }
+    // Set when the add dialog was opened from a quick-add chip, so the
+    // dialog starts with that expense name filled in and only the amount is
+    // left to enter.
+    var prefilledName by remember { mutableStateOf("") }
     var expenseToEdit by remember { mutableStateOf<ExpenseDto?>(null) }
     var expenseToDelete by remember { mutableStateOf<ExpenseDto?>(null) }
     var addError by remember { mutableStateOf<String?>(null) }
@@ -124,10 +126,10 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.expenses_title)) }) }) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
-                // One chip per category already in use - most expenses are
-                // another instance of something spent on before, so these
-                // skip straight past picking/retyping the category.
-                if (state.categories.isNotEmpty()) {
+                // One chip per expense name already in use - most expenses
+                // are another instance of something spent on before, so
+                // these skip straight past retyping the name.
+                if (state.names.isNotEmpty()) {
                     Text(
                         stringResource(R.string.expense_quick_add),
                         style = MaterialTheme.typography.labelMedium,
@@ -138,10 +140,10 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(state.categories, key = { it }) { category ->
+                        items(state.names, key = { it }) { name ->
                             AssistChip(
-                                onClick = { prefilledCategory = category; addError = null; showAddDialog = true },
-                                label = { Text(category) },
+                                onClick = { prefilledName = name; addError = null; showAddDialog = true },
+                                label = { Text(name) },
                                 leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
                             )
                         }
@@ -165,7 +167,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                 }
             }
             FloatingActionButton(
-                onClick = { prefilledCategory = ""; addError = null; showAddDialog = true },
+                onClick = { prefilledName = ""; addError = null; showAddDialog = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.expense_add)) }
         }
@@ -174,16 +176,15 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     if (showAddDialog) {
         ExpenseDialog(
             title = stringResource(R.string.expense_add),
-            initialName = "",
+            initialName = prefilledName,
             initialAmount = "",
-            initialCategory = prefilledCategory,
             initialDateIso = null,
-            categorySuggestions = state.categories,
+            nameSuggestions = state.names,
             error = addError,
             onDismiss = { showAddDialog = false },
-            onSave = { name, amount, category, date ->
+            onSave = { name, amount, date ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.create(name, amount, category, date)) {
+                    when (val result = viewModel.create(name, amount, date)) {
                         is ApiResult.Success -> { viewModel.load(); showAddDialog = false }
                         is ApiResult.Error -> addError = result.message
                     }
@@ -197,14 +198,13 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             title = stringResource(R.string.expense_edit),
             initialName = expense.name,
             initialAmount = expense.amount,
-            initialCategory = expense.category ?: "",
             initialDateIso = expense.date,
-            categorySuggestions = state.categories,
+            nameSuggestions = state.names,
             error = editError,
             onDismiss = { expenseToEdit = null; editError = null },
-            onSave = { name, amount, category, date ->
+            onSave = { name, amount, date ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.update(expense.id, name, amount, category, date, expense.notes)) {
+                    when (val result = viewModel.update(expense.id, name, amount, date, expense.notes)) {
                         is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; editError = null }
                         is ApiResult.Error -> editError = result.message
                     }
@@ -237,12 +237,7 @@ fun ExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(expense.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    expense.category?.takeIf { it.isNotBlank() }
-                        ?.let { "$it · ${formatIsoDate(expense.date)}" }
-                        ?: formatIsoDate(expense.date),
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Text(formatIsoDate(expense.date), style = MaterialTheme.typography.bodySmall)
                 if (deficit > 0) {
                     Text(
                         stringResource(R.string.expense_deficit_badge, formatAmount(expense.deficitAmount)),
@@ -270,17 +265,15 @@ fun ExpenseDialog(
     title: String,
     initialName: String,
     initialAmount: String,
-    initialCategory: String,
     initialDateIso: String?,
-    categorySuggestions: List<String>,
+    nameSuggestions: List<String>,
     error: String? = null,
     onDismiss: () -> Unit,
-    onSave: (String, Double, String?, String?) -> Unit,
+    onSave: (String, Double, String?) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
+    var nameExpanded by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf(initialAmount) }
-    var category by remember { mutableStateOf(initialCategory) }
-    var categoryExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var dateMillis by remember {
         mutableStateOf(
@@ -288,11 +281,12 @@ fun ExpenseDialog(
                 ?: System.currentTimeMillis()
         )
     }
-    // Free text with suggestions rather than a closed list: typing a name
-    // that doesn't exist yet creates that category, same as products and
-    // other sales, so the owner is never blocked by a missing option.
-    val filteredCategories = categorySuggestions.filter {
-        category.isBlank() || it.contains(category, ignoreCase = true)
+    // The name doubles as the expense's category, so past names are offered
+    // as suggestions - but as free text, not a closed list: typing a name
+    // that doesn't exist yet starts a new grouping, so the owner is never
+    // blocked by a missing option.
+    val filteredNames = nameSuggestions.filter {
+        name.isBlank() || it.contains(name, ignoreCase = true)
     }
 
     AlertDialog(
@@ -300,7 +294,29 @@ fun ExpenseDialog(
         title = { Text(title) },
         text = {
             Column {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.expense_name)) }, singleLine = true)
+                ExposedDropdownMenuBox(
+                    expanded = nameExpanded && filteredNames.isNotEmpty(),
+                    onExpandedChange = { nameExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it; nameExpanded = true },
+                        label = { Text(stringResource(R.string.expense_name)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    DropdownMenu(
+                        expanded = nameExpanded && filteredNames.isNotEmpty(),
+                        onDismissRequest = { nameExpanded = false },
+                    ) {
+                        filteredNames.forEach { suggestion ->
+                            DropdownMenuItem(
+                                text = { Text(suggestion) },
+                                onClick = { name = suggestion; nameExpanded = false },
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
@@ -309,30 +325,6 @@ fun ExpenseDialog(
                     singleLine = true,
                     modifier = Modifier.padding(top = 8.dp),
                 )
-                ExposedDropdownMenuBox(
-                    expanded = categoryExpanded && filteredCategories.isNotEmpty(),
-                    onExpandedChange = { categoryExpanded = it },
-                    modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = category,
-                        onValueChange = { category = it; categoryExpanded = true },
-                        label = { Text(stringResource(R.string.expense_category)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    )
-                    DropdownMenu(
-                        expanded = categoryExpanded && filteredCategories.isNotEmpty(),
-                        onDismissRequest = { categoryExpanded = false },
-                    ) {
-                        filteredCategories.forEach { suggestion ->
-                            DropdownMenuItem(
-                                text = { Text(suggestion) },
-                                onClick = { category = suggestion; categoryExpanded = false },
-                            )
-                        }
-                    }
-                }
                 Text(
                     stringResource(R.string.expense_date),
                     style = MaterialTheme.typography.labelSmall,
@@ -348,12 +340,7 @@ fun ExpenseDialog(
             TextButton(onClick = {
                 val amountValue = amount.toDoubleOrNull()
                 if (name.isNotBlank() && amountValue != null) {
-                    onSave(
-                        name,
-                        amountValue,
-                        category.trim().ifBlank { null },
-                        Instant.ofEpochMilli(dateMillis).toString(),
-                    )
+                    onSave(name.trim(), amountValue, Instant.ofEpochMilli(dateMillis).toString())
                 }
             }) { Text(stringResource(R.string.action_save)) }
         },

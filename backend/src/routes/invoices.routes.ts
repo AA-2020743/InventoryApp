@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
@@ -75,6 +76,32 @@ invoicesRouter.get(
     });
     if (!invoice) throw new HttpError(404, "Invoice not found");
     res.json(invoice);
+  })
+);
+
+// The stock this invoice actually paid for: every RESTOCK linked to it,
+// with the product it added to and what that line cost. `linkedTotal` is
+// the sum of those lines, which the app compares against the invoice's own
+// `amount` so a mismatch (stock booked but not all of it accounted for on
+// the invoice, or vice versa) is visible rather than silent.
+invoicesRouter.get(
+  "/:id/inventory",
+  asyncHandler(async (req, res) => {
+    const invoice = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id } });
+    if (!invoice) throw new HttpError(404, "Invoice not found");
+
+    const items = await prisma.inventoryTransaction.findMany({
+      where: { supplierInvoiceId: invoice.id },
+      include: { product: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const linkedTotal = items.reduce(
+      (acc, t) => acc.add((t.unitCost ?? new Prisma.Decimal(0)).mul(t.quantityChange)),
+      new Prisma.Decimal(0)
+    );
+
+    res.json({ invoiceId: invoice.id, invoiceAmount: invoice.amount, items, linkedTotal });
   })
 );
 

@@ -76,6 +76,9 @@ interface ApiService {
     @GET("api/invoices/upcoming")
     suspend fun getUpcomingInvoices(@Query("days") days: Int? = null): UpcomingInvoicesResponse
 
+    @GET("api/invoices/{id}/inventory")
+    suspend fun getInvoiceInventory(@Path("id") id: String): InvoiceInventoryResponse
+
     @POST("api/invoices")
     suspend fun createInvoice(@Body input: InvoiceInput): SupplierInvoiceDto
 
@@ -129,8 +132,8 @@ interface ApiService {
     @GET("api/expenses")
     suspend fun getExpenses(): List<ExpenseDto>
 
-    @GET("api/expenses/categories")
-    suspend fun getExpenseCategories(): List<String>
+    @GET("api/expenses/names")
+    suspend fun getExpenseNames(): List<String>
 
     @GET("api/expenses/for-range")
     suspend fun getExpensesForRange(

@@ -138,6 +138,30 @@ data class InvoiceInput(
     val imageUrl: String? = null,
 )
 
+// One RESTOCK booked against a supplier invoice, with the product it added
+// stock to. lineCost (quantity x unitCost) is computed client-side.
+@JsonClass(generateAdapter = true)
+data class InvoiceInventoryItemDto(
+    val id: String,
+    val productId: String,
+    val product: ProductDto?,
+    val quantityChange: String,
+    val unitCost: String?,
+    val note: String?,
+    val createdAt: String,
+)
+
+// The stock a supplier invoice paid for. linkedTotal is the summed cost of
+// the lines below, so the app can flag when it doesn't match the invoice's
+// own amount (stock booked but not fully accounted for, or vice versa).
+@JsonClass(generateAdapter = true)
+data class InvoiceInventoryResponse(
+    val invoiceId: String,
+    val invoiceAmount: String,
+    val items: List<InvoiceInventoryItemDto>,
+    val linkedTotal: String,
+)
+
 @JsonClass(generateAdapter = true)
 data class UpcomingInvoicesResponse(
     val overdue: List<SupplierInvoiceDto>,
@@ -215,7 +239,6 @@ data class ExpenseDto(
 data class ExpenseInput(
     val name: String,
     val amount: Double,
-    val category: String?,
     val date: String?,
     val notes: String?,
 )

@@ -189,11 +189,12 @@ model Expense {
   id            String   @id @default(uuid())
   name          String
   amount        Decimal  @db.Decimal(12, 2)
-  // Optional free-text grouping (rent, salaries, utilities, ...), the same
-  // implicit-taxonomy approach as OtherSale.category and Product.category:
-  // typing a new one creates it, and the distinct values already in use are
-  // offered back as suggestions. Drives the per-category expense totals on
-  // the Stats screen.
+  // Legacy, no longer written or shown: an expense's `name` turned out to
+  // be its category in practice ("Rent", "Cashier salary"), so grouping and
+  // the name suggestions both key off `name` and this stays null on new
+  // rows. Kept rather than dropped so backups taken while it was in use
+  // still restore cleanly (restore spreads whatever columns the archive
+  // carries straight into createMany).
   category      String?
   // The calendar day the expense happened - shown to the owner and counted
   // toward that day's/month's profit and expense totals.

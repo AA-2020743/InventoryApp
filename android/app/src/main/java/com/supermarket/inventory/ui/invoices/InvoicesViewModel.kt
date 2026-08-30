@@ -7,9 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.SessionManager
+import com.supermarket.inventory.data.remote.dto.InvoiceInventoryResponse
+import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.data.remote.dto.UploadImageResponse
 import com.supermarket.inventory.data.repository.InvoiceRepository
+import com.supermarket.inventory.data.repository.ProductRepository
 import com.supermarket.inventory.data.repository.SupplierRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -20,12 +23,19 @@ data class InvoicesUiState(
     val isLoading: Boolean = true,
     val invoices: List<SupplierInvoiceDto> = emptyList(),
     val error: String? = null,
+    // Set while the linked-stock sheet is open for one invoice.
+    val linkedInventory: InvoiceInventoryResponse? = null,
+    val linkedInventoryLoading: Boolean = false,
+    val linkedInventoryError: String? = null,
+    // Products offered in the "add stock to this invoice" picker.
+    val products: List<ProductDto> = emptyList(),
 )
 
 @HiltViewModel
 class InvoicesViewModel @Inject constructor(
     private val invoiceRepository: InvoiceRepository,
     private val supplierRepository: SupplierRepository,
+    private val productRepository: ProductRepository,
     private val sessionManager: SessionManager,
 ) : ViewModel() {
 
@@ -60,6 +70,56 @@ class InvoicesViewModel @Inject constructor(
 
     fun dismissError() {
         uiState = uiState.copy(error = null)
+    }
+
+    // Opens the linked-stock view for one invoice: what this invoice
+    // actually paid for. Also pulls the product list so stock can be added
+    // to the invoice from the same place.
+    fun openLinkedInventory(invoiceId: String) {
+        viewModelScope.launch {
+            uiState = uiState.copy(linkedInventoryLoading = true, linkedInventoryError = null, linkedInventory = null)
+            when (val result = invoiceRepository.getInventory(invoiceId)) {
+                is ApiResult.Success ->
+                    uiState = uiState.copy(linkedInventoryLoading = false, linkedInventory = result.data)
+                is ApiResult.Error ->
+                    uiState = uiState.copy(linkedInventoryLoading = false, linkedInventoryError = result.message)
+            }
+            when (val productsResult = productRepository.getProducts()) {
+                is ApiResult.Success -> uiState = uiState.copy(products = productsResult.data)
+                is ApiResult.Error -> Unit
+            }
+        }
+    }
+
+    fun closeLinkedInventory() {
+        uiState = uiState.copy(linkedInventory = null, linkedInventoryError = null, linkedInventoryLoading = false)
+    }
+
+    // Books stock against the invoice: a DEFERRED restock, so the till is
+    // untouched - the invoice's own PENDING -> PAID lifecycle governs cash.
+    // Returns the error message on failure, null on success.
+    suspend fun addStockToInvoice(
+        invoiceId: String,
+        productId: String,
+        quantity: Double,
+        unitCost: Double?,
+    ): String? {
+        val result = productRepository.restock(
+            id = productId,
+            quantity = quantity,
+            unitCost = unitCost,
+            note = null,
+            financing = "DEFERRED",
+            supplierInvoiceId = invoiceId,
+        )
+        return when (result) {
+            is ApiResult.Success -> {
+                openLinkedInventory(invoiceId)
+                load()
+                null
+            }
+            is ApiResult.Error -> result.message
+        }
     }
 
     suspend fun loadSuppliers() = supplierRepository.getSuppliers()

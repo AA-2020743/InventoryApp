@@ -53,6 +53,10 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
     ): ApiResult<SupplierInvoiceDto> =
         apiCall { api.updateInvoice(id, InvoiceInput(supplierId, invoiceNumber, amount, dueDateIso, notes, imageUrl)) }
 
+    // The stock booked against this invoice - what it actually paid for.
+    suspend fun getInventory(id: String): ApiResult<InvoiceInventoryResponse> =
+        apiCall { api.getInvoiceInventory(id) }
+
     suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id) }
 

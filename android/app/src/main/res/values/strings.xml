@@ -117,6 +117,18 @@
     <string name="product_delete_confirm">This removes the product from your inventory and search results. Past sales and stock history involving it are kept for your records.</string>
     <string name="restock_title">Restock</string>
     <string name="restock_quantity">Quantity received</string>
+    <string name="invoice_linked_stock">Linked stock</string>
+    <string name="invoice_amount_label">Invoice amount: %1$s</string>
+    <string name="invoice_linked_total_label">Stock booked to it: %1$s</string>
+    <string name="invoice_linked_mismatch">Unaccounted for: %1$s</string>
+    <string name="invoice_no_linked_stock">No stock linked to this invoice yet.</string>
+    <string name="invoice_linked_line_detail">%1$s @ %2$s each</string>
+    <string name="invoice_add_stock">Add stock to this invoice</string>
+    <string name="invoice_pick_product">Product</string>
+    <string name="invoice_link_stock_prompt_title">Invoice saved</string>
+    <string name="invoice_link_stock_prompt_message">Record the stock this invoice paid for? It won\'t touch the cash register - the invoice covers it until you mark it paid.</string>
+    <string name="invoice_link_stock_now">Add stock now</string>
+    <string name="invoice_link_stock_later">Later</string>
     <string name="restock_packages_received">Packages received</string>
     <string name="restock_unit_cost">New unit cost (optional)</string>
     <string name="restock_financing_label">Paid for with</string>
@@ -232,7 +244,6 @@
     <string name="expense_name">Name (e.g. Cashier salary)</string>
     <string name="expense_amount">Amount</string>
     <string name="expense_date">Date</string>
-    <string name="expense_category">Category (optional)</string>
     <string name="expense_quick_add">Quick add</string>
     <string name="expense_deficit_badge">Deficit: %1$s</string>
 
