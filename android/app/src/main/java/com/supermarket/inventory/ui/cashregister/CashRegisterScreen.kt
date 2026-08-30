@@ -40,8 +40,8 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.CashRegisterEntryDto
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
-import com.supermarket.inventory.ui.theme.LossRed
-import com.supermarket.inventory.ui.theme.ProfitGreen
+import com.supermarket.inventory.ui.theme.lossColor
+import com.supermarket.inventory.ui.theme.profitColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +135,7 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
 @Composable
 private fun LedgerRow(entry: CashRegisterEntryDto) {
     val amountValue = entry.amount.toDoubleOrNull() ?: 0.0
-    val color = if (amountValue < 0) LossRed else ProfitGreen
+    val color = if (amountValue < 0) lossColor() else profitColor()
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f))) {
         Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {

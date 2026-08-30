@@ -81,7 +81,7 @@
     <string name="inventory_add_product">إضافة منتج</string>
     <string name="inventory_low_stock_badge">مخزون منخفض</string>
     <string name="inventory_all_categories">الكل</string>
-    <string name="inventory_empty">لا توجد منتجات بعد. اضغط + للإضافة.</string>
+    <string name="inventory_empty">لا توجد منتجات بعد</string>
     <string name="inventory_report_button">تقرير</string>
     <string name="inventory_report_title">تقرير المخزون</string>
     <string name="inventory_report_total_value">إجمالي قيمة المخزون</string>
@@ -232,7 +232,7 @@
 
     <!-- Expenses -->
     <string name="expenses_title">المصروفات</string>
-    <string name="expenses_empty">لا توجد مصروفات بعد. اضغط + للإضافة.</string>
+    <string name="expenses_empty">لا توجد مصروفات بعد</string>
     <string name="assets_title">الأصول</string>
     <string name="asset_add">إضافة أصل</string>
     <string name="asset_edit">تعديل الأصل</string>
@@ -249,7 +249,7 @@
 
     <!-- Other sales -->
     <string name="other_sales_title">مبيعات أخرى</string>
-    <string name="other_sales_empty">لا توجد مبيعات أخرى بعد. اضغط + للإضافة.</string>
+    <string name="other_sales_empty">لا توجد مبيعات أخرى بعد</string>
     <string name="other_sale_add">إضافة بيع آخر</string>
     <string name="other_sale_edit">تعديل البيع الآخر</string>
     <string name="other_sale_amount">المبلغ</string>
@@ -335,4 +335,12 @@
     <string name="notif_sales_sync_issue_title">تعذرت مزامنة بعض المبيعات غير المتصلة</string>
     <string name="notif_sales_sync_issue_body">‏تعذر إرسال %1$d عملية بيع محفوظة أثناء عدم الاتصال إلى الخادم وتم تجاهلها. يرجى مراجعة مستويات المخزون الأخيرة.</string>
 
+    <string name="inventory_empty_hint">اضغط + لإضافة أول منتج.</string>
+    <string name="expenses_empty_hint">اضغط + لتسجيل ما تم إنفاقه.</string>
+    <string name="other_sales_empty_hint">اضغط + لتسجيل دخل متنوع.</string>
+    <string name="deferred_sales_empty_hint">تظهر هنا المبيعات الآجلة حتى يتم تحصيلها.</string>
+    <string name="debts_empty_hint">تظهر هنا الأموال المُقرضة للعاملين حتى يتم سدادها.</string>
+    <string name="invoices_empty">لا توجد فواتير موردين</string>
+    <string name="invoices_empty_hint">اضغط + لتسجيل فاتورة، ثم اربط بها المخزون الذي دفعت ثمنه.</string>
+    <string name="settings_version">إصدار التطبيق</string>
 </resources>

@@ -27,8 +27,12 @@ android {
         applicationId = "com.supermarket.inventory"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // Bump both on every release from here on: versionCode +1 each
+        // build, versionName as MAJOR.MINOR.PATCH. Both are shown on the
+        // Settings screen so staff can report exactly which build they are
+        // running.
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

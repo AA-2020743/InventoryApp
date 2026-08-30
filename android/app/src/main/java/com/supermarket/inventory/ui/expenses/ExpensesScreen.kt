@@ -61,6 +61,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
+import androidx.compose.material.icons.filled.Payments
+import com.supermarket.inventory.ui.common.EmptyState
 
 data class ExpensesUiState(
     val isLoading: Boolean = true,
@@ -155,9 +157,11 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when {
                         state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                        state.expenses.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(stringResource(R.string.expenses_empty))
-                        }
+                        state.expenses.isEmpty() -> EmptyState(
+                            icon = Icons.Filled.Payments,
+                            title = stringResource(R.string.expenses_empty),
+                            hint = stringResource(R.string.expenses_empty_hint),
+                        )
                         else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
                             items(state.expenses, key = { it.id }) { expense ->
                                 ExpenseRow(expense, onEdit = { expenseToEdit = expense }, onDelete = { expenseToDelete = expense })

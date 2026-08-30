@@ -53,6 +53,8 @@ import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Schedule
+import com.supermarket.inventory.ui.common.EmptyState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,9 +78,11 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
     Box(Modifier.fillMaxSize()) {
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.sales.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.deferred_sales_empty))
-            }
+            state.sales.isEmpty() -> EmptyState(
+                icon = Icons.Filled.Schedule,
+                title = stringResource(R.string.deferred_sales_empty),
+                hint = stringResource(R.string.deferred_sales_empty_hint),
+            )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(12.dp),

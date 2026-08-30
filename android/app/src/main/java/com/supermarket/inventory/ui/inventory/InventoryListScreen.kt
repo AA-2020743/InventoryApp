@@ -45,7 +45,9 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatQuantity
-import com.supermarket.inventory.ui.theme.WarningAmber
+import com.supermarket.inventory.ui.theme.warningColor
+import androidx.compose.material.icons.filled.Inventory2
+import com.supermarket.inventory.ui.common.EmptyState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,9 +151,11 @@ fun InventoryListScreen(
 
             when {
                 state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.products.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.inventory_empty))
-                }
+                state.products.isEmpty() -> EmptyState(
+                    icon = Icons.Filled.Inventory2,
+                    title = stringResource(R.string.inventory_empty),
+                    hint = stringResource(R.string.inventory_empty_hint),
+                )
                 else -> LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
                     items(state.products, key = { it.id }) { product ->
                         ProductRow(
@@ -202,7 +206,7 @@ private fun ProductRow(product: ProductDto, imageUrl: String?, onClick: () -> Un
                 Text(
                     "${formatQuantity(product.quantity)} ${product.unit}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isLowStock) WarningAmber else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isLowStock) warningColor() else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

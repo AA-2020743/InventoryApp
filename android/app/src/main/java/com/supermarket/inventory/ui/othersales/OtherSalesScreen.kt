@@ -59,6 +59,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
+import androidx.compose.material.icons.filled.Savings
+import com.supermarket.inventory.ui.common.EmptyState
 
 data class OtherSalesUiState(
     val isLoading: Boolean = true,
@@ -148,9 +150,11 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                    state.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.other_sales_empty))
-                    }
+                    state.entries.isEmpty() -> EmptyState(
+                        icon = Icons.Filled.Savings,
+                        title = stringResource(R.string.other_sales_empty),
+                        hint = stringResource(R.string.other_sales_empty_hint),
+                    )
                     else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
                         items(state.entries, key = { it.id }) { entry ->
                             OtherSaleRow(entry, onEdit = { entryToEdit = entry }, onDelete = { entryToDelete = entry })

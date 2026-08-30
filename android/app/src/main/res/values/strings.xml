@@ -81,7 +81,7 @@
     <string name="inventory_add_product">Add product</string>
     <string name="inventory_low_stock_badge">Low stock</string>
     <string name="inventory_all_categories">All</string>
-    <string name="inventory_empty">No products yet. Tap + to add one.</string>
+    <string name="inventory_empty">No products yet</string>
     <string name="inventory_report_button">Report</string>
     <string name="inventory_report_title">Inventory report</string>
     <string name="inventory_report_total_value">Total inventory value</string>
@@ -232,7 +232,7 @@
 
     <!-- Expenses -->
     <string name="expenses_title">Expenses</string>
-    <string name="expenses_empty">No expenses yet. Tap + to add one.</string>
+    <string name="expenses_empty">No expenses yet</string>
     <string name="assets_title">Assets</string>
     <string name="asset_add">Add asset</string>
     <string name="asset_edit">Edit asset</string>
@@ -249,7 +249,7 @@
 
     <!-- Other sales -->
     <string name="other_sales_title">Other sales</string>
-    <string name="other_sales_empty">No other sales yet. Tap + to add one.</string>
+    <string name="other_sales_empty">No other sales yet</string>
     <string name="other_sale_add">Add other sale</string>
     <string name="other_sale_edit">Edit other sale</string>
     <string name="other_sale_amount">Amount</string>
@@ -335,4 +335,12 @@
     <string name="notif_sales_sync_issue_title">Some offline sales didn\'t sync</string>
     <string name="notif_sales_sync_issue_body">%1$d sale(s) saved while offline could not be sent to the server and were dropped. Please review recent stock levels.</string>
 
+    <string name="inventory_empty_hint">Tap + to add your first product.</string>
+    <string name="expenses_empty_hint">Tap + to record what you spent.</string>
+    <string name="other_sales_empty_hint">Tap + to record miscellaneous income.</string>
+    <string name="deferred_sales_empty_hint">Sales made on credit show up here until collected.</string>
+    <string name="debts_empty_hint">Money lent to workers shows up here until repaid.</string>
+    <string name="invoices_empty">No supplier invoices</string>
+    <string name="invoices_empty_hint">Tap + to record one, then link the stock it paid for.</string>
+    <string name="settings_version">App version</string>
 </resources>

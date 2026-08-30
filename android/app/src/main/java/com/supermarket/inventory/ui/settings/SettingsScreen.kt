@@ -61,6 +61,8 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 import javax.inject.Inject
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.compose.foundation.layout.Arrangement
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -321,6 +323,32 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 
             OutlinedButton(onClick = { scope.launch { viewModel.logout() } }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_logout))
+            }
+
+            // Read from the installed package rather than BuildConfig, so it
+            // needs no extra build configuration and always reflects the APK
+            // actually running. Shown as name + build number: the build
+            // number is the unambiguous one when staff report an issue.
+            val versionLabel = remember(context) {
+                runCatching {
+                    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+                    "${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)})"
+                }.getOrDefault("-")
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    stringResource(R.string.settings_version),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    versionLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

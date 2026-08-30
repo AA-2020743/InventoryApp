@@ -57,6 +57,8 @@ import com.supermarket.inventory.ui.common.topSlicesWithOther
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.compose.material.icons.filled.BarChart
+import com.supermarket.inventory.ui.common.EmptyState
 
 enum class InventoryReportSort { VALUE, NAME, CATEGORY, QUANTITY }
 
@@ -171,9 +173,11 @@ fun InventoryReportScreen(
             state.isLoading -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            state.items.isEmpty() -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.inventory_report_empty))
-            }
+            state.items.isEmpty() -> EmptyState(
+                icon = Icons.Filled.BarChart,
+                title = stringResource(R.string.inventory_report_empty),
+                modifier = Modifier.padding(padding),
+            )
             else -> LazyColumn(
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 contentPadding = PaddingValues(12.dp),

@@ -72,12 +72,14 @@ import com.supermarket.inventory.ui.common.copyUriToCacheFile
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
 import com.supermarket.inventory.ui.common.formatQuantity
-import com.supermarket.inventory.ui.theme.LossRed
-import com.supermarket.inventory.ui.theme.ProfitGreen
-import com.supermarket.inventory.ui.theme.WarningAmber
+import com.supermarket.inventory.ui.theme.lossColor
+import com.supermarket.inventory.ui.theme.profitColor
+import com.supermarket.inventory.ui.theme.warningColor
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneOffset
+import androidx.compose.material.icons.filled.Receipt
+import com.supermarket.inventory.ui.common.EmptyState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,9 +103,11 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             }
             when {
                 state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.invoices.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.inventory_empty))
-                }
+                state.invoices.isEmpty() -> EmptyState(
+                    icon = Icons.Filled.Receipt,
+                    title = stringResource(R.string.invoices_empty),
+                    hint = stringResource(R.string.invoices_empty_hint),
+                )
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
@@ -299,7 +303,7 @@ private fun LinkedStockDialog(
                                 formatAmount((invoiceAmount - bookedTotal).toString()),
                             ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = WarningAmber,
+                            color = warningColor(),
                         )
                     }
                 }
@@ -448,9 +452,9 @@ private fun InvoiceRow(
     val dueInstant = try { Instant.parse(invoice.dueDate) } catch (_: Exception) { now }
     val isOverdue = invoice.status == "PENDING" && dueInstant.isBefore(now)
     val statusColor = when {
-        invoice.status == "PAID" -> ProfitGreen
-        isOverdue -> LossRed
-        else -> WarningAmber
+        invoice.status == "PAID" -> profitColor()
+        isOverdue -> lossColor()
+        else -> warningColor()
     }
 
     val deficit = invoice.deficitAmount.toDoubleOrNull() ?: 0.0
@@ -506,7 +510,7 @@ private fun InvoiceRow(
                 } else {
                     Text(
                         stringResource(R.string.invoice_status_paid),
-                        color = ProfitGreen,
+                        color = profitColor(),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         modifier = Modifier.padding(start = 8.dp, end = 12.dp),

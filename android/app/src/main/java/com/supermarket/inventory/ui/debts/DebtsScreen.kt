@@ -57,6 +57,8 @@ import com.supermarket.inventory.ui.common.formatIsoDateTime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import com.supermarket.inventory.ui.common.EmptyState
 
 data class DebtsUiState(
     val isLoading: Boolean = true,
@@ -149,9 +151,11 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
     Box(Modifier.fillMaxSize()) {
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.debts.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.debts_empty))
-            }
+            state.debts.isEmpty() -> EmptyState(
+                icon = Icons.Filled.AccountBalanceWallet,
+                title = stringResource(R.string.debts_empty),
+                hint = stringResource(R.string.debts_empty_hint),
+            )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(12.dp),

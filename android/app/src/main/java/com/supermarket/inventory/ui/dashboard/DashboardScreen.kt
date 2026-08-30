@@ -49,9 +49,9 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.DashboardPeriodDto
 import com.supermarket.inventory.data.remote.dto.DashboardSummaryDto
 import com.supermarket.inventory.ui.common.formatAmount
-import com.supermarket.inventory.ui.theme.LossRed
-import com.supermarket.inventory.ui.theme.ProfitGreen
-import com.supermarket.inventory.ui.theme.WarningAmber
+import com.supermarket.inventory.ui.theme.lossColor
+import com.supermarket.inventory.ui.theme.profitColor
+import com.supermarket.inventory.ui.theme.warningColor
 import kotlinx.coroutines.delay
 
 private const val AUTO_REFRESH_INTERVAL_MS = 8_000L
@@ -185,7 +185,7 @@ private fun StatLine(
 private fun TodayCard(today: DashboardPeriodDto) {
     val profit = today.profit.toDoubleOrNull() ?: 0.0
     val isLoss = profit < 0
-    val color = if (isLoss) LossRed else ProfitGreen
+    val color = if (isLoss) lossColor() else profitColor()
     val deficit = today.deficit.toDoubleOrNull() ?: 0.0
 
     Card(
@@ -224,7 +224,7 @@ private fun TodayCard(today: DashboardPeriodDto) {
                 StatLine(
                     stringResource(R.string.dashboard_deficit),
                     formatAmount(today.deficit),
-                    valueColor = LossRed,
+                    valueColor = lossColor(),
                     valueStyle = MaterialTheme.typography.titleMedium,
                 )
             }
@@ -237,7 +237,7 @@ private fun TodayCard(today: DashboardPeriodDto) {
 @Composable
 private fun MonthCard(month: DashboardPeriodDto) {
     val profit = month.profit.toDoubleOrNull() ?: 0.0
-    val color = if (profit < 0) LossRed else ProfitGreen
+    val color = if (profit < 0) lossColor() else profitColor()
     val deficit = month.deficit.toDoubleOrNull() ?: 0.0
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -263,7 +263,7 @@ private fun MonthCard(month: DashboardPeriodDto) {
                 StatLine(
                     stringResource(R.string.dashboard_deficit),
                     formatAmount(month.deficit),
-                    valueColor = LossRed,
+                    valueColor = lossColor(),
                     valueStyle = MaterialTheme.typography.titleMedium,
                 )
             } else {
@@ -321,7 +321,7 @@ private fun ValuationCard(summary: DashboardSummaryDto) {
             StatLine(
                 stringResource(R.string.dashboard_overall_deficit),
                 formatAmount(summary.allTimeDeficitTotal),
-                valueColor = if (deficit > 0) LossRed else MaterialTheme.colorScheme.onSurface,
+                valueColor = if (deficit > 0) lossColor() else MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -337,7 +337,7 @@ private fun AlertsCard(summary: DashboardSummaryDto, onViewInventory: () -> Unit
                 AlertRow(
                     icon = Icons.Filled.Inventory2,
                     text = stringResource(R.string.dashboard_low_stock_alert, summary.alerts.lowStockCount),
-                    color = WarningAmber,
+                    color = warningColor(),
                     onClick = onViewInventory,
                 )
             }
@@ -345,7 +345,7 @@ private fun AlertsCard(summary: DashboardSummaryDto, onViewInventory: () -> Unit
                 AlertRow(
                     icon = Icons.Filled.Receipt,
                     text = stringResource(R.string.dashboard_invoices_overdue_alert, summary.alerts.overdueInvoicesCount),
-                    color = LossRed,
+                    color = lossColor(),
                     onClick = onViewInvoices,
                 )
             }
@@ -353,7 +353,7 @@ private fun AlertsCard(summary: DashboardSummaryDto, onViewInventory: () -> Unit
                 AlertRow(
                     icon = Icons.Filled.Receipt,
                     text = stringResource(R.string.dashboard_invoices_due_alert, summary.alerts.dueSoonInvoicesCount),
-                    color = WarningAmber,
+                    color = warningColor(),
                     onClick = onViewInvoices,
                 )
             }

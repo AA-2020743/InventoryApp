@@ -60,8 +60,8 @@ import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.common.topSlicesWithOther
-import com.supermarket.inventory.ui.theme.LossRed
-import com.supermarket.inventory.ui.theme.ProfitGreen
+import com.supermarket.inventory.ui.theme.lossColor
+import com.supermarket.inventory.ui.theme.profitColor
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -233,7 +233,7 @@ private fun OverviewTab(
                     CategoryBreakdownCard(
                         title = stringResource(R.string.stats_other_sales_by_category),
                         breakdown = otherSales.byCategory,
-                        accent = ProfitGreen,
+                        accent = profitColor(),
                     )
                 }
             }
@@ -395,7 +395,7 @@ private fun PeriodSummaryCard(state: StatsUiState) {
                     Text(
                         formatAmount(state.periodProfit),
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (profit < 0) LossRed else ProfitGreen,
+                        color = if (profit < 0) lossColor() else profitColor(),
                     )
                 }
                 Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
@@ -403,7 +403,7 @@ private fun PeriodSummaryCard(state: StatsUiState) {
                     Text(
                         "${formatPercent(marginPercent.toString())}%",
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (marginPercent < 0) LossRed else ProfitGreen,
+                        color = if (marginPercent < 0) lossColor() else profitColor(),
                     )
                 }
             }
@@ -435,7 +435,7 @@ private fun TopProductRow(item: TopProductItemDto) {
                 Text(item.name, style = MaterialTheme.typography.bodyLarge)
                 Text(stringResource(R.string.stats_quantity_sold, formatQuantity(item.quantitySold.toString())), style = MaterialTheme.typography.bodySmall)
             }
-            Text(formatAmount(item.profit), style = MaterialTheme.typography.bodyLarge, color = ProfitGreen)
+            Text(formatAmount(item.profit), style = MaterialTheme.typography.bodyLarge, color = profitColor())
         }
     }
 }
