@@ -476,26 +476,41 @@ private fun InvoiceRow(
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
             }
             Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${stringResource(R.string.invoice_due_date)}: ${formatIsoDate(invoice.dueDate)}",
-                    color = statusColor,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            Text(
+                text = "${stringResource(R.string.invoice_due_date)}: ${formatIsoDate(invoice.dueDate)}",
+                color = statusColor,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            // The actions get a row to themselves rather than sharing one
+            // with the due date: sharing left them whatever width the date
+            // didn't take, which in Arabic (longer labels, longer month
+            // names) squeezed the paid/mark-paid label down to a single
+            // character per line.
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onViewLinkedStock) {
+                    Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.invoice_linked_stock), maxLines = 1)
+                }
                 // No "pay from cash register?" choice anymore - marking paid
                 // always tries to pay from the till, recording a deficit if
                 // it comes up short, so this is a direct one-tap action.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onViewLinkedStock) {
-                        Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.invoice_linked_stock))
+                if (invoice.status == "PENDING") {
+                    TextButton(onClick = onMarkPaid) {
+                        Text(stringResource(R.string.invoice_mark_paid), maxLines = 1)
                     }
-                    if (invoice.status == "PENDING") {
-                        TextButton(onClick = onMarkPaid) { Text(stringResource(R.string.invoice_mark_paid)) }
-                    } else {
-                        Text(stringResource(R.string.invoice_status_paid), color = ProfitGreen, style = MaterialTheme.typography.bodySmall)
-                    }
+                } else {
+                    Text(
+                        stringResource(R.string.invoice_status_paid),
+                        color = ProfitGreen,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp, end = 12.dp),
+                    )
                 }
             }
         }
