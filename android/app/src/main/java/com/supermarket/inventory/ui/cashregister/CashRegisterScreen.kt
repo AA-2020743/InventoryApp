@@ -42,11 +42,14 @@ import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.theme.lossColor
 import com.supermarket.inventory.ui.theme.profitColor
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.IconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
     val state = viewModel.uiState
+    var entryToDelete by remember { mutableStateOf<CashRegisterEntryDto?>(null) }
     var showSetBalanceDialog by remember { mutableStateOf(false) }
     var showAddEntryDialog by remember { mutableStateOf(false) }
     var showZeroConfirm by remember { mutableStateOf(false) }
@@ -86,7 +89,16 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
                 } else {
                     LazyColumn(contentPadding = PaddingValues(12.dp)) {
                         items(state.entries, key = { it.id }) { entry ->
-                            LedgerRow(entry)
+                            LedgerRow(
+                                entry = entry,
+                                // Only a hand-made entry can be removed
+                                // here; one created for an expense, sale,
+                                // invoice, restock or debt is corrected
+                                // through that record instead.
+                                onDelete = if (entry.isManual) {
+                                    { entryToDelete = entry }
+                                } else null,
+                            )
                             Spacer(Modifier.height(6.dp))
                         }
                     }
@@ -106,6 +118,22 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
             currentBalance = state.balance,
             onDismiss = { showSetBalanceDialog = false },
             onConfirm = { value, note -> viewModel.setBalance(value, note); showSetBalanceDialog = false },
+        )
+    }
+
+    entryToDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { entryToDelete = null },
+            title = { Text(stringResource(R.string.cash_register_remove_entry_title)) },
+            text = { Text(stringResource(R.string.cash_register_remove_entry_message, formatAmount(entry.amount))) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteEntry(entry.id); entryToDelete = null }) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { entryToDelete = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
         )
     }
 
@@ -133,16 +161,21 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun LedgerRow(entry: CashRegisterEntryDto) {
+private fun LedgerRow(entry: CashRegisterEntryDto, onDelete: (() -> Unit)? = null) {
     val amountValue = entry.amount.toDoubleOrNull() ?: 0.0
     val color = if (amountValue < 0) lossColor() else profitColor()
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f))) {
         Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(entry.note ?: "", style = MaterialTheme.typography.bodyMedium)
                 Text(formatIsoDateTime(entry.createdAt), style = MaterialTheme.typography.bodySmall)
             }
             Text(formatAmount(entry.amount), color = color, style = MaterialTheme.typography.titleMedium)
+            onDelete?.let {
+                IconButton(onClick = it) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
+                }
+            }
         }
     }
 }

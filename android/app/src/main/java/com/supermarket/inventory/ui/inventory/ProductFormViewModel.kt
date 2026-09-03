@@ -154,7 +154,11 @@ class ProductFormViewModel @Inject constructor(
             when (val result = repository.getTransactions(productId)) {
                 is ApiResult.Success -> uiState = uiState.copy(
                     historyLoading = false,
-                    purchaseHistory = result.data.filter { it.type == "RESTOCK" },
+                    // Restocks (whose cash-or-invoice choice can be wrong)
+                    // and spoilages (which can be recorded in error) are the
+                    // two movements with something to correct. Sales and
+                    // manual adjustments are corrected where they were made.
+                    purchaseHistory = result.data.filter { it.type == "RESTOCK" || it.type == "SPOILAGE" },
                 )
                 is ApiResult.Error -> uiState = uiState.copy(historyLoading = false, historyError = result.message)
             }
@@ -183,6 +187,18 @@ class ProductFormViewModel @Inject constructor(
             is ApiResult.Error -> result.message
         }
     }
+
+    // Puts stock written off by mistake back on the shelf and removes the
+    // write-off expense. Returns null on success, or why it was refused.
+    suspend fun undoSpoilage(transactionId: String): String? =
+        when (val result = repository.undoSpoilage(transactionId)) {
+            is ApiResult.Success -> {
+                loadPurchaseHistory()
+                uiState.productId?.let { loadProduct(it) }
+                null
+            }
+            is ApiResult.Error -> result.message
+        }
 
     fun onFinancingChange(financing: RestockFinancing) {
         uiState = uiState.copy(financing = financing, error = null)

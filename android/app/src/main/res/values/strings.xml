@@ -351,4 +351,9 @@
     <string name="purchase_correct">Correct</string>
     <string name="purchase_correct_apply">Apply correction</string>
     <string name="purchase_correct_no_invoices">No pending supplier invoices to move this onto. Create one first from Others.</string>
+    <string name="invoice_unmark_paid">Undo payment</string>
+    <string name="spoilage_history_line">Spoiled: %1$s units</string>
+    <string name="spoilage_undo">Undo spoilage</string>
+    <string name="cash_register_remove_entry_title">Remove this entry?</string>
+    <string name="cash_register_remove_entry_message">The balance goes back to what it was before this %1$s entry.</string>
 </resources>

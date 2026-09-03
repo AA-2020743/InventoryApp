@@ -17,6 +17,12 @@ class CashRegisterRepository @Inject constructor(private val api: ApiService) {
     suspend fun setBalance(value: Double, note: String?): ApiResult<CashRegisterEntryResponse> =
         apiCall { api.setCashRegister(SetCashRegisterRequest(value, note)) }
 
+    // Removes a hand-made till entry recorded by mistake (a mistyped top-up,
+    // or a reconciliation that shouldn't have happened). The server refuses
+    // entries that belong to another record.
+    suspend fun deleteEntry(id: String): ApiResult<CashRegisterResponse> =
+        apiCall { api.deleteCashRegisterEntry(id) }
+
     suspend fun addEntry(amount: Double, note: String?): ApiResult<CashRegisterEntryResponse> =
         apiCall { api.addCashRegisterEntry(CashRegisterEntryRequest(amount, note)) }
 }

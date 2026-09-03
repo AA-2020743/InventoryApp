@@ -48,6 +48,15 @@ class CashRegisterViewModel @Inject constructor(
         }
     }
 
+    fun deleteEntry(id: String) {
+        viewModelScope.launch {
+            when (val result = repository.deleteEntry(id)) {
+                is ApiResult.Success -> load()
+                is ApiResult.Error -> uiState = uiState.copy(error = result.message)
+            }
+        }
+    }
+
     fun addEntry(amount: Double, note: String?) {
         viewModelScope.launch {
             when (repository.addEntry(amount, note)) {

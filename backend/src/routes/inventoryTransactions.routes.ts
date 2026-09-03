@@ -111,3 +111,70 @@ inventoryTransactionsRouter.post(
     });
   })
 );
+
+// Undoes a spoilage recorded by mistake - stock written off that was
+// actually sold, or simply the wrong product or quantity. Puts the units
+// back on the shelf and removes the write-off expense the spoilage created,
+// so the day's profit stops carrying a loss that never happened.
+//
+// Spoilage never touched the till (a write-off isn't a cash outflow), so
+// there is no cash side to reverse here.
+inventoryTransactionsRouter.post(
+  "/:id/undo-spoilage",
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.inventoryTransaction.findUnique({
+      where: { id: req.params.id },
+      include: { product: true },
+    });
+    if (!existing) throw new HttpError(404, "Stock movement not found");
+    if (existing.type !== "SPOILAGE") throw new HttpError(400, "That movement is not a spoilage");
+
+    // quantityChange is negative for a spoilage, so subtracting it puts the
+    // units back.
+    const restored = existing.quantityChange.neg();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.update({
+        where: { id: existing.productId },
+        data: { quantity: { increment: restored } },
+      });
+
+      // Spoilages recorded before write-offs were linked carry no back
+      // reference. Rather than guess which expense belongs to this one,
+      // fall back to an exact name-and-amount match that is itself
+      // unlinked, and only when exactly one such row exists - anything
+      // ambiguous is left alone and reported, so no unrelated expense can
+      // be deleted by a correction.
+      const expenseName = `Spoiled: ${existing.product.name}`;
+      const cost = (existing.unitCost ?? new Prisma.Decimal(0)).mul(restored);
+      const candidates = await tx.expense.findMany({
+        where: {
+          OR: [
+            { inventoryTransactionId: existing.id },
+            { inventoryTransactionId: null, name: expenseName, amount: cost },
+          ],
+        },
+      });
+      const linked = candidates.filter((e) => e.inventoryTransactionId === existing.id);
+      const toRemove = linked.length > 0 ? linked : candidates.length === 1 ? candidates : [];
+
+      if (toRemove.length > 0) {
+        const ids = toRemove.map((e) => e.id);
+        await tx.cashRegisterEntry.deleteMany({ where: { expenseId: { in: ids } } });
+        await tx.expense.deleteMany({ where: { id: { in: ids } } });
+      }
+
+      await tx.inventoryTransaction.delete({ where: { id: existing.id } });
+      return { product, expensesRemoved: toRemove.length };
+    });
+
+    res.json({
+      product: result.product,
+      quantityRestored: restored,
+      // False when the write-off couldn't be identified unambiguously (an
+      // old unlinked spoilage), so the app can say the stock came back but
+      // the expense still needs removing by hand.
+      expenseReversed: result.expensesRemoved > 0,
+    });
+  })
+);

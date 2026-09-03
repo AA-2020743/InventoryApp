@@ -376,6 +376,7 @@ fun ProductFormScreen(
             state = state,
             onDismiss = { showHistoryDialog = false },
             onRefinance = { txnId, financing -> viewModel.refinancePurchase(txnId, financing) },
+            onUndoSpoilage = { txnId -> viewModel.undoSpoilage(txnId) },
         )
     }
 
@@ -430,6 +431,7 @@ private fun PurchaseHistoryDialog(
     state: ProductFormUiState,
     onDismiss: () -> Unit,
     onRefinance: suspend (String, RestockFinancing) -> String?,
+    onUndoSpoilage: suspend (String) -> String?,
 ) {
     val scope = rememberCoroutineScope()
     // Which row's correction controls are open; only one at a time.
@@ -454,6 +456,22 @@ private fun PurchaseHistoryDialog(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     else -> state.purchaseHistory.forEach { txn ->
+                        if (txn.type == "SPOILAGE") {
+                            SpoilageHistoryRow(
+                                txn = txn,
+                                busy = busy,
+                                onUndo = {
+                                    busy = true
+                                    rowError = null
+                                    scope.launch {
+                                        val failure = onUndoSpoilage(txn.id)
+                                        busy = false
+                                        rowError = failure
+                                    }
+                                },
+                            )
+                            return@forEach
+                        }
                         val onInvoice = txn.supplierInvoiceId != null
                         val financingLabel = if (onInvoice) {
                             val inv = txn.supplierInvoice
@@ -575,6 +593,39 @@ private fun PurchaseHistoryDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
+}
+
+// A spoilage has no cash-or-invoice side to correct - the only thing that
+// can be wrong is that it happened at all, so the single action is to put
+// the stock back and drop the write-off.
+@Composable
+private fun SpoilageHistoryRow(
+    txn: com.supermarket.inventory.data.remote.dto.InventoryTransactionDto,
+    busy: Boolean,
+    onUndo: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(
+                        R.string.spoilage_history_line,
+                        formatQuantity(txn.quantityChange.removePrefix("-")),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    formatIsoDate(txn.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(enabled = !busy, onClick = onUndo) {
+                Text(stringResource(R.string.spoilage_undo))
+            }
+        }
+        Divider(Modifier.padding(top = 4.dp))
+    }
 }
 
 @Composable

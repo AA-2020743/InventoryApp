@@ -60,6 +60,11 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
     suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id) }
 
+    // Undoes a payment made by mistake: the money goes back in the till and
+    // the invoice returns to pending.
+    suspend fun markUnpaid(id: String): ApiResult<SupplierInvoiceDto> =
+        apiCall { api.markInvoiceUnpaid(id) }
+
     suspend fun deleteInvoice(id: String): ApiResult<Unit> = apiCall { api.deleteInvoice(id) }
 
     suspend fun uploadImage(file: File): ApiResult<UploadImageResponse> = apiCall {

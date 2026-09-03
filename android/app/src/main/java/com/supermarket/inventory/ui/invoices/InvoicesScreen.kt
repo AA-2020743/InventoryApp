@@ -116,6 +116,7 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                         InvoiceRow(
                             invoice = invoice,
                             onMarkPaid = { viewModel.markPaid(invoice.id) },
+                            onMarkUnpaid = { viewModel.markUnpaid(invoice.id) },
                             onEdit = { invoiceToEdit = invoice },
                             onDelete = { invoiceToDelete = invoice },
                             onViewImage = { invoice.imageUrl?.let { invoiceImageToView = viewModel.fullImageUrl(it) } },
@@ -443,6 +444,7 @@ private fun LinkedStockDialog(
 private fun InvoiceRow(
     invoice: SupplierInvoiceDto,
     onMarkPaid: () -> Unit,
+    onMarkUnpaid: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onViewImage: () -> Unit,
@@ -513,8 +515,13 @@ private fun InvoiceRow(
                         color = profitColor(),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
-                        modifier = Modifier.padding(start = 8.dp, end = 12.dp),
+                        modifier = Modifier.padding(start = 8.dp),
                     )
+                    // Marking paid is one tap and drains the till by the
+                    // invoice amount, so the way back needs to be one tap too.
+                    TextButton(onClick = onMarkUnpaid) {
+                        Text(stringResource(R.string.invoice_unmark_paid), maxLines = 1)
+                    }
                 }
             }
         }

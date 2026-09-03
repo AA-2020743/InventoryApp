@@ -105,3 +105,40 @@ cashRegisterRouter.post(
     res.status(201).json({ balance, entry });
   })
 );
+
+// Removes a manual till entry recorded by mistake - a mistyped top-up, or a
+// "reset to zero" reconciliation that shouldn't have been made. The balance
+// is the sum of every entry, so deleting one simply restores what it was
+// before.
+//
+// Only entries the owner created by hand can go: every other entry belongs
+// to an expense, sale, invoice, restock, other-sale or debt, and deleting
+// it here would leave that record claiming a cash movement that no longer
+// exists. Those are corrected through the record itself, which is what the
+// refusal points at.
+cashRegisterRouter.delete(
+  "/entries/:id",
+  asyncHandler(async (req, res) => {
+    const entry = await prisma.cashRegisterEntry.findUnique({ where: { id: req.params.id } });
+    if (!entry) throw new HttpError(404, "Cash register entry not found");
+
+    const linkedTo =
+      (entry.expenseId && "an expense") ||
+      (entry.saleId && "a sale") ||
+      (entry.invoiceId && "a supplier invoice") ||
+      (entry.inventoryTransactionId && "a restock") ||
+      (entry.otherSaleId && "another sale") ||
+      (entry.debtId && "a worker debt") ||
+      null;
+    if (linkedTo) {
+      throw new HttpError(
+        400,
+        `This entry belongs to ${linkedTo}, so it can't be removed on its own. Correct that record instead.`
+      );
+    }
+
+    await prisma.cashRegisterEntry.delete({ where: { id: entry.id } });
+    const balance = await getCashRegisterBalance();
+    res.json({ balance, removed: entry });
+  })
+);

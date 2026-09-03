@@ -201,9 +201,16 @@ model Expense {
   date          DateTime @default(now())
   deficitAmount Decimal  @default(0) @db.Decimal(12, 2)
   notes         String?
+  // Set only on the write-off expense a spoilage creates, pointing back at
+  // that SPOILAGE stock movement. Undoing the spoilage uses it to find and
+  // remove exactly this expense rather than guessing by name and amount.
+  // Plain nullable id with no relation, matching how CashRegisterEntry
+  // links back to the records it was created for.
+  inventoryTransactionId String?
   createdAt     DateTime @default(now())
 
   @@index([category])
+  @@index([inventoryTransactionId])
 }
 
 // A miscellaneous profit entry not tied to inventory or a checkout sale

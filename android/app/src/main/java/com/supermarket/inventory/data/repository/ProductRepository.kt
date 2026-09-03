@@ -88,6 +88,11 @@ class ProductRepository @Inject constructor(
     suspend fun getTransactions(id: String): ApiResult<List<InventoryTransactionDto>> =
         apiCall { api.getProductTransactions(id) }
 
+    // Puts spoiled-by-mistake stock back on the shelf and removes the
+    // write-off expense the spoilage created.
+    suspend fun undoSpoilage(transactionId: String): ApiResult<UndoSpoilageResponse> =
+        apiCall { api.undoSpoilage(transactionId) }
+
     // Corrects a restock that was recorded with the wrong financing: moves
     // it between "paid in cash" and "on a supplier invoice", reversing the
     // cash side that the original entry created.

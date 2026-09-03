@@ -103,6 +103,17 @@ data class InventoryTransactionDto(
 
 // Corrects how an already-recorded restock was paid for. The goods are not
 // in question - only the cash/invoice side is undone and re-applied.
+// Result of putting a mistaken spoilage back. expenseReversed is false when
+// the write-off couldn't be identified unambiguously (an old spoilage from
+// before write-offs were linked), meaning the stock returned but the expense
+// still needs removing by hand.
+@JsonClass(generateAdapter = true)
+data class UndoSpoilageResponse(
+    val product: ProductDto,
+    val quantityRestored: String,
+    val expenseReversed: Boolean,
+)
+
 @JsonClass(generateAdapter = true)
 data class RefinanceRequest(
     val financing: String,
@@ -424,7 +435,20 @@ data class CashRegisterEntryDto(
     val note: String?,
     val invoiceId: String?,
     val createdAt: String,
-)
+    // An entry created for another record (an expense, sale, invoice,
+    // restock, other sale or debt) is that record's business - it can only
+    // be corrected through it. Only a hand-made entry can be removed here,
+    // which is what these let the app work out.
+    val expenseId: String? = null,
+    val saleId: String? = null,
+    val inventoryTransactionId: String? = null,
+    val otherSaleId: String? = null,
+    val debtId: String? = null,
+) {
+    val isManual: Boolean
+        get() = invoiceId == null && expenseId == null && saleId == null &&
+            inventoryTransactionId == null && otherSaleId == null && debtId == null
+}
 
 @JsonClass(generateAdapter = true)
 data class CashRegisterResponse(

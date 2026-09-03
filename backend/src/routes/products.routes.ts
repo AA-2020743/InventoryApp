@@ -383,7 +383,7 @@ productsRouter.post(
         where: { id: product.id },
         data: { quantity: { decrement: quantity } },
       });
-      await tx.inventoryTransaction.create({
+      const movement = await tx.inventoryTransaction.create({
         data: {
           productId: product.id,
           type: "SPOILAGE",
@@ -394,7 +394,14 @@ productsRouter.post(
       });
 
       const expense = await tx.expense.create({
-        data: { name: expenseName, amount: cost, notes: notes ?? null },
+        // Linked back to the movement above so undoing the spoilage removes
+        // exactly this write-off instead of guessing by name and amount.
+        data: {
+          name: expenseName,
+          amount: cost,
+          notes: notes ?? null,
+          inventoryTransactionId: movement.id,
+        },
       });
 
       return { product: updatedProduct, expense };

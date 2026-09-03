@@ -52,6 +52,9 @@ interface ApiService {
     @GET("api/products/{id}/transactions")
     suspend fun getProductTransactions(@Path("id") id: String): List<InventoryTransactionDto>
 
+    @POST("api/inventory-transactions/{id}/undo-spoilage")
+    suspend fun undoSpoilage(@Path("id") id: String): UndoSpoilageResponse
+
     @POST("api/inventory-transactions/{id}/refinance")
     suspend fun refinanceTransaction(
         @Path("id") id: String,
@@ -93,6 +96,9 @@ interface ApiService {
 
     @POST("api/invoices/{id}/pay")
     suspend fun markInvoicePaid(@Path("id") id: String): SupplierInvoiceDto
+
+    @POST("api/invoices/{id}/unpay")
+    suspend fun markInvoiceUnpaid(@Path("id") id: String): SupplierInvoiceDto
 
     @DELETE("api/invoices/{id}")
     suspend fun deleteInvoice(@Path("id") id: String)
@@ -216,6 +222,9 @@ interface ApiService {
 
     @POST("api/cash-register/set")
     suspend fun setCashRegister(@Body request: SetCashRegisterRequest): CashRegisterEntryResponse
+
+    @DELETE("api/cash-register/entries/{id}")
+    suspend fun deleteCashRegisterEntry(@Path("id") id: String): CashRegisterResponse
 
     @POST("api/cash-register/entries")
     suspend fun addCashRegisterEntry(@Body request: CashRegisterEntryRequest): CashRegisterEntryResponse

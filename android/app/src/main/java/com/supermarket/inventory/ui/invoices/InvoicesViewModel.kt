@@ -59,6 +59,17 @@ class InvoicesViewModel @Inject constructor(
         }
     }
 
+    // Reverses a payment recorded by mistake - the till gets its money back
+    // and the invoice returns to pending.
+    fun markUnpaid(id: String) {
+        viewModelScope.launch {
+            when (val result = invoiceRepository.markUnpaid(id)) {
+                is ApiResult.Success -> load()
+                is ApiResult.Error -> uiState = uiState.copy(error = result.message)
+            }
+        }
+    }
+
     fun markPaid(id: String) {
         viewModelScope.launch {
             when (val result = invoiceRepository.markPaid(id)) {

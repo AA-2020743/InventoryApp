@@ -174,6 +174,33 @@ invoicesRouter.post(
   })
 );
 
+// Undoes a payment made by mistake: puts the money back in the till and
+// returns the invoice to PENDING. The stock the invoice covers is left
+// linked to it - that side wasn't wrong, only the payment was.
+//
+// This is also what unblocks moving stock off an invoice: a restock can't
+// be re-financed away from an invoice that's already paid (it would charge
+// the till twice), so the invoice gets unpaid here first.
+invoicesRouter.post(
+  "/:id/unpay",
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new HttpError(404, "Invoice not found");
+    if (existing.status !== "PAID") throw new HttpError(400, "Invoice is not marked paid");
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      await tx.cashRegisterEntry.deleteMany({ where: { invoiceId: existing.id } });
+      return tx.supplierInvoice.update({
+        where: { id: existing.id },
+        // deficitAmount described a shortfall at the moment of payment;
+        // with the payment undone there is no shortfall to carry.
+        data: { status: "PENDING", paidAt: null, deficitAmount: 0 },
+      });
+    });
+    res.json(invoice);
+  })
+);
+
 invoicesRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {

@@ -351,4 +351,9 @@
     <string name="purchase_correct">تصحيح</string>
     <string name="purchase_correct_apply">تطبيق التصحيح</string>
     <string name="purchase_correct_no_invoices">لا توجد فواتير موردين معلقة لنقلها إليها. أنشئ فاتورة أولًا من تبويب أخرى.</string>
+    <string name="invoice_unmark_paid">تراجع عن الدفع</string>
+    <string name="spoilage_history_line">تالف: %1$s وحدة</string>
+    <string name="spoilage_undo">تراجع عن التلف</string>
+    <string name="cash_register_remove_entry_title">إزالة هذه الحركة؟</string>
+    <string name="cash_register_remove_entry_message">سيعود الرصيد إلى ما كان عليه قبل حركة %1$s هذه.</string>
 </resources>
