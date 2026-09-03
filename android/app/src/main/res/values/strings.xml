@@ -343,4 +343,12 @@
     <string name="invoices_empty">No supplier invoices</string>
     <string name="invoices_empty_hint">Tap + to record one, then link the stock it paid for.</string>
     <string name="settings_version">App version</string>
+    <string name="purchase_history_title">Purchase history</string>
+    <string name="purchase_history_empty">No stock purchases recorded for this product yet.</string>
+    <string name="purchase_history_line">%1$s units at %2$s each</string>
+    <string name="purchase_financing_cash">Paid in cash</string>
+    <string name="purchase_financing_invoice">On invoice: %1$s</string>
+    <string name="purchase_correct">Correct</string>
+    <string name="purchase_correct_apply">Apply correction</string>
+    <string name="purchase_correct_no_invoices">No pending supplier invoices to move this onto. Create one first from Others.</string>
 </resources>

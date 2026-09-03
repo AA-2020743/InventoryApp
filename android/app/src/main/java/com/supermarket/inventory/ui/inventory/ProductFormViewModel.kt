@@ -21,6 +21,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
+import com.supermarket.inventory.data.remote.dto.InventoryTransactionDto
 
 enum class ThresholdMode { UNITS, PACKAGES }
 
@@ -78,6 +79,12 @@ data class ProductFormUiState(
     val financing: RestockFinancing = RestockFinancing.Cash,
     val suppliers: List<SupplierDto> = emptyList(),
     val pendingInvoices: List<SupplierInvoiceDto> = emptyList(),
+    // Past stock purchases for this product, so a restock entered with the
+    // wrong financing (cash vs. on a supplier invoice) can be corrected
+    // after the fact. Loaded on demand when the history sheet is opened.
+    val purchaseHistory: List<InventoryTransactionDto> = emptyList(),
+    val historyLoading: Boolean = false,
+    val historyError: String? = null,
 ) {
     val unitsPerPackageValue: Double get() = unitsPerPackage.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
 }
@@ -135,6 +142,45 @@ class ProductFormViewModel @Inject constructor(
                 is ApiResult.Success -> uiState = uiState.copy(pendingInvoices = result.data)
                 is ApiResult.Error -> Unit
             }
+        }
+    }
+
+    // Restocks only: the other movement types (sales, spoilage, manual
+    // adjustments) have no cash-or-invoice side to have gotten wrong.
+    fun loadPurchaseHistory() {
+        val productId = uiState.productId ?: return
+        viewModelScope.launch {
+            uiState = uiState.copy(historyLoading = true, historyError = null)
+            when (val result = repository.getTransactions(productId)) {
+                is ApiResult.Success -> uiState = uiState.copy(
+                    historyLoading = false,
+                    purchaseHistory = result.data.filter { it.type == "RESTOCK" },
+                )
+                is ApiResult.Error -> uiState = uiState.copy(historyLoading = false, historyError = result.message)
+            }
+        }
+    }
+
+    // Moves an already-recorded restock between "paid in cash" and "on a
+    // supplier invoice", reversing whichever cash movement the original
+    // entry made. Returns null on success, or the reason it was refused -
+    // most usefully when correcting to cash would overdraw the register.
+    suspend fun refinancePurchase(transactionId: String, financing: RestockFinancing): String? {
+        val args = resolveFinancing(financing) ?: return uiState.error
+        val result = repository.refinance(
+            transactionId = transactionId,
+            financing = args.financing,
+            supplierInvoiceId = args.supplierInvoiceId,
+            newInvoice = args.newInvoice,
+        )
+        return when (result) {
+            is ApiResult.Success -> {
+                loadPurchaseHistory()
+                loadFinancingOptions()
+                uiState.productId?.let { loadProduct(it) }
+                null
+            }
+            is ApiResult.Error -> result.message
         }
     }
 

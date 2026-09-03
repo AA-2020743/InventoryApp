@@ -52,6 +52,12 @@ interface ApiService {
     @GET("api/products/{id}/transactions")
     suspend fun getProductTransactions(@Path("id") id: String): List<InventoryTransactionDto>
 
+    @POST("api/inventory-transactions/{id}/refinance")
+    suspend fun refinanceTransaction(
+        @Path("id") id: String,
+        @Body request: RefinanceRequest,
+    ): RefinanceResponse
+
     @Multipart
     @POST("api/uploads/image")
     suspend fun uploadImage(@Part image: MultipartBody.Part): UploadImageResponse

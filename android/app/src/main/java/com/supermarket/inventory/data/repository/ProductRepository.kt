@@ -88,6 +88,17 @@ class ProductRepository @Inject constructor(
     suspend fun getTransactions(id: String): ApiResult<List<InventoryTransactionDto>> =
         apiCall { api.getProductTransactions(id) }
 
+    // Corrects a restock that was recorded with the wrong financing: moves
+    // it between "paid in cash" and "on a supplier invoice", reversing the
+    // cash side that the original entry created.
+    suspend fun refinance(
+        transactionId: String,
+        financing: String,
+        supplierInvoiceId: String? = null,
+        newInvoice: NewInvoiceForRestockInput? = null,
+    ): ApiResult<RefinanceResponse> =
+        apiCall { api.refinanceTransaction(transactionId, RefinanceRequest(financing, supplierInvoiceId, newInvoice)) }
+
     suspend fun uploadImage(file: File): ApiResult<UploadImageResponse> = apiCall {
         val body = file.asRequestBody("image/*".toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("image", file.name, body)

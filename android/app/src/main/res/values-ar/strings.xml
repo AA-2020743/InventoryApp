@@ -343,4 +343,12 @@
     <string name="invoices_empty">لا توجد فواتير موردين</string>
     <string name="invoices_empty_hint">اضغط + لتسجيل فاتورة، ثم اربط بها المخزون الذي دفعت ثمنه.</string>
     <string name="settings_version">إصدار التطبيق</string>
+    <string name="purchase_history_title">سجل المشتريات</string>
+    <string name="purchase_history_empty">لا توجد مشتريات مخزون مسجلة لهذا المنتج بعد.</string>
+    <string name="purchase_history_line">%1$s وحدة بسعر %2$s للوحدة</string>
+    <string name="purchase_financing_cash">مدفوعة نقدًا</string>
+    <string name="purchase_financing_invoice">على فاتورة: %1$s</string>
+    <string name="purchase_correct">تصحيح</string>
+    <string name="purchase_correct_apply">تطبيق التصحيح</string>
+    <string name="purchase_correct_no_invoices">لا توجد فواتير موردين معلقة لنقلها إليها. أنشئ فاتورة أولًا من تبويب أخرى.</string>
 </resources>

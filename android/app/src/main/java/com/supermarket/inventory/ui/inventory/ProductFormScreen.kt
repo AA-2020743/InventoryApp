@@ -62,6 +62,13 @@ import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
 import java.time.Instant
 import java.time.ZoneOffset
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Divider
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import com.supermarket.inventory.ui.common.formatQuantity
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -344,6 +351,15 @@ fun ProductFormScreen(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+                // Correcting a purchase that was entered with the wrong
+                // financing lives here, next to the actions that created it.
+                OutlinedButton(
+                    onClick = { showHistoryDialog = true; viewModel.loadPurchaseHistory() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.purchase_history_title))
+                }
+                Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { showDeleteConfirm = true },
                     colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -353,6 +369,14 @@ fun ProductFormScreen(
                 }
             }
         }
+    }
+
+    if (showHistoryDialog) {
+        PurchaseHistoryDialog(
+            state = state,
+            onDismiss = { showHistoryDialog = false },
+            onRefinance = { txnId, financing -> viewModel.refinancePurchase(txnId, financing) },
+        )
     }
 
     if (showRestockDialog) {
@@ -393,6 +417,164 @@ fun ProductFormScreen(
             },
         )
     }
+}
+
+
+// Past stock purchases for this product, each showing how it was paid for,
+// with a way to correct that choice after the fact. Entering a delivery as
+// cash when it was really on the supplier's invoice (or the reverse) is an
+// easy slip at the counter, and until it's corrected the till and the
+// invoice both carry the wrong figure.
+@Composable
+private fun PurchaseHistoryDialog(
+    state: ProductFormUiState,
+    onDismiss: () -> Unit,
+    onRefinance: suspend (String, RestockFinancing) -> String?,
+) {
+    val scope = rememberCoroutineScope()
+    // Which row's correction controls are open; only one at a time.
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var choice by remember { mutableStateOf<RestockFinancing>(RestockFinancing.Cash) }
+    var rowError by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.purchase_history_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                when {
+                    state.historyLoading -> CircularProgressIndicator()
+                    state.historyError != null -> Text(
+                        state.historyError,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    state.purchaseHistory.isEmpty() -> Text(
+                        stringResource(R.string.purchase_history_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    else -> state.purchaseHistory.forEach { txn ->
+                        val onInvoice = txn.supplierInvoiceId != null
+                        val financingLabel = if (onInvoice) {
+                            val inv = txn.supplierInvoice
+                            stringResource(
+                                R.string.purchase_financing_invoice,
+                                inv?.supplier?.name ?: inv?.invoiceNumber ?: "",
+                            )
+                        } else {
+                            stringResource(R.string.purchase_financing_cash)
+                        }
+
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(
+                                            R.string.purchase_history_line,
+                                            formatQuantity(txn.quantityChange),
+                                            formatAmount(txn.unitCost ?: "0"),
+                                        ),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Text(
+                                        formatIsoDate(txn.createdAt),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        financingLabel,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (onInvoice) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                TextButton(onClick = {
+                                    rowError = null
+                                    if (editingId == txn.id) {
+                                        editingId = null
+                                    } else {
+                                        editingId = txn.id
+                                        // Default to the opposite of what it is
+                                        // now - that's the correction the owner
+                                        // opened this row to make.
+                                        choice = if (onInvoice) {
+                                            RestockFinancing.Cash
+                                        } else {
+                                            state.pendingInvoices.firstOrNull()
+                                                ?.let { RestockFinancing.ExistingInvoice(it.id) }
+                                                ?: RestockFinancing.Cash
+                                        }
+                                    }
+                                }) { Text(stringResource(R.string.purchase_correct)) }
+                            }
+
+                            if (editingId == txn.id) {
+                                Column(Modifier.padding(start = 8.dp, top = 4.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = choice is RestockFinancing.Cash,
+                                            onClick = { choice = RestockFinancing.Cash },
+                                        )
+                                        Text(stringResource(R.string.restock_financing_cash))
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = choice is RestockFinancing.ExistingInvoice,
+                                            onClick = {
+                                                choice = state.pendingInvoices.firstOrNull()
+                                                    ?.let { RestockFinancing.ExistingInvoice(it.id) }
+                                                    ?: choice
+                                            },
+                                            enabled = state.pendingInvoices.isNotEmpty(),
+                                        )
+                                        Text(stringResource(R.string.restock_financing_deferred))
+                                    }
+                                    if (choice is RestockFinancing.ExistingInvoice) {
+                                        ExistingInvoicePicker(
+                                            pendingInvoices = state.pendingInvoices,
+                                            selectedId = (choice as RestockFinancing.ExistingInvoice).invoiceId,
+                                            onSelect = { choice = RestockFinancing.ExistingInvoice(it) },
+                                        )
+                                    }
+                                    if (state.pendingInvoices.isEmpty()) {
+                                        Text(
+                                            stringResource(R.string.purchase_correct_no_invoices),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    rowError?.let {
+                                        Text(
+                                            it,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(top = 4.dp),
+                                        )
+                                    }
+                                    TextButton(
+                                        enabled = !busy,
+                                        onClick = {
+                                            busy = true
+                                            rowError = null
+                                            scope.launch {
+                                                val failure = onRefinance(txn.id, choice)
+                                                busy = false
+                                                if (failure == null) editingId = null else rowError = failure
+                                            }
+                                        },
+                                    ) { Text(stringResource(R.string.purchase_correct_apply)) }
+                                }
+                            }
+                            Divider(Modifier.padding(top = 4.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
 }
 
 @Composable

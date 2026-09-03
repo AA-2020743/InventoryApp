@@ -95,6 +95,29 @@ data class InventoryTransactionDto(
     val unitCost: String?,
     val note: String?,
     val createdAt: String,
+    // Null means this stock was paid for in cash; set means it sits on a
+    // supplier invoice. Drives the financing badge and the correction.
+    val supplierInvoiceId: String? = null,
+    val supplierInvoice: SupplierInvoiceDto? = null,
+)
+
+// Corrects how an already-recorded restock was paid for. The goods are not
+// in question - only the cash/invoice side is undone and re-applied.
+@JsonClass(generateAdapter = true)
+data class RefinanceRequest(
+    val financing: String,
+    val supplierInvoiceId: String? = null,
+    val newInvoice: NewInvoiceForRestockInput? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class RefinanceResponse(
+    val transaction: InventoryTransactionDto,
+    val previousFinancing: String,
+    val financing: String,
+    // Set when the correction left a pending invoice covering no stock at
+    // all, so the app can point the owner at it to review.
+    val orphanedInvoiceId: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

@@ -14,7 +14,7 @@ export const productsRouter = Router();
 // lifecycle governs when cash actually leaves for it. Not provided
 // explicitly by older callers - inferred as DEFERRED when an invoice to
 // link is present, CASH otherwise, so the field stays optional.
-const newInvoiceForRestockSchema = z.object({
+export const newInvoiceForRestockSchema = z.object({
   supplierId: z.string().uuid(),
   invoiceNumber: z.string().trim().optional().nullable(),
   dueDate: z.coerce.date(),
@@ -33,7 +33,7 @@ const financingFields = {
 // exists, or one created here on the fly - and returns its id so the
 // caller can stamp it onto the InventoryTransaction instead of touching
 // cash at all.
-async function resolveRestockFinancing(
+export async function resolveRestockFinancing(
   tx: Prisma.TransactionClient,
   input: {
     financing?: "CASH" | "DEFERRED";
@@ -409,6 +409,7 @@ productsRouter.get(
   asyncHandler(async (req, res) => {
     const transactions = await prisma.inventoryTransaction.findMany({
       where: { productId: req.params.id },
+      include: { supplierInvoice: { include: { supplier: true } } },
       orderBy: { createdAt: "desc" },
     });
     res.json(transactions);
