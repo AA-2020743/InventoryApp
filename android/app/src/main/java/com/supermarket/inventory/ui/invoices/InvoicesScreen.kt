@@ -781,6 +781,7 @@ private fun PurchaseInvoiceDialog(
     var productExpanded by remember { mutableStateOf(false) }
     var quantity by remember { mutableStateOf("") }
     var unitCost by remember { mutableStateOf("") }
+    var showQuickAddProduct by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -917,8 +918,11 @@ private fun PurchaseInvoiceDialog(
                     )
                 }
 
+                // Unlike the picker on an existing invoice, this one opens
+                // even when nothing matches - "no such product" is exactly
+                // when the create-new entry at the bottom is wanted.
                 ExposedDropdownMenuBox(
-                    expanded = productExpanded && matches.isNotEmpty(),
+                    expanded = productExpanded,
                     onExpandedChange = { productExpanded = it },
                     modifier = Modifier.padding(top = 8.dp),
                 ) {
@@ -926,11 +930,12 @@ private fun PurchaseInvoiceDialog(
                         value = selectedProduct?.name ?: productQuery,
                         onValueChange = { productQuery = it; selectedProduct = null; productExpanded = true },
                         label = { Text(stringResource(R.string.invoice_pick_product)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = productExpanded) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                     )
                     DropdownMenu(
-                        expanded = productExpanded && matches.isNotEmpty(),
+                        expanded = productExpanded,
                         onDismissRequest = { productExpanded = false },
                     ) {
                         matches.forEach { product ->
@@ -944,6 +949,15 @@ private fun PurchaseInvoiceDialog(
                                 },
                             )
                         }
+                        // A delivery often brings something the shop has
+                        // never stocked. Creating it here keeps the invoice
+                        // being typed intact instead of sending the owner
+                        // off to Inventory and back.
+                        if (matches.isNotEmpty()) Divider()
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.product_quick_add)) },
+                            onClick = { productExpanded = false; showQuickAddProduct = true },
+                        )
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1118,6 +1132,128 @@ private fun PurchaseInvoiceDialog(
             },
         )
     }
+
+    if (showQuickAddProduct) {
+        QuickAddProductDialog(
+            // Seeded from what's already been typed into the line, so a
+            // name half-entered in the picker isn't thrown away.
+            initialName = if (selectedProduct == null) productQuery else "",
+            initialPurchaseCost = unitCost,
+            onDismiss = { showQuickAddProduct = false },
+            onSave = { name, barcode, sellingPrice, purchaseCost, onFailure ->
+                scope.launch {
+                    when (val result = viewModel.createProduct(name, barcode, sellingPrice, purchaseCost)) {
+                        is ApiResult.Success -> {
+                            // Drop it straight into the line being typed:
+                            // the only reason to create it here was to put
+                            // it on this invoice.
+                            selectedProduct = result.data
+                            productQuery = result.data.name
+                            if (unitCost.isBlank()) unitCost = result.data.purchaseCost
+                            showQuickAddProduct = false
+                        }
+                        is ApiResult.Error -> onFailure(result.message)
+                    }
+                }
+            },
+        )
+    }
+}
+
+// Creating a product from inside a purchase, for something the shop has
+// never carried. Deliberately the short version - name, barcode, what it
+// sells for - because it starts with no stock: the invoice line being typed
+// is what puts the first units on the shelf, and at the price the invoice
+// charged.
+@Composable
+private fun QuickAddProductDialog(
+    initialName: String,
+    initialPurchaseCost: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String?, Double, Double, (String) -> Unit) -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var barcode by remember { mutableStateOf("") }
+    var sellingPrice by remember { mutableStateOf("") }
+    var purchaseCost by remember { mutableStateOf(initialPurchaseCost) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val nameRequired = stringResource(R.string.product_quick_add_needs_name)
+    val priceRequired = stringResource(R.string.product_quick_add_needs_price)
+    val barcodeRequired = stringResource(R.string.product_quick_add_needs_barcode)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.product_quick_add_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    stringResource(R.string.product_quick_add_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.product_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = barcode,
+                    onValueChange = { barcode = it },
+                    label = { Text(stringResource(R.string.product_barcode)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = purchaseCost,
+                    onValueChange = { purchaseCost = it },
+                    label = { Text(stringResource(R.string.product_purchase_cost)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = sellingPrice,
+                    onValueChange = { sellingPrice = it },
+                    label = { Text(stringResource(R.string.product_selling_price)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isSaving,
+                onClick = {
+                    val price = sellingPrice.toDoubleOrNull()
+                    when {
+                        name.isBlank() -> error = nameRequired
+                        price == null || price < 0 -> error = priceRequired
+                        // A product with no barcode is identified by its
+                        // photo instead, and there's nowhere to take one
+                        // from here - that one belongs on the full form.
+                        barcode.isBlank() -> error = barcodeRequired
+                        else -> {
+                            isSaving = true
+                            error = null
+                            onSave(name.trim(), barcode.trim(), price, purchaseCost.toDoubleOrNull() ?: 0.0) { failure ->
+                                isSaving = false
+                                error = failure
+                            }
+                        }
+                    }
+                },
+            ) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 // Editing an invoice that already exists: its paperwork, not its contents.

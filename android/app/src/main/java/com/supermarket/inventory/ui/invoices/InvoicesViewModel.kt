@@ -10,6 +10,7 @@ import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.data.remote.dto.InvoiceInventoryResponse
 import com.supermarket.inventory.data.remote.dto.InvoiceLineInput
 import com.supermarket.inventory.data.remote.dto.ProductDto
+import com.supermarket.inventory.data.remote.dto.ProductInput
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.data.remote.dto.UploadImageResponse
 import com.supermarket.inventory.data.repository.InvoiceRepository
@@ -154,6 +155,39 @@ class InvoicesViewModel @Inject constructor(
             }
             is ApiResult.Error -> result.message
         }
+    }
+
+    // Creates a product from inside the purchase dialog so a delivery of
+    // something new doesn't have to be interrupted by a trip to Inventory.
+    // It starts empty on purpose - the invoice line about to be added is
+    // what books its first stock, and books it against the invoice.
+    suspend fun createProduct(
+        name: String,
+        barcode: String?,
+        sellingPrice: Double,
+        purchaseCost: Double,
+    ): ApiResult<ProductDto> {
+        val result = productRepository.create(
+            ProductInput(
+                barcode = barcode,
+                name = name,
+                imageUrl = null,
+                category = null,
+                unit = "pcs",
+                unitsPerPackage = 1.0,
+                soldByWeight = false,
+                purchaseCost = purchaseCost,
+                sellingPrice = sellingPrice,
+                quantity = 0.0,
+                lowStockThreshold = 0.0,
+            )
+        )
+        if (result is ApiResult.Success) {
+            // Straight into the picker's list, so it can be selected right
+            // away without waiting for a reload.
+            uiState = uiState.copy(products = uiState.products + result.data)
+        }
+        return result
     }
 
     suspend fun loadSuppliers() = supplierRepository.getSuppliers()

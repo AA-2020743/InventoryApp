@@ -7,6 +7,7 @@ import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { applyCashDeduction } from "./cashRegister.routes";
 import { applyRestockToProduct } from "./products.routes";
 import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
+import { recomputeProductCost } from "../services/productCost";
 
 export const invoicesRouter = Router();
 
@@ -169,6 +170,10 @@ invoicesRouter.put(
           ...(input.unitCost !== undefined ? { unitCost: new Prisma.Decimal(input.unitCost) } : {}),
         },
       });
+      // The line just changed how much of this delivery there was, or what
+      // it cost, so the product's blended cost is now built on a figure
+      // that no longer exists - rebuild it from what the log now says.
+      await recomputeProductCost(tx, movement.productId);
       await syncInvoiceTotalFromLines(tx, req.params.id);
       return line;
     });
@@ -199,6 +204,9 @@ invoicesRouter.delete(
         data: { quantity: { decrement: movement.quantityChange } },
       });
       await tx.inventoryTransaction.delete({ where: { id: movement.id } });
+      // The delivery is gone from the log, so the price it contributed to
+      // the product's blended cost has to go with it.
+      await recomputeProductCost(tx, movement.productId);
       await syncInvoiceTotalFromLines(tx, req.params.id);
     });
 
@@ -446,6 +454,12 @@ invoicesRouter.delete(
         // one re-financed to cash and back could have left one behind.
         await tx.cashRegisterEntry.deleteMany({ where: { inventoryTransactionId: { in: lineIds } } });
         await tx.inventoryTransaction.deleteMany({ where: { id: { in: lineIds } } });
+        // Every delivery this invoice made is now out of the log, so each
+        // product it touched has to have its blended cost rebuilt without
+        // them. Once per product, however many lines it had.
+        for (const productId of removalByProduct.keys()) {
+          await recomputeProductCost(tx, productId);
+        }
       }
       await tx.cashRegisterEntry.deleteMany({ where: { invoiceId: existing.id } });
       await tx.supplierInvoice.delete({ where: { id: existing.id } });

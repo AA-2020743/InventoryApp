@@ -391,4 +391,11 @@
     <string name="invoice_lines_drive_cash">هذه الفاتورة مسددة، لذا فتعديل أي بند يغيّر الإجمالي ويعيد الفرق إلى الخزينة أو يخصمه منها.</string>
     <string name="invoice_delete_message_paid">سيؤدي هذا إلى إزالة المخزون الذي وردته هذه الفاتورة من مخزونك، وإعادة ما خُصم من الخزينة إليها.</string>
     <string name="restock_financing_invoice_only">يصل المخزون على فاتورة مورد. لتسجيل مخزون مشترى نقدًا، استخدم «أخرى ← فواتير الموردين».</string>
+    <!-- Creating a product from inside a purchase invoice -->
+    <string name="product_quick_add">+ إضافة منتج جديد</string>
+    <string name="product_quick_add_title">منتج جديد</string>
+    <string name="product_quick_add_hint">يبدأ بدون مخزون — البند الذي تضيفه هو ما يضع أول وحدات على الرف، بالسعر الذي حاسبتك عليه هذه الفاتورة.</string>
+    <string name="product_quick_add_needs_name">اكتب اسم المنتج.</string>
+    <string name="product_quick_add_needs_price">اكتب سعر البيع.</string>
+    <string name="product_quick_add_needs_barcode">المنتج بدون باركود يُعرَّف بصورته، لذا أضفه من تبويب المخزون بدلًا من هنا.</string>
 </resources>

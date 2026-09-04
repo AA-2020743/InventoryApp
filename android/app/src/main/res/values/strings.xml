@@ -391,4 +391,11 @@
     <string name="invoice_lines_drive_cash">This invoice is paid, so editing a line moves the total and returns or takes the difference from the cash register.</string>
     <string name="invoice_delete_message_paid">This removes the stock this invoice delivered from your inventory and returns what it took from the cash register.</string>
     <string name="restock_financing_invoice_only">Stock arrives on a supplier invoice. To record stock bought with cash, use Others → Supplier invoices.</string>
+    <!-- Creating a product from inside a purchase invoice -->
+    <string name="product_quick_add">+ Add new product</string>
+    <string name="product_quick_add_title">New product</string>
+    <string name="product_quick_add_hint">It starts with no stock — the line you are adding is what puts the first units on the shelf, at the price this invoice charged.</string>
+    <string name="product_quick_add_needs_name">Give the product a name.</string>
+    <string name="product_quick_add_needs_price">Enter what it sells for.</string>
+    <string name="product_quick_add_needs_barcode">A product without a barcode is identified by its photo, so add that one from Inventory instead.</string>
 </resources>
