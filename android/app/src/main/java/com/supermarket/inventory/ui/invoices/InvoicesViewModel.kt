@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.data.remote.dto.InvoiceInventoryResponse
+import com.supermarket.inventory.data.remote.dto.InvoiceLineInput
 import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.data.remote.dto.UploadImageResponse
@@ -55,6 +56,12 @@ class InvoicesViewModel @Inject constructor(
             when (val result = invoiceRepository.getInvoices()) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, invoices = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
+            }
+            // Needed by the purchase dialog's product picker, so it's ready
+            // before the dialog opens rather than after.
+            when (val productsResult = productRepository.getProducts()) {
+                is ApiResult.Success -> uiState = uiState.copy(products = productsResult.data)
+                is ApiResult.Error -> Unit
             }
         }
     }
@@ -152,6 +159,18 @@ class InvoicesViewModel @Inject constructor(
     suspend fun loadSuppliers() = supplierRepository.getSuppliers()
 
     suspend fun createSupplier(name: String, contactInfo: String?) = supplierRepository.createSupplier(name, contactInfo)
+
+    // Records a purchase: the invoice and the stock it delivered, totalled
+    // from its lines. "CASH" settles it from the till immediately.
+    suspend fun createPurchase(
+        supplierId: String,
+        invoiceNumber: String?,
+        dueDateIso: String,
+        paymentMethod: String,
+        lines: List<InvoiceLineInput>,
+        amount: Double?,
+        imageUrl: String?,
+    ) = invoiceRepository.createPurchase(supplierId, invoiceNumber, dueDateIso, paymentMethod, lines, amount, imageUrl)
 
     suspend fun createInvoice(supplierId: String, invoiceNumber: String?, amount: Double, dueDateIso: String, notes: String?, imageUrl: String?) =
         invoiceRepository.createInvoice(supplierId, invoiceNumber, amount, dueDateIso, notes, imageUrl)

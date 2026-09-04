@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { applyCashDeduction } from "./cashRegister.routes";
+import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
 
 export const productsRouter = Router();
 
@@ -33,6 +34,45 @@ const financingFields = {
 // exists, or one created here on the fly - and returns its id so the
 // caller can stamp it onto the InventoryTransaction instead of touching
 // cash at all.
+// Books `quantity` units of `product` into stock at `unitCost`, blending the
+// new cost into the product's purchase cost as a quantity-weighted average
+// rather than overwriting it: 10 @ 5 already on hand plus 10 new @ 7 leaves
+// all 20 valued at 6, not 7. Degenerates to the new cost when nothing was on
+// hand. Passing no unitCost keeps the existing cost untouched.
+//
+// Shared by the restock route and by invoice creation, which books its lines
+// the same way - the stock arrived the same way, whichever screen recorded it.
+export async function applyRestockToProduct(
+  tx: Prisma.TransactionClient,
+  product: { id: string; quantity: Prisma.Decimal; purchaseCost: Prisma.Decimal },
+  quantity: number,
+  unitCost?: number
+): Promise<Prisma.Decimal> {
+  const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
+  const newQuantity = new Prisma.Decimal(quantity);
+
+  let blended: Prisma.Decimal | undefined;
+  if (unitCost !== undefined) {
+    const totalQuantity = product.quantity.add(newQuantity);
+    blended = totalQuantity.gt(0)
+      ? product.quantity
+          .mul(product.purchaseCost)
+          .add(newQuantity.mul(effectiveUnitCost))
+          .div(totalQuantity)
+      : effectiveUnitCost;
+  }
+
+  await tx.product.update({
+    where: { id: product.id },
+    data: {
+      quantity: { increment: quantity },
+      ...(blended !== undefined ? { purchaseCost: blended } : {}),
+    },
+  });
+
+  return effectiveUnitCost;
+}
+
 export async function resolveRestockFinancing(
   tx: Prisma.TransactionClient,
   input: {
@@ -51,7 +91,12 @@ export async function resolveRestockFinancing(
   if (input.supplierInvoiceId) {
     const invoice = await tx.supplierInvoice.findUnique({ where: { id: input.supplierInvoiceId } });
     if (!invoice) throw new HttpError(404, "Supplier invoice not found");
-    if (invoice.status !== "PENDING") {
+    // A settled invoice normally can't take more stock: its amount was
+    // agreed and paid, and adding to it would leave goods the payment never
+    // covered. A line-managed invoice is the exception - a cash purchase is
+    // paid the moment it's created, and its total and payment both resize
+    // to whatever its lines say, so growing it charges the difference.
+    if (invoice.status !== "PENDING" && !invoice.amountFromLines) {
       throw new HttpError(400, "Can only link a deferred restock to a pending invoice");
     }
     return { financing, supplierInvoiceId: invoice.id };
@@ -257,41 +302,15 @@ productsRouter.post(
 
     // The cash/invoice side always reflects what was actually paid for
     // *this* restock (quantity at the price entered now) - never the
-    // blended figure below, which is a valuation concept, not a real
-    // transaction amount.
+    // blended valuation figure the helper leaves on the product.
     const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
-
-    // A restock at a different price doesn't overwrite the cost of stock
-    // already on hand - it blends in proportionally (quantity-weighted
-    // average), same as standard inventory costing. E.g. 10 units @ $5
-    // already in stock + 10 new units @ $7 -> purchaseCost becomes $6 for
-    // all 20, not $7 for all 20. Degenerates to just the new cost when
-    // there's no existing stock (quantity was 0).
-    const newQuantityDecimal = new Prisma.Decimal(quantity);
-    const blendedPurchaseCost =
-      unitCost !== undefined
-        ? (() => {
-            const totalQuantity = product.quantity.add(newQuantityDecimal);
-            return totalQuantity.gt(0)
-              ? product.quantity
-                  .mul(product.purchaseCost)
-                  .add(newQuantityDecimal.mul(effectiveUnitCost))
-                  .div(totalQuantity)
-              : effectiveUnitCost;
-          })()
-        : undefined;
 
     const updated = await prisma.$transaction(async (tx) => {
       const cost = effectiveUnitCost.mul(quantity);
       const resolved = await resolveRestockFinancing(tx, data, cost);
 
-      const updatedProduct = await tx.product.update({
-        where: { id: product.id },
-        data: {
-          quantity: { increment: quantity },
-          ...(blendedPurchaseCost !== undefined ? { purchaseCost: blendedPurchaseCost } : {}),
-        },
-      });
+      await applyRestockToProduct(tx, product, quantity, unitCost);
+      const updatedProduct = await tx.product.findUniqueOrThrow({ where: { id: product.id } });
       const txn = await tx.inventoryTransaction.create({
         data: {
           productId: product.id,
@@ -305,6 +324,10 @@ productsRouter.post(
 
       if (resolved.financing === "CASH") {
         await applyCashDeduction(tx, { inventoryTransactionId: txn.id }, cost, `Restock: ${product.name}`);
+      } else if (resolved.supplierInvoiceId) {
+        // Stock added to a line-managed invoice grows that invoice's total,
+        // and its payment with it if it was already settled.
+        await syncInvoiceTotalFromLines(tx, resolved.supplierInvoiceId);
       }
 
       return updatedProduct;

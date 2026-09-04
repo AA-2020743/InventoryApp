@@ -684,10 +684,16 @@ private fun RestockDialog(
     )
 }
 
-// Cash vs deferred-to-a-supplier-invoice choice, shared between creating a
-// new product's initial stock and restocking an existing one. Deferred
-// needs an invoice to land on - either one already pending, picked from a
-// dropdown, or a brand new one described inline (supplier + due date).
+// Which supplier invoice this stock arrives on - either one already pending,
+// picked from a dropdown, or a brand new one described inline (supplier +
+// due date).
+//
+// There is deliberately no cash option here anymore: stock bought with cash
+// is recorded as a supplier invoice from Others -> Supplier invoices, so
+// every cash purchase has a document behind it that can be reviewed,
+// corrected, or undone. Cash stays reachable as a correction (Purchase
+// history -> Correct), which is what it's for - fixing a purchase that was
+// entered against the wrong side.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FinancingChoiceFields(
@@ -697,58 +703,53 @@ private fun FinancingChoiceFields(
     pendingInvoices: List<SupplierInvoiceDto>,
     modifier: Modifier = Modifier,
 ) {
-    val isDeferred = financing !is RestockFinancing.Cash
+    // The state still starts on the old cash default; move it onto an
+    // invoice as soon as this section appears, so nothing can be saved as a
+    // cash purchase just because the owner never touched the picker.
+    LaunchedEffect(financing, pendingInvoices, suppliers) {
+        if (financing is RestockFinancing.Cash) {
+            onFinancingChange(
+                pendingInvoices.firstOrNull()?.let { RestockFinancing.ExistingInvoice(it.id) }
+                    ?: RestockFinancing.NewInvoice(supplierId = suppliers.firstOrNull()?.id ?: "")
+            )
+        }
+    }
+
     Column(modifier) {
         Text(stringResource(R.string.restock_financing_label), style = MaterialTheme.typography.labelMedium)
-        Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            stringResource(R.string.restock_financing_invoice_only),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (pendingInvoices.isNotEmpty()) {
+                FilterChip(
+                    selected = financing is RestockFinancing.ExistingInvoice,
+                    onClick = { onFinancingChange(RestockFinancing.ExistingInvoice(pendingInvoices.first().id)) },
+                    label = { Text(stringResource(R.string.restock_financing_existing_invoice)) },
+                )
+            }
             FilterChip(
-                selected = !isDeferred,
-                onClick = { onFinancingChange(RestockFinancing.Cash) },
-                label = { Text(stringResource(R.string.restock_financing_cash)) },
-            )
-            FilterChip(
-                selected = isDeferred,
-                onClick = {
-                    if (!isDeferred) {
-                        onFinancingChange(
-                            pendingInvoices.firstOrNull()?.let { RestockFinancing.ExistingInvoice(it.id) }
-                                ?: RestockFinancing.NewInvoice(supplierId = suppliers.firstOrNull()?.id ?: "")
-                        )
-                    }
-                },
-                label = { Text(stringResource(R.string.restock_financing_deferred)) },
+                selected = financing is RestockFinancing.NewInvoice,
+                onClick = { onFinancingChange(RestockFinancing.NewInvoice(supplierId = suppliers.firstOrNull()?.id ?: "")) },
+                label = { Text(stringResource(R.string.restock_financing_new_invoice)) },
             )
         }
 
-        if (isDeferred) {
-            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (pendingInvoices.isNotEmpty()) {
-                    FilterChip(
-                        selected = financing is RestockFinancing.ExistingInvoice,
-                        onClick = { onFinancingChange(RestockFinancing.ExistingInvoice(pendingInvoices.first().id)) },
-                        label = { Text(stringResource(R.string.restock_financing_existing_invoice)) },
-                    )
-                }
-                FilterChip(
-                    selected = financing is RestockFinancing.NewInvoice,
-                    onClick = { onFinancingChange(RestockFinancing.NewInvoice(supplierId = suppliers.firstOrNull()?.id ?: "")) },
-                    label = { Text(stringResource(R.string.restock_financing_new_invoice)) },
-                )
-            }
-
-            when (financing) {
-                is RestockFinancing.ExistingInvoice -> ExistingInvoicePicker(
-                    pendingInvoices = pendingInvoices,
-                    selectedId = financing.invoiceId,
-                    onSelect = { onFinancingChange(RestockFinancing.ExistingInvoice(it)) },
-                )
-                is RestockFinancing.NewInvoice -> NewInvoiceFields(
-                    value = financing,
-                    suppliers = suppliers,
-                    onChange = onFinancingChange,
-                )
-                is RestockFinancing.Cash -> Unit
-            }
+        when (financing) {
+            is RestockFinancing.ExistingInvoice -> ExistingInvoicePicker(
+                pendingInvoices = pendingInvoices,
+                selectedId = financing.invoiceId,
+                onSelect = { onFinancingChange(RestockFinancing.ExistingInvoice(it)) },
+            )
+            is RestockFinancing.NewInvoice -> NewInvoiceFields(
+                value = financing,
+                suppliers = suppliers,
+                onChange = onFinancingChange,
+            )
+            // Only for the instant before the effect above moves it off cash.
+            is RestockFinancing.Cash -> Unit
         }
     }
 }

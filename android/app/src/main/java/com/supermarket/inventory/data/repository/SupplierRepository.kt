@@ -66,6 +66,23 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
     suspend fun deleteStockLine(invoiceId: String, transactionId: String): ApiResult<Unit> =
         apiCall { api.deleteInvoiceStockLine(invoiceId, transactionId) }
 
+    // Records a purchase: the invoice plus the stock it delivered, totalled
+    // from its lines. "CASH" settles it from the till there and then.
+    suspend fun createPurchase(
+        supplierId: String,
+        invoiceNumber: String?,
+        dueDateIso: String,
+        paymentMethod: String,
+        lines: List<InvoiceLineInput>,
+        amount: Double? = null,
+        imageUrl: String? = null,
+    ): ApiResult<SupplierInvoiceDto> =
+        apiCall {
+            api.createPurchase(
+                InvoicePurchaseInput(supplierId, invoiceNumber, dueDateIso, paymentMethod, lines, amount, null, imageUrl)
+            )
+        }
+
     suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id) }
 

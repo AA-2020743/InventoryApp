@@ -120,6 +120,12 @@ model SupplierInvoice {
   // cash register - mirrors Expense.deficitAmount, same always-deduct
   // mechanism (see applyCashDeduction).
   deficitAmount Decimal       @default(0) @db.Decimal(12, 2)
+  // True for invoices whose amount is derived from the stock lines booked
+  // against them - the purchase-document flow, where the total is the sum
+  // of what was delivered rather than a figure someone typed. Invoices
+  // created before that flow (and any created without lines) keep their
+  // typed amount and are left alone by the recalculation.
+  amountFromLines Boolean     @default(false)
   notes         String?
   // A photo of the physical invoice/receipt, uploaded via the generic
   // /api/uploads/image endpoint (see uploads.routes.ts) - stores the

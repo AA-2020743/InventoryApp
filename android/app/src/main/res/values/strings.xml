@@ -359,4 +359,36 @@
     <string name="adjust_refund_notice">%1$s will be returned to the cash register.</string>
     <string name="invoice_line_new_quantity">New quantity</string>
     <string name="invoice_delete_message">This also removes the stock this invoice delivered from your inventory. No money is returned for that stock - it was never paid for from the cash register.</string>
+    <!-- Supplier invoices: open vs settled shelves -->
+    <string name="invoices_filter_open">Open · %1$d</string>
+    <string name="invoices_filter_settled">Settled · %1$d</string>
+    <string name="invoices_outstanding_label">Still owed</string>
+    <string name="invoices_settled_total_label">Settled total</string>
+    <string name="invoices_overdue_count">%1$d overdue</string>
+    <string name="invoices_empty_open">Nothing outstanding</string>
+    <string name="invoices_empty_open_hint">Tap + to record a purchase. Invoices you have already paid are under Settled.</string>
+    <string name="invoices_empty_settled">No settled invoices yet</string>
+    <string name="invoices_empty_settled_hint">Invoices move here once they are paid, with the stock they delivered still attached.</string>
+    <string name="invoice_paid_on">Paid</string>
+    <string name="invoice_total_from_stock_badge">Total from its stock</string>
+    <!-- Recording a purchase -->
+    <string name="invoice_purchase_title">Record a purchase</string>
+    <string name="invoice_payment_label">How is it paid?</string>
+    <string name="invoice_payment_cash">Cash now</string>
+    <string name="invoice_payment_deferred">On credit</string>
+    <string name="invoice_payment_cash_hint">The total comes out of the cash register as soon as you save.</string>
+    <string name="invoice_payment_deferred_hint">Nothing leaves the cash register until you mark it paid.</string>
+    <string name="invoice_lines_title">Products on this invoice</string>
+    <string name="invoice_no_lines">Nothing added yet. The invoice total is the sum of what you list here.</string>
+    <string name="invoice_line_add">Add to invoice</string>
+    <string name="invoice_total_from_lines">Invoice total: %1$s</string>
+    <string name="invoice_amount_manual">Total (for an invoice that is not for stock)</string>
+    <string name="invoice_needs_supplier">Pick a supplier first.</string>
+    <string name="invoice_needs_lines_or_amount">Add at least one product, or type a total for an invoice that is not for stock.</string>
+    <string name="invoice_needs_due_date">Pick a due date.</string>
+    <string name="invoice_amount_locked_note">This total is the sum of the stock booked to this invoice. Change it from Linked stock.</string>
+    <string name="invoice_lines_drive_total">The invoice total follows these lines, so editing one changes it.</string>
+    <string name="invoice_lines_drive_cash">This invoice is paid, so editing a line moves the total and returns or takes the difference from the cash register.</string>
+    <string name="invoice_delete_message_paid">This removes the stock this invoice delivered from your inventory and returns what it took from the cash register.</string>
+    <string name="restock_financing_invoice_only">Stock arrives on a supplier invoice. To record stock bought with cash, use Others → Supplier invoices.</string>
 </resources>

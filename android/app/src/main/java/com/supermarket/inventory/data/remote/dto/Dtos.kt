@@ -160,6 +160,9 @@ data class SupplierInvoiceDto(
     val notes: String?,
     val imageUrl: String?,
     val createdAt: String,
+    // True when the amount is the sum of the stock lines booked against
+    // this invoice, rather than a figure typed on an older invoice.
+    val amountFromLines: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)
@@ -169,6 +172,32 @@ data class InvoiceInput(
     val amount: Double,
     val dueDate: String,
     val notes: String?,
+    val imageUrl: String? = null,
+)
+
+// One product being purchased on a new invoice.
+@JsonClass(generateAdapter = true)
+data class InvoiceLineInput(
+    val productId: String,
+    val quantity: Double,
+    val unitCost: Double,
+)
+
+// Recording a purchase: the invoice is the document and its lines are the
+// stock it brought in, so the total is their sum rather than a typed figure.
+// paymentMethod decides where the money comes from - CASH settles it against
+// the till immediately, DEFERRED leaves it owed until marked paid.
+@JsonClass(generateAdapter = true)
+data class InvoicePurchaseInput(
+    val supplierId: String,
+    val invoiceNumber: String?,
+    val dueDate: String,
+    val paymentMethod: String,
+    val lines: List<InvoiceLineInput>,
+    // Only for an invoice that isn't for stock at all - with lines present
+    // the server ignores it and uses their sum.
+    val amount: Double? = null,
+    val notes: String? = null,
     val imageUrl: String? = null,
 )
 

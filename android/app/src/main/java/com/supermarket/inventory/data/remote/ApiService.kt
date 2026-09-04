@@ -104,6 +104,9 @@ interface ApiService {
     @POST("api/invoices")
     suspend fun createInvoice(@Body input: InvoiceInput): SupplierInvoiceDto
 
+    @POST("api/invoices")
+    suspend fun createPurchase(@Body input: InvoicePurchaseInput): SupplierInvoiceDto
+
     @PUT("api/invoices/{id}")
     suspend fun updateInvoice(@Path("id") id: String, @Body input: InvoiceInput): SupplierInvoiceDto
 

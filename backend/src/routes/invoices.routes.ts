@@ -5,6 +5,8 @@ import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { applyCashDeduction } from "./cashRegister.routes";
+import { applyRestockToProduct } from "./products.routes";
+import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
 
 export const invoicesRouter = Router();
 
@@ -134,10 +136,11 @@ async function requireLinkedRestock(invoiceId: string, transactionId: string) {
 // invoice covers is the invoice's own record, so correcting the line
 // corrects the inventory with it - up or down.
 //
-// No cash moves either way, deliberately: stock on a supplier invoice was
-// never paid for from the till (the invoice's PENDING -> PAID lifecycle is
-// what moves the money), so there is nothing to refund when it shrinks and
-// nothing to charge when it grows.
+// The money follows only if the invoice has already been settled. On a
+// still-pending invoice nothing has left the till yet, so a line change
+// moves no cash. On a settled one - which is what a cash purchase is - the
+// total is recomputed and its till entry resized to match: shrinking a line
+// hands money back, growing one takes more.
 invoicesRouter.put(
   "/:id/inventory/:transactionId",
   asyncHandler(async (req, res) => {
@@ -159,22 +162,24 @@ invoicesRouter.put(
         where: { id: movement.productId },
         data: { quantity: { increment: delta } },
       });
-      return tx.inventoryTransaction.update({
+      const line = await tx.inventoryTransaction.update({
         where: { id: movement.id },
         data: {
           quantityChange: newQuantity,
           ...(input.unitCost !== undefined ? { unitCost: new Prisma.Decimal(input.unitCost) } : {}),
         },
       });
+      await syncInvoiceTotalFromLines(tx, req.params.id);
+      return line;
     });
 
     res.json(updated);
   })
 );
 
-// Removes a stock line from this invoice entirely, taking its units back
-// out of inventory. Same reasoning as the edit above: no cash moves, since
-// none was spent on it.
+// Removes a stock line entirely, taking its units back out of inventory and
+// off the invoice's total. Same money rule as the edit above: a settled
+// invoice hands the line's value back, a pending one has nothing to return.
 invoicesRouter.delete(
   "/:id/inventory/:transactionId",
   asyncHandler(async (req, res) => {
@@ -194,20 +199,102 @@ invoicesRouter.delete(
         data: { quantity: { decrement: movement.quantityChange } },
       });
       await tx.inventoryTransaction.delete({ where: { id: movement.id } });
+      await syncInvoiceTotalFromLines(tx, req.params.id);
     });
 
     res.status(204).send();
   })
 );
 
+const invoiceCreateInput = invoiceInput.extend({
+  // Optional so an invoice can still be recorded on its own; when lines are
+  // given they define both the stock and the invoice's total.
+  amount: z.number().positive().optional(),
+  // CASH settles the invoice immediately out of the till - that's what a
+  // cash purchase is here. DEFERRED leaves it pending until it's paid.
+  paymentMethod: z.enum(["CASH", "DEFERRED"]).optional().default("DEFERRED"),
+  lines: z
+    .array(
+      z.object({
+        productId: z.string(),
+        quantity: z.number().positive(),
+        unitCost: z.number().nonnegative(),
+      })
+    )
+    .optional(),
+});
+
+// Creating a purchase: the invoice is the document, and the stock it brought
+// in are its lines. The total is the sum of those lines rather than a figure
+// typed separately, so the paperwork can't disagree with the goods.
+//
+// paymentMethod decides where the money comes from: CASH settles it against
+// the till right away (refused, with nothing recorded, if the register can't
+// cover it), DEFERRED leaves it owed until it's marked paid.
 invoicesRouter.post(
   "/",
   asyncHandler(async (req, res) => {
-    const data = invoiceInput.parse(req.body);
-    const supplier = await prisma.supplier.findUnique({ where: { id: data.supplierId } });
+    const { lines, paymentMethod, amount, ...invoiceFields } = invoiceCreateInput.parse(req.body);
+
+    const supplier = await prisma.supplier.findUnique({ where: { id: invoiceFields.supplierId } });
     if (!supplier) throw new HttpError(404, "Supplier not found");
 
-    const invoice = await prisma.supplierInvoice.create({ data });
+    const hasLines = (lines?.length ?? 0) > 0;
+    if (!hasLines && amount === undefined) {
+      throw new HttpError(400, "An invoice needs either its stock lines or an amount");
+    }
+
+    const products = hasLines
+      ? await prisma.product.findMany({ where: { id: { in: lines!.map((l) => l.productId) } } })
+      : [];
+    if (hasLines && products.length !== new Set(lines!.map((l) => l.productId)).size) {
+      throw new HttpError(404, "One of the products on this invoice no longer exists");
+    }
+
+    const linesTotal = (lines ?? []).reduce(
+      (acc, l) => acc.add(new Prisma.Decimal(l.unitCost).mul(l.quantity)),
+      new Prisma.Decimal(0)
+    );
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      const created = await tx.supplierInvoice.create({
+        data: {
+          ...invoiceFields,
+          amount: hasLines ? linesTotal : new Prisma.Decimal(amount!),
+          amountFromLines: hasLines,
+          ...(paymentMethod === "CASH" ? { status: "PAID" as const, paidAt: new Date() } : {}),
+        },
+      });
+
+      for (const line of lines ?? []) {
+        const product = products.find((p) => p.id === line.productId)!;
+        const effectiveUnitCost = await applyRestockToProduct(tx, product, line.quantity, line.unitCost);
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: product.id,
+            type: "RESTOCK",
+            quantityChange: line.quantity,
+            unitCost: effectiveUnitCost,
+            supplierInvoiceId: created.id,
+          },
+        });
+      }
+
+      // Paid up front means the till covers it now; the same hard block as
+      // any other outflow applies, and failing it rolls back the whole
+      // invoice - no stock, no document, no half-recorded purchase.
+      if (paymentMethod === "CASH") {
+        await applyCashDeduction(
+          tx,
+          { invoiceId: created.id },
+          created.amount,
+          paymentNote(created.invoiceNumber, supplier.name)
+        );
+      }
+
+      return created;
+    });
+
     res.status(201).json(invoice);
   })
 );
@@ -222,6 +309,17 @@ invoicesRouter.put(
     const invoice = await prisma.$transaction(async (tx) => {
       const existing = await tx.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
       if (!existing) throw new HttpError(404, "Invoice not found");
+      // A line-managed invoice is worth what its stock came to. Letting an
+      // edit type a different figure over that would put the paperwork and
+      // the goods back out of step, which is the whole thing this flow
+      // exists to prevent - the way to change it is to change the lines.
+      if (
+        existing.amountFromLines &&
+        data.amount !== undefined &&
+        !existing.amount.equals(new Prisma.Decimal(data.amount))
+      ) {
+        throw new HttpError(400, "This invoice's total comes from the stock booked to it - change the stock instead");
+      }
       const updated = await tx.supplierInvoice.update({ where: { id: req.params.id }, data });
       if (updated.status !== "PAID") return updated;
 

@@ -359,4 +359,36 @@
     <string name="adjust_refund_notice">سيتم إرجاع %1$s إلى الخزينة.</string>
     <string name="invoice_line_new_quantity">الكمية الجديدة</string>
     <string name="invoice_delete_message">سيؤدي هذا أيضًا إلى إزالة المخزون الذي وردته هذه الفاتورة من مخزونك. لن تتم إعادة أي أموال مقابل هذا المخزون - فلم يُدفع ثمنه من الخزينة أصلًا.</string>
+    <!-- Supplier invoices: open vs settled shelves -->
+    <string name="invoices_filter_open">مفتوحة · %1$d</string>
+    <string name="invoices_filter_settled">مسددة · %1$d</string>
+    <string name="invoices_outstanding_label">المستحق عليك</string>
+    <string name="invoices_settled_total_label">إجمالي المسدد</string>
+    <string name="invoices_overdue_count">%1$d متأخرة</string>
+    <string name="invoices_empty_open">لا توجد مستحقات</string>
+    <string name="invoices_empty_open_hint">اضغط + لتسجيل عملية شراء. الفواتير التي سددتها موجودة في تبويب «مسددة».</string>
+    <string name="invoices_empty_settled">لا توجد فواتير مسددة بعد</string>
+    <string name="invoices_empty_settled_hint">تنتقل الفواتير إلى هنا بعد سدادها، ويظل المخزون الذي وردته مرتبطًا بها.</string>
+    <string name="invoice_paid_on">تم السداد</string>
+    <string name="invoice_total_from_stock_badge">الإجمالي من مخزونها</string>
+    <!-- Recording a purchase -->
+    <string name="invoice_purchase_title">تسجيل عملية شراء</string>
+    <string name="invoice_payment_label">كيف تم الدفع؟</string>
+    <string name="invoice_payment_cash">نقدًا الآن</string>
+    <string name="invoice_payment_deferred">آجل</string>
+    <string name="invoice_payment_cash_hint">سيُخصم الإجمالي من الخزينة فور الحفظ.</string>
+    <string name="invoice_payment_deferred_hint">لن يخرج أي مبلغ من الخزينة حتى تحدد الفاتورة كمسددة.</string>
+    <string name="invoice_lines_title">المنتجات في هذه الفاتورة</string>
+    <string name="invoice_no_lines">لم تُضف منتجات بعد. إجمالي الفاتورة هو مجموع ما تدرجه هنا.</string>
+    <string name="invoice_line_add">إضافة إلى الفاتورة</string>
+    <string name="invoice_total_from_lines">إجمالي الفاتورة: %1$s</string>
+    <string name="invoice_amount_manual">الإجمالي (لفاتورة ليست مخزونًا)</string>
+    <string name="invoice_needs_supplier">اختر المورد أولًا.</string>
+    <string name="invoice_needs_lines_or_amount">أضف منتجًا واحدًا على الأقل، أو اكتب إجماليًا لفاتورة ليست مخزونًا.</string>
+    <string name="invoice_needs_due_date">اختر تاريخ الاستحقاق.</string>
+    <string name="invoice_amount_locked_note">هذا الإجمالي هو مجموع المخزون المرتبط بهذه الفاتورة. لتغييره استخدم «المخزون المرتبط».</string>
+    <string name="invoice_lines_drive_total">إجمالي الفاتورة يتبع هذه البنود، لذا فتعديل أي بند يغيّره.</string>
+    <string name="invoice_lines_drive_cash">هذه الفاتورة مسددة، لذا فتعديل أي بند يغيّر الإجمالي ويعيد الفرق إلى الخزينة أو يخصمه منها.</string>
+    <string name="invoice_delete_message_paid">سيؤدي هذا إلى إزالة المخزون الذي وردته هذه الفاتورة من مخزونك، وإعادة ما خُصم من الخزينة إليها.</string>
+    <string name="restock_financing_invoice_only">يصل المخزون على فاتورة مورد. لتسجيل مخزون مشترى نقدًا، استخدم «أخرى ← فواتير الموردين».</string>
 </resources>
