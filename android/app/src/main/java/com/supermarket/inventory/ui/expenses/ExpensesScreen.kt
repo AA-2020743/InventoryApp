@@ -63,6 +63,11 @@ import java.time.Instant
 import javax.inject.Inject
 import androidx.compose.material.icons.filled.Payments
 import com.supermarket.inventory.ui.common.EmptyState
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 data class ExpensesUiState(
     val isLoading: Boolean = true,
@@ -111,7 +116,7 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
 // "pay from register?" choice or recurrence to configure anymore, just
 // what was spent and when. If the register can't cover it in full, the
 // server records the shortfall as deficitAmount, surfaced here as a badge.
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
@@ -137,12 +142,21 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(start = 12.dp, top = 12.dp),
                     )
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    // Wraps onto further lines instead of running off the
+                    // side, so every name is reachable without swiping. The
+                    // height cap keeps a long list of names from pushing the
+                    // expenses themselves off the screen - past that it
+                    // scrolls within its own band.
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 148.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        items(state.names, key = { it }) { name ->
+                        state.names.forEach { name ->
                             AssistChip(
                                 onClick = { prefilledName = name; addError = null; showAddDialog = true },
                                 label = { Text(name) },

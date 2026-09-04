@@ -61,6 +61,11 @@ import java.time.Instant
 import javax.inject.Inject
 import androidx.compose.material.icons.filled.Savings
 import com.supermarket.inventory.ui.common.EmptyState
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 data class OtherSalesUiState(
     val isLoading: Boolean = true,
@@ -107,7 +112,7 @@ class OtherSalesViewModel @Inject constructor(private val repository: OtherSaleR
 // fee, a one-off arrangement, etc.) - always credits the cash register in
 // full immediately, and feeds the day/month's revenue and profit on the
 // dashboard the same way a sale's revenue does.
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
     val state = viewModel.uiState
@@ -130,12 +135,19 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 12.dp, top = 12.dp),
                 )
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                // Wraps rather than scrolling sideways, same as the expense
+                // chips, with a height cap so a long list can't crowd out
+                // the entries below.
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 148.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    items(state.categories, key = { it }) { category ->
+                    state.categories.forEach { category ->
                         AssistChip(
                             onClick = { prefilledCategory = category; showAddDialog = true },
                             label = { Text(category) },
