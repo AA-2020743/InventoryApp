@@ -397,5 +397,9 @@
     <string name="product_quick_add_hint">It starts with no stock — the line you are adding is what puts the first units on the shelf, at the price this invoice charged.</string>
     <string name="product_quick_add_needs_name">Give the product a name.</string>
     <string name="product_quick_add_needs_price">Enter what it sells for.</string>
-    <string name="product_quick_add_needs_barcode">A product without a barcode is identified by its photo, so add that one from Inventory instead.</string>
+    <string name="product_quick_add_needs_barcode">Give it a barcode, or a photo if there is nothing printed on it — that is how the till recognises it.</string>
+    <string name="product_quick_add_photo">Add photo</string>
+    <string name="invoice_now_empty">This invoice covers nothing now, so it is worth 0.00.</string>
+    <string name="invoice_delete_empty">Delete this invoice</string>
+    <string name="purchase_history_revaluation">Cost set to %1$s</string>
 </resources>

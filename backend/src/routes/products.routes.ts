@@ -223,6 +223,21 @@ productsRouter.post(
         },
       });
 
+      // Opening valuation: the cost typed on the form, put into the movement
+      // log rather than living only on the product. Zero units, so it moves
+      // no stock - it only states what this product's stock is worth to
+      // begin with, which is what a correction falls back to once every
+      // delivery it ever had has been undone.
+      await tx.inventoryTransaction.create({
+        data: {
+          productId: created.id,
+          type: "RESTOCK",
+          quantityChange: 0,
+          unitCost: created.purchaseCost,
+          note: "Opening cost",
+        },
+      });
+
       if (created.quantity.gt(0)) {
         const cost = created.purchaseCost.mul(created.quantity);
         const resolved = await resolveRestockFinancing(tx, data, cost);
@@ -256,18 +271,49 @@ productsRouter.put(
     const data = productInput.partial().parse(req.body);
     // financing/supplierInvoiceId/newInvoice only make sense for initial
     // stock at creation time - editing a product's own fields never
-    // touches quantity or how it was paid for, so strip them here rather
-    // than passing them into Product.update (not real Product columns).
-    const { financing: _financing, supplierInvoiceId: _supplierInvoiceId, newInvoice: _newInvoice, ...productFields } = data;
+    // touches how it was paid for, so strip them here rather than passing
+    // them into Product.update (not real Product columns).
+    //
+    // quantity is stripped for a different reason: stock only ever moves
+    // through restock/adjust/sale, each of which writes a movement row.
+    // Letting an edit set it directly would put stock on the shelf that
+    // the log can't account for, and the log is what a correction replays.
+    const {
+      financing: _financing,
+      supplierInvoiceId: _supplierInvoiceId,
+      newInvoice: _newInvoice,
+      quantity: _quantity,
+      ...productFields
+    } = data;
     const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new HttpError(404, "Product not found");
 
-    const product = await prisma.product.update({
-      where: { id: req.params.id },
-      data: {
-        ...productFields,
-        barcode: productFields.barcode === undefined ? undefined : productFields.barcode ?? null,
-      },
+    const product = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: { id: req.params.id },
+        data: {
+          ...productFields,
+          barcode: productFields.barcode === undefined ? undefined : productFields.barcode ?? null,
+        },
+      });
+
+      // A cost set by hand overrides what the deliveries average out to, so
+      // it goes into the log as a revaluation. Without that, the next
+      // correction on this product would replay the deliveries straight
+      // over the figure the owner just typed.
+      if (!existing.purchaseCost.equals(updated.purchaseCost)) {
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: updated.id,
+            type: "RESTOCK",
+            quantityChange: 0,
+            unitCost: updated.purchaseCost,
+            note: "Cost corrected by hand",
+          },
+        });
+      }
+
+      return updated;
     });
     res.json(product);
   })

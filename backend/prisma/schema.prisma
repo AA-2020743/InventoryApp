@@ -81,10 +81,11 @@ model InventoryTransaction {
   note           String?
   supplierInvoiceId String?
   supplierInvoice   SupplierInvoice?      @relation(fields: [supplierInvoiceId], references: [id])
-  // RESTOCK only, and only when not linked to a supplierInvoice above (that
-  // invoice's own PENDING/PAID lifecycle already governs the cash side) -
-  // set when paying for this stock couldn't be fully covered by the cash
-  // register. Same always-deduct mechanism as Expense/SupplierInvoice.
+  // Historical only. Cash outflows are hard-blocked now: applyCashDeduction
+  // refuses anything the register can't cover in full rather than deducting
+  // what it can and recording the gap, so nothing writes a non-zero value
+  // here any more. Rows carrying one predate that change and are still
+  // shown, which is why the column stays.
   deficitAmount  Decimal                  @default(0) @db.Decimal(12, 2)
   createdAt      DateTime                 @default(now())
 
@@ -116,9 +117,11 @@ model SupplierInvoice {
   dueDate       DateTime
   status        InvoiceStatus @default(PENDING)
   paidAt        DateTime?
-  // Set when marking this invoice paid couldn't fully cover it from the
-  // cash register - mirrors Expense.deficitAmount, same always-deduct
-  // mechanism (see applyCashDeduction).
+  // Historical only. Cash outflows are hard-blocked now: applyCashDeduction
+  // refuses anything the register can't cover in full rather than deducting
+  // what it can and recording the gap, so nothing writes a non-zero value
+  // here any more. Rows carrying one predate that change and are still
+  // shown, which is why the column stays.
   deficitAmount Decimal       @default(0) @db.Decimal(12, 2)
   // True for invoices whose amount is derived from the stock lines booked
   // against them - the purchase-document flow, where the total is the sum
@@ -187,10 +190,10 @@ model SaleItem {
 }
 
 // A one-off operating cost (rent, salaries, supplies, etc.), always paid
-// out of the cash register immediately: if the register doesn't have
-// enough cash on hand, only what's available is deducted and the shortfall
-// is recorded as deficitAmount rather than ever letting the register go
-// negative. See applyExpenseCashDeduction in expenses.routes.ts.
+// out of the cash register immediately. An expense the register can't cover
+// in full is refused outright rather than part-paid; deficitAmount below is
+// a historical column from when a shortfall was recorded instead of
+// refused. See applyCashDeduction in cashRegister.routes.ts.
 model Expense {
   id            String   @id @default(uuid())
   name          String
@@ -272,9 +275,11 @@ model Debt {
   // exactly when status flips to REPAID.
   amountRepaid Decimal    @default(0) @db.Decimal(12, 2)
   status       DebtStatus @default(OUTSTANDING)
-  // Set once at creation if the till couldn't fully cover disbursing this
-  // debt - same always-deduct + deficit-on-shortfall mechanism as Expense/
-  // SupplierInvoice/restock. Never touched by repayments afterward.
+  // Historical only. Cash outflows are hard-blocked now: applyCashDeduction
+  // refuses anything the register can't cover in full rather than deducting
+  // what it can and recording the gap, so nothing writes a non-zero value
+  // here any more. Rows carrying one predate that change and are still
+  // shown, which is why the column stays.
   deficitAmount Decimal   @default(0) @db.Decimal(12, 2)
   notes        String?
   repaidAt     DateTime?

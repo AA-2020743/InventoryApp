@@ -474,6 +474,28 @@ private fun PurchaseHistoryDialog(
                             )
                             return@forEach
                         }
+                        // A restock of zero units is a revaluation, not a
+                        // delivery: what the product was said to be worth,
+                        // either when it was created or when the cost was
+                        // corrected by hand. Nothing was bought, so there is
+                        // no payment to correct.
+                        if ((txn.quantityChange.toDoubleOrNull() ?: 0.0) == 0.0) {
+                            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                                Text(
+                                    stringResource(
+                                        R.string.purchase_history_revaluation,
+                                        formatAmount(txn.unitCost ?: "0"),
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    formatIsoDate(txn.createdAt),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            return@forEach
+                        }
                         val onInvoice = txn.supplierInvoiceId != null
                         val financingLabel = if (onInvoice) {
                             val inv = txn.supplierInvoice

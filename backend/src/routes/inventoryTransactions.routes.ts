@@ -5,6 +5,7 @@ import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { applyCashDeduction } from "./cashRegister.routes";
 import { newInvoiceForRestockSchema, resolveRestockFinancing } from "./products.routes";
+import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
 
 export const inventoryTransactionsRouter = Router();
 
@@ -45,6 +46,11 @@ inventoryTransactionsRouter.post(
     if (existing.type !== "RESTOCK") {
       throw new HttpError(400, "Only a restock has a cash-or-invoice side to correct");
     }
+    // A zero-unit restock is a revaluation, not a delivery - it brought no
+    // goods and cost nothing, so there is no payment to move.
+    if (existing.quantityChange.lte(0)) {
+      throw new HttpError(400, "That entry is a cost correction, not a delivery, so it has nothing to pay for");
+    }
 
     const previousFinancing = existing.supplierInvoiceId ? "DEFERRED" : "CASH";
     const previousInvoiceId = existing.supplierInvoiceId;
@@ -72,6 +78,9 @@ inventoryTransactionsRouter.post(
           where: { id: existing.id },
           data: { supplierInvoiceId: null, deficitAmount: 0 },
         });
+        // The invoice it just left is worth the sum of the lines it still
+        // has, which is one line fewer than a moment ago.
+        if (previousInvoiceId) await syncInvoiceTotalFromLines(tx, previousInvoiceId);
         // Throws (rolling the correction back) if the till can't cover it.
         await applyCashDeduction(
           tx,
@@ -86,10 +95,25 @@ inventoryTransactionsRouter.post(
       // restock to the invoice that really covers it.
       await tx.cashRegisterEntry.deleteMany({ where: { inventoryTransactionId: existing.id } });
       const resolved = await resolveRestockFinancing(tx, input, cost);
-      return tx.inventoryTransaction.update({
+      const txn = await tx.inventoryTransaction.update({
         where: { id: existing.id },
         data: { supplierInvoiceId: resolved.supplierInvoiceId, deficitAmount: 0 },
       });
+
+      // Both invoices have to be re-totalled: the one losing the line and
+      // the one gaining it. Without this the stock could land on a settled
+      // cash invoice - whose total and payment resize to its lines - while
+      // the till kept the refund above, leaving the goods paid for by
+      // nobody. On a settled invoice the sync charges the difference and is
+      // refused outright, rolling the whole correction back, if the
+      // register can't cover it.
+      if (previousInvoiceId && previousInvoiceId !== resolved.supplierInvoiceId) {
+        await syncInvoiceTotalFromLines(tx, previousInvoiceId);
+      }
+      if (resolved.supplierInvoiceId) {
+        await syncInvoiceTotalFromLines(tx, resolved.supplierInvoiceId);
+      }
+      return txn;
     });
 
     // Moving the last restock off a pending invoice leaves that invoice

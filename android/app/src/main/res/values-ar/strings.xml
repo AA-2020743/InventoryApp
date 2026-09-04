@@ -397,5 +397,9 @@
     <string name="product_quick_add_hint">يبدأ بدون مخزون — البند الذي تضيفه هو ما يضع أول وحدات على الرف، بالسعر الذي حاسبتك عليه هذه الفاتورة.</string>
     <string name="product_quick_add_needs_name">اكتب اسم المنتج.</string>
     <string name="product_quick_add_needs_price">اكتب سعر البيع.</string>
-    <string name="product_quick_add_needs_barcode">المنتج بدون باركود يُعرَّف بصورته، لذا أضفه من تبويب المخزون بدلًا من هنا.</string>
+    <string name="product_quick_add_needs_barcode">أضف باركود، أو صورة إن لم يكن عليه باركود مطبوع — فبها يتعرف عليه نظام البيع.</string>
+    <string name="product_quick_add_photo">إضافة صورة</string>
+    <string name="invoice_now_empty">هذه الفاتورة لم تعد تغطي شيئًا، لذا قيمتها 0.00.</string>
+    <string name="invoice_delete_empty">حذف هذه الفاتورة</string>
+    <string name="purchase_history_revaluation">تم ضبط التكلفة على %1$s</string>
 </resources>

@@ -114,8 +114,9 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
 
 // Expenses always pay out of the cash register immediately - there's no
 // "pay from register?" choice or recurrence to configure anymore, just
-// what was spent and when. If the register can't cover it in full, the
-// server records the shortfall as deficitAmount, surfaced here as a badge.
+// what was spent and when. One the register can't cover in full is refused
+// outright; the deficit badge below only ever shows on rows recorded before
+// that hard block existed, back when a shortfall was carried instead.
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {

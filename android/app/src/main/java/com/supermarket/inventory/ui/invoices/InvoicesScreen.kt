@@ -288,6 +288,11 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
             viewModel = viewModel,
             invoice = current,
             onDismiss = { linkedStockInvoice = null; viewModel.closeLinkedInventory() },
+            onDeleteEmpty = {
+                linkedStockInvoice = null
+                viewModel.closeLinkedInventory()
+                invoiceToDelete = current
+            },
         )
     }
 
@@ -374,6 +379,7 @@ private fun LinkedStockDialog(
     viewModel: InvoicesViewModel,
     invoice: SupplierInvoiceDto,
     onDismiss: () -> Unit,
+    onDeleteEmpty: () -> Unit,
 ) {
     val state = viewModel.uiState
     val scope = rememberCoroutineScope()
@@ -449,10 +455,30 @@ private fun LinkedStockDialog(
                         state.linkedInventoryError,
                         color = MaterialTheme.colorScheme.error,
                     )
-                    linked == null || linked.items.isEmpty() -> Text(
-                        stringResource(R.string.invoice_no_linked_stock),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    linked == null || linked.items.isEmpty() -> {
+                        Text(
+                            stringResource(R.string.invoice_no_linked_stock),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        // A line-managed invoice with nothing left on it is
+                        // worth zero and covers nothing - the paperwork for
+                        // a purchase that has been corrected away entirely.
+                        // It may still be a document worth keeping, so this
+                        // offers rather than tidies it away.
+                        if (invoice.amountFromLines) {
+                            Text(
+                                stringResource(R.string.invoice_now_empty),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = warningColor(),
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            TextButton(onClick = onDeleteEmpty) {
+                                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(stringResource(R.string.invoice_delete_empty))
+                            }
+                        }
+                    }
                     else -> linked.items.forEach { line ->
                         val qty = line.quantityChange.toDoubleOrNull() ?: 0.0
                         val cost = line.unitCost?.toDoubleOrNull() ?: 0.0
@@ -759,10 +785,10 @@ private fun PurchaseInvoiceDialog(
     var suppliers by remember { mutableStateOf<List<SupplierDto>>(emptyList()) }
     var selectedSupplier by remember { mutableStateOf<SupplierDto?>(null) }
     var expanded by remember { mutableStateOf(false) }
-    // Deferred stays the default: this dialog has always meant "an invoice I
-    // owe", and cash is money actually leaving the till, so it's a choice
-    // that has to be made deliberately.
-    var paymentMethod by remember { mutableStateOf(PAYMENT_DEFERRED) }
+    // Cash is the default: this is now the only way to record stock bought
+    // with cash, which is the common counter transaction, and the hint under
+    // the switch says plainly that the till is about to be drawn on.
+    var paymentMethod by remember { mutableStateOf(PAYMENT_CASH) }
     var lines by remember { mutableStateOf<List<PurchaseLine>>(emptyList()) }
     var invoiceNumber by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
@@ -1135,14 +1161,15 @@ private fun PurchaseInvoiceDialog(
 
     if (showQuickAddProduct) {
         QuickAddProductDialog(
+            viewModel = viewModel,
             // Seeded from what's already been typed into the line, so a
             // name half-entered in the picker isn't thrown away.
             initialName = if (selectedProduct == null) productQuery else "",
             initialPurchaseCost = unitCost,
             onDismiss = { showQuickAddProduct = false },
-            onSave = { name, barcode, sellingPrice, purchaseCost, onFailure ->
+            onSave = { name, barcode, sellingPrice, purchaseCost, productImage, onFailure ->
                 scope.launch {
-                    when (val result = viewModel.createProduct(name, barcode, sellingPrice, purchaseCost)) {
+                    when (val result = viewModel.createProduct(name, barcode, sellingPrice, purchaseCost, productImage)) {
                         is ApiResult.Success -> {
                             // Drop it straight into the line being typed:
                             // the only reason to create it here was to put
@@ -1161,27 +1188,51 @@ private fun PurchaseInvoiceDialog(
 }
 
 // Creating a product from inside a purchase, for something the shop has
-// never carried. Deliberately the short version - name, barcode, what it
-// sells for - because it starts with no stock: the invoice line being typed
-// is what puts the first units on the shelf, and at the price the invoice
+// never carried. Deliberately the short version - what it is, what it sells
+// for - because it starts with no stock: the invoice line being typed is
+// what puts the first units on the shelf, and at the price the invoice
 // charged.
+//
+// A product is identified either by its barcode or, for loose goods with
+// nothing printed on them, by a photo. Both are offered here so neither
+// kind of product has to be entered somewhere else.
 @Composable
 private fun QuickAddProductDialog(
+    viewModel: InvoicesViewModel,
     initialName: String,
     initialPurchaseCost: String,
     onDismiss: () -> Unit,
-    onSave: (String, String?, Double, Double, (String) -> Unit) -> Unit,
+    onSave: (String, String?, Double, Double, String?, (String) -> Unit) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var barcode by remember { mutableStateOf("") }
     var sellingPrice by remember { mutableStateOf("") }
     var purchaseCost by remember { mutableStateOf(initialPurchaseCost) }
+    var productImage by remember { mutableStateOf<String?>(null) }
+    var isUploadingImage by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val nameRequired = stringResource(R.string.product_quick_add_needs_name)
     val priceRequired = stringResource(R.string.product_quick_add_needs_price)
     val barcodeRequired = stringResource(R.string.product_quick_add_needs_barcode)
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            val file = copyUriToCacheFile(context, uri)
+            if (file != null) {
+                isUploadingImage = true
+                scope.launch {
+                    when (val result = viewModel.uploadImage(file)) {
+                        is ApiResult.Success -> { productImage = result.data.url; isUploadingImage = false }
+                        is ApiResult.Error -> { error = result.message; isUploadingImage = false }
+                    }
+                }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1207,6 +1258,31 @@ private fun QuickAddProductDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
+                // The alternative to a barcode, for loose goods: a photo is
+                // how the till screen recognises them.
+                Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val currentImage = productImage
+                    if (currentImage != null) {
+                        AsyncImage(
+                            model = viewModel.fullImageUrl(currentImage),
+                            contentDescription = stringResource(R.string.product_quick_add_photo),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = { productImage = null }) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.invoice_remove_attachment))
+                        }
+                    } else if (isUploadingImage) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
+                        OutlinedButton(onClick = { imagePicker.launch("image/*") }) {
+                            Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.product_quick_add_photo))
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = purchaseCost,
                     onValueChange = { purchaseCost = it },
@@ -1236,14 +1312,19 @@ private fun QuickAddProductDialog(
                     when {
                         name.isBlank() -> error = nameRequired
                         price == null || price < 0 -> error = priceRequired
-                        // A product with no barcode is identified by its
-                        // photo instead, and there's nowhere to take one
-                        // from here - that one belongs on the full form.
-                        barcode.isBlank() -> error = barcodeRequired
+                        // One or the other has to identify it: a scan at the
+                        // till, or a picture to tap.
+                        barcode.isBlank() && productImage == null -> error = barcodeRequired
                         else -> {
                             isSaving = true
                             error = null
-                            onSave(name.trim(), barcode.trim(), price, purchaseCost.toDoubleOrNull() ?: 0.0) { failure ->
+                            onSave(
+                                name.trim(),
+                                barcode.trim().ifBlank { null },
+                                price,
+                                purchaseCost.toDoubleOrNull() ?: 0.0,
+                                productImage,
+                            ) { failure ->
                                 isSaving = false
                                 error = failure
                             }

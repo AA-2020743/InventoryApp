@@ -166,12 +166,13 @@ class InvoicesViewModel @Inject constructor(
         barcode: String?,
         sellingPrice: Double,
         purchaseCost: Double,
+        imageUrl: String?,
     ): ApiResult<ProductDto> {
         val result = productRepository.create(
             ProductInput(
                 barcode = barcode,
                 name = name,
-                imageUrl = null,
+                imageUrl = imageUrl,
                 category = null,
                 unit = "pcs",
                 unitsPerPackage = 1.0,
