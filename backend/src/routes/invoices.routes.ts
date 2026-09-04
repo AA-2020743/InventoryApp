@@ -296,15 +296,63 @@ invoicesRouter.post(
   })
 );
 
+// Deleting an invoice takes the stock it brought in with it. The invoice is
+// the only way that stock entered, so an invoice that shouldn't exist means
+// its deliveries shouldn't either - leaving them behind would inflate the
+// inventory with goods no record accounts for.
+//
+// Removing that stock credits nothing to the till: it was never paid for
+// from there, so there is no purchase value to hand back. (The invoice's
+// own payment entry is still removed, as before - if the invoice was paid,
+// that money did leave the till and returns with the invoice.)
 invoicesRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    await prisma.$transaction(async (tx) => {
-      const existing = await tx.supplierInvoice.findUnique({ where: { id: req.params.id } });
-      if (!existing) throw new HttpError(404, "Invoice not found");
-      await tx.cashRegisterEntry.deleteMany({ where: { invoiceId: existing.id } });
-      await tx.supplierInvoice.delete({ where: { id: req.params.id } });
+    const existing = await prisma.supplierInvoice.findUnique({
+      where: { id: req.params.id },
+      include: { inventoryTransactions: { include: { product: true } } },
     });
+    if (!existing) throw new HttpError(404, "Invoice not found");
+
+    // Several lines can point at the same product, so the check has to be
+    // against each product's total across the invoice, not line by line.
+    const removalByProduct = new Map<string, { name: string; onHand: Prisma.Decimal; removing: Prisma.Decimal }>();
+    for (const line of existing.inventoryTransactions) {
+      const entry = removalByProduct.get(line.productId) ?? {
+        name: line.product.name,
+        onHand: line.product.quantity,
+        removing: new Prisma.Decimal(0),
+      };
+      entry.removing = entry.removing.add(line.quantityChange);
+      removalByProduct.set(line.productId, entry);
+    }
+    for (const { name, onHand, removing } of removalByProduct.values()) {
+      if (removing.gt(onHand)) {
+        throw new HttpError(
+          400,
+          `Deleting this invoice would leave ${name} at negative stock - some of what it delivered has already been sold.`
+        );
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const line of existing.inventoryTransactions) {
+        await tx.product.update({
+          where: { id: line.productId },
+          data: { quantity: { decrement: line.quantityChange } },
+        });
+      }
+      const lineIds = existing.inventoryTransactions.map((line) => line.id);
+      if (lineIds.length > 0) {
+        // Defensive: a line on an invoice shouldn't carry a till entry, but
+        // one re-financed to cash and back could have left one behind.
+        await tx.cashRegisterEntry.deleteMany({ where: { inventoryTransactionId: { in: lineIds } } });
+        await tx.inventoryTransaction.deleteMany({ where: { id: { in: lineIds } } });
+      }
+      await tx.cashRegisterEntry.deleteMany({ where: { invoiceId: existing.id } });
+      await tx.supplierInvoice.delete({ where: { id: existing.id } });
+    });
+
     res.status(204).send();
   })
 );

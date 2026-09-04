@@ -358,4 +358,5 @@
     <string name="cash_register_remove_entry_message">سيعود الرصيد إلى ما كان عليه قبل حركة %1$s هذه.</string>
     <string name="adjust_refund_notice">سيتم إرجاع %1$s إلى الخزينة.</string>
     <string name="invoice_line_new_quantity">الكمية الجديدة</string>
+    <string name="invoice_delete_message">سيؤدي هذا أيضًا إلى إزالة المخزون الذي وردته هذه الفاتورة من مخزونك. لن تتم إعادة أي أموال مقابل هذا المخزون - فلم يُدفع ثمنه من الخزينة أصلًا.</string>
 </resources>

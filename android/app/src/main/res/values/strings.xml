@@ -358,4 +358,5 @@
     <string name="cash_register_remove_entry_message">The balance goes back to what it was before this %1$s entry.</string>
     <string name="adjust_refund_notice">%1$s will be returned to the cash register.</string>
     <string name="invoice_line_new_quantity">New quantity</string>
+    <string name="invoice_delete_message">This also removes the stock this invoice delivered from your inventory. No money is returned for that stock - it was never paid for from the cash register.</string>
 </resources>

@@ -205,7 +205,9 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
         AlertDialog(
             onDismissRequest = { invoiceToDelete = null },
             title = { Text(stringResource(R.string.confirm_delete_named_title, invoice.supplier?.name ?: invoice.supplierId)) },
-            text = { Text(stringResource(R.string.confirm_delete_message)) },
+            // Deleting the invoice takes its deliveries out of stock too, so
+            // say so here rather than letting the inventory drop unannounced.
+            text = { Text(stringResource(R.string.invoice_delete_message)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteInvoice(invoice.id); invoiceToDelete = null }) {
                     Text(stringResource(R.string.action_delete))
