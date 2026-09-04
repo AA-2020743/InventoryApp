@@ -79,6 +79,22 @@ class InvoicesViewModel @Inject constructor(
         }
     }
 
+    // Corrects a stock line on this invoice: `quantity` is the line's new
+    // total. Inventory follows the change; the till is untouched, since
+    // invoiced stock was never paid for from it. Returns null on success.
+    suspend fun updateLinkedStock(invoiceId: String, transactionId: String, quantity: Double): String? =
+        when (val result = invoiceRepository.updateStockLine(invoiceId, transactionId, quantity)) {
+            is ApiResult.Success -> { openLinkedInventory(invoiceId); load(); null }
+            is ApiResult.Error -> result.message
+        }
+
+    // Takes the line off the invoice and its units back out of inventory.
+    suspend fun removeLinkedStock(invoiceId: String, transactionId: String): String? =
+        when (val result = invoiceRepository.deleteStockLine(invoiceId, transactionId)) {
+            is ApiResult.Success -> { openLinkedInventory(invoiceId); load(); null }
+            is ApiResult.Error -> result.message
+        }
+
     fun dismissError() {
         uiState = uiState.copy(error = null)
     }

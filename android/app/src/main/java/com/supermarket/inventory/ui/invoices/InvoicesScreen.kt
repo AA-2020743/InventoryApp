@@ -272,6 +272,12 @@ private fun LinkedStockDialog(
     var unitCost by remember { mutableStateOf("") }
     var addError by remember { mutableStateOf<String?>(null) }
     var isAdding by remember { mutableStateOf(false) }
+    // Which existing line has its quantity editor open, and the value being
+    // typed into it.
+    var editingLineId by remember { mutableStateOf<String?>(null) }
+    var editedQuantity by remember { mutableStateOf("") }
+    var lineError by remember { mutableStateOf<String?>(null) }
+    var lineBusy by remember { mutableStateOf(false) }
 
     val matches = state.products.filter {
         productQuery.isBlank() || it.name.contains(productQuery, ignoreCase = true) ||
@@ -326,25 +332,90 @@ private fun LinkedStockDialog(
                     else -> linked.items.forEach { line ->
                         val qty = line.quantityChange.toDoubleOrNull() ?: 0.0
                         val cost = line.unitCost?.toDoubleOrNull() ?: 0.0
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(line.product?.name ?: line.productId, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    stringResource(
-                                        R.string.invoice_linked_line_detail,
-                                        formatQuantity(line.quantityChange),
-                                        formatAmount(line.unitCost ?: "0"),
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(line.product?.name ?: line.productId, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        stringResource(
+                                            R.string.invoice_linked_line_detail,
+                                            formatQuantity(line.quantityChange),
+                                            formatAmount(line.unitCost ?: "0"),
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(formatAmount((qty * cost).toString()), style = MaterialTheme.typography.bodyMedium)
+                                IconButton(onClick = {
+                                    lineError = null
+                                    if (editingLineId == line.id) {
+                                        editingLineId = null
+                                    } else {
+                                        editingLineId = line.id
+                                        editedQuantity = formatQuantity(line.quantityChange)
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                                }
+                                IconButton(enabled = !lineBusy, onClick = {
+                                    lineBusy = true
+                                    lineError = null
+                                    scope.launch {
+                                        lineError = viewModel.removeLinkedStock(invoice.id, line.id)
+                                        lineBusy = false
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
+                                }
                             }
-                            Text(formatAmount((qty * cost).toString()), style = MaterialTheme.typography.bodyMedium)
+                            // Correcting the line here corrects the stock it
+                            // brought in, without touching the till - this
+                            // stock was never paid for from it.
+                            if (editingLineId == line.id) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    OutlinedTextField(
+                                        value = editedQuantity,
+                                        onValueChange = { editedQuantity = it },
+                                        label = { Text(stringResource(R.string.invoice_line_new_quantity)) },
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    TextButton(
+                                        enabled = !lineBusy,
+                                        onClick = {
+                                            val newQty = editedQuantity.toDoubleOrNull()
+                                            if (newQty == null || newQty <= 0) return@TextButton
+                                            lineBusy = true
+                                            lineError = null
+                                            scope.launch {
+                                                val failure = viewModel.updateLinkedStock(invoice.id, line.id, newQty)
+                                                lineBusy = false
+                                                if (failure == null) editingLineId = null else lineError = failure
+                                            }
+                                        },
+                                    ) { Text(stringResource(R.string.action_save)) }
+                                }
+                            }
                         }
                     }
+                }
+
+                lineError?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
 
                 Spacer(Modifier.height(12.dp))

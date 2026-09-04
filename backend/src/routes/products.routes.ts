@@ -332,20 +332,44 @@ productsRouter.post(
       throw new HttpError(400, "Adjustment would result in negative stock");
     }
 
-    const [updated] = await prisma.$transaction([
-      prisma.product.update({
+    // Stock entered here was paid for out of the till (the inventory screen
+    // is the cash-financed path - deferred stock arrives through a supplier
+    // invoice instead), so taking stock back out returns what it cost. That
+    // makes an over-entered delivery correctable: reduce the stock and the
+    // money comes back, exactly reversing the restock that spent it.
+    //
+    // Priced at the product's current purchase cost, which is the blended
+    // weighted average - the same figure the stock is valued at, so removing
+    // it leaves inventory value and cash consistent with each other.
+    const refund = quantityChange < 0 ? product.purchaseCost.mul(Math.abs(quantityChange)) : null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedProduct = await tx.product.update({
         where: { id: product.id },
         data: { quantity: { increment: quantityChange } },
-      }),
-      prisma.inventoryTransaction.create({
+      });
+      const movement = await tx.inventoryTransaction.create({
         data: {
           productId: product.id,
           type: "ADJUSTMENT",
           quantityChange,
+          // Recorded so the refund below is priced from the same figure the
+          // stock left at, rather than whatever the cost blends to later.
+          unitCost: quantityChange < 0 ? product.purchaseCost : null,
           note,
         },
-      }),
-    ]);
+      });
+      if (refund && refund.gt(0)) {
+        await tx.cashRegisterEntry.create({
+          data: {
+            amount: refund,
+            note: `Stock removed: ${product.name}`,
+            inventoryTransactionId: movement.id,
+          },
+        });
+      }
+      return updatedProduct;
+    });
 
     res.json(updated);
   })

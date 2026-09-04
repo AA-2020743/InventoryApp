@@ -57,6 +57,15 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
     suspend fun getInventory(id: String): ApiResult<InvoiceInventoryResponse> =
         apiCall { api.getInvoiceInventory(id) }
 
+    // Changes how much stock a line on this invoice brought in - the new
+    // total for the line, not a delta. Inventory follows; cash does not.
+    suspend fun updateStockLine(invoiceId: String, transactionId: String, quantity: Double, unitCost: Double? = null): ApiResult<InventoryTransactionDto> =
+        apiCall { api.updateInvoiceStockLine(invoiceId, transactionId, LinkedStockInput(quantity, unitCost)) }
+
+    // Takes a stock line off the invoice, removing its units from inventory.
+    suspend fun deleteStockLine(invoiceId: String, transactionId: String): ApiResult<Unit> =
+        apiCall { api.deleteInvoiceStockLine(invoiceId, transactionId) }
+
     suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id) }
 

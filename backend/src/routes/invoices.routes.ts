@@ -105,6 +105,101 @@ invoicesRouter.get(
   })
 );
 
+const linkedStockInput = z.object({
+  quantity: z.number().positive(),
+  unitCost: z.number().nonnegative().optional(),
+});
+
+// Loads a restock that is actually booked against this invoice, refusing
+// anything that belongs elsewhere so an id from another invoice can't be
+// edited through this one.
+async function requireLinkedRestock(invoiceId: string, transactionId: string) {
+  const invoice = await prisma.supplierInvoice.findUnique({ where: { id: invoiceId } });
+  if (!invoice) throw new HttpError(404, "Invoice not found");
+
+  const movement = await prisma.inventoryTransaction.findUnique({
+    where: { id: transactionId },
+    include: { product: true },
+  });
+  if (!movement || movement.supplierInvoiceId !== invoiceId) {
+    throw new HttpError(404, "That stock line is not on this invoice");
+  }
+  if (movement.type !== "RESTOCK") {
+    throw new HttpError(400, "Only a restock line can be edited here");
+  }
+  return { invoice, movement };
+}
+
+// Changes how much stock a line on this invoice brought in. The stock the
+// invoice covers is the invoice's own record, so correcting the line
+// corrects the inventory with it - up or down.
+//
+// No cash moves either way, deliberately: stock on a supplier invoice was
+// never paid for from the till (the invoice's PENDING -> PAID lifecycle is
+// what moves the money), so there is nothing to refund when it shrinks and
+// nothing to charge when it grows.
+invoicesRouter.put(
+  "/:id/inventory/:transactionId",
+  asyncHandler(async (req, res) => {
+    const input = linkedStockInput.parse(req.body);
+    const { movement } = await requireLinkedRestock(req.params.id, req.params.transactionId);
+
+    const newQuantity = new Prisma.Decimal(input.quantity);
+    const delta = newQuantity.sub(movement.quantityChange);
+    const resultingStock = movement.product.quantity.add(delta);
+    if (resultingStock.lt(0)) {
+      throw new HttpError(
+        400,
+        `Reducing this line that far would leave ${movement.product.name} at negative stock - some of it has already been sold.`
+      );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id: movement.productId },
+        data: { quantity: { increment: delta } },
+      });
+      return tx.inventoryTransaction.update({
+        where: { id: movement.id },
+        data: {
+          quantityChange: newQuantity,
+          ...(input.unitCost !== undefined ? { unitCost: new Prisma.Decimal(input.unitCost) } : {}),
+        },
+      });
+    });
+
+    res.json(updated);
+  })
+);
+
+// Removes a stock line from this invoice entirely, taking its units back
+// out of inventory. Same reasoning as the edit above: no cash moves, since
+// none was spent on it.
+invoicesRouter.delete(
+  "/:id/inventory/:transactionId",
+  asyncHandler(async (req, res) => {
+    const { movement } = await requireLinkedRestock(req.params.id, req.params.transactionId);
+
+    const resultingStock = movement.product.quantity.sub(movement.quantityChange);
+    if (resultingStock.lt(0)) {
+      throw new HttpError(
+        400,
+        `Removing this line would leave ${movement.product.name} at negative stock - some of it has already been sold.`
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id: movement.productId },
+        data: { quantity: { decrement: movement.quantityChange } },
+      });
+      await tx.inventoryTransaction.delete({ where: { id: movement.id } });
+    });
+
+    res.status(204).send();
+  })
+);
+
 invoicesRouter.post(
   "/",
   asyncHandler(async (req, res) => {

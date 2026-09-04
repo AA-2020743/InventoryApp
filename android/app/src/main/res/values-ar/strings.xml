@@ -356,4 +356,6 @@
     <string name="spoilage_undo">تراجع عن التلف</string>
     <string name="cash_register_remove_entry_title">إزالة هذه الحركة؟</string>
     <string name="cash_register_remove_entry_message">سيعود الرصيد إلى ما كان عليه قبل حركة %1$s هذه.</string>
+    <string name="adjust_refund_notice">سيتم إرجاع %1$s إلى الخزينة.</string>
+    <string name="invoice_line_new_quantity">الكمية الجديدة</string>
 </resources>

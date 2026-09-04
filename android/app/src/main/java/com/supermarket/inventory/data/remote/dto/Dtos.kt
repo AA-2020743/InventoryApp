@@ -101,8 +101,6 @@ data class InventoryTransactionDto(
     val supplierInvoice: SupplierInvoiceDto? = null,
 )
 
-// Corrects how an already-recorded restock was paid for. The goods are not
-// in question - only the cash/invoice side is undone and re-applied.
 // Result of putting a mistaken spoilage back. expenseReversed is false when
 // the write-off couldn't be identified unambiguously (an old spoilage from
 // before write-offs were linked), meaning the stock returned but the expense
@@ -114,6 +112,8 @@ data class UndoSpoilageResponse(
     val expenseReversed: Boolean,
 )
 
+// Corrects how an already-recorded restock was paid for. The goods are not
+// in question - only the cash/invoice side is undone and re-applied.
 @JsonClass(generateAdapter = true)
 data class RefinanceRequest(
     val financing: String,
@@ -194,6 +194,15 @@ data class InvoiceInventoryResponse(
     val invoiceAmount: String,
     val items: List<InvoiceInventoryItemDto>,
     val linkedTotal: String,
+)
+
+// Corrects a stock line already booked against an invoice. Quantity is the
+// new total for the line, not a delta. No cash moves either way - stock on
+// an invoice was never paid for from the till.
+@JsonClass(generateAdapter = true)
+data class LinkedStockInput(
+    val quantity: Double,
+    val unitCost: Double? = null,
 )
 
 @JsonClass(generateAdapter = true)

@@ -88,6 +88,19 @@ interface ApiService {
     @GET("api/invoices/{id}/inventory")
     suspend fun getInvoiceInventory(@Path("id") id: String): InvoiceInventoryResponse
 
+    @PUT("api/invoices/{id}/inventory/{transactionId}")
+    suspend fun updateInvoiceStockLine(
+        @Path("id") id: String,
+        @Path("transactionId") transactionId: String,
+        @Body input: LinkedStockInput,
+    ): InventoryTransactionDto
+
+    @DELETE("api/invoices/{id}/inventory/{transactionId}")
+    suspend fun deleteInvoiceStockLine(
+        @Path("id") id: String,
+        @Path("transactionId") transactionId: String,
+    )
+
     @POST("api/invoices")
     suspend fun createInvoice(@Body input: InvoiceInput): SupplierInvoiceDto
 

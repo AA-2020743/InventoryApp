@@ -356,4 +356,6 @@
     <string name="spoilage_undo">Undo spoilage</string>
     <string name="cash_register_remove_entry_title">Remove this entry?</string>
     <string name="cash_register_remove_entry_message">The balance goes back to what it was before this %1$s entry.</string>
+    <string name="adjust_refund_notice">%1$s will be returned to the cash register.</string>
+    <string name="invoice_line_new_quantity">New quantity</string>
 </resources>

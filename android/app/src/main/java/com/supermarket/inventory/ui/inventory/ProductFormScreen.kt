@@ -396,6 +396,7 @@ fun ProductFormScreen(
     }
     if (showAdjustDialog) {
         AdjustDialog(
+            purchaseCost = state.purchaseCost,
             onDismiss = { showAdjustDialog = false },
             onConfirm = { change, reason ->
                 viewModel.adjust(change, reason)
@@ -855,9 +856,17 @@ private fun NewInvoiceFields(
 }
 
 @Composable
-private fun AdjustDialog(onDismiss: () -> Unit, onConfirm: (Double, String) -> Unit) {
+private fun AdjustDialog(
+    purchaseCost: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, String) -> Unit,
+) {
     var change by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
+    // Taking stock out returns what it cost to the till, so say so before
+    // it happens rather than leaving the balance to move unannounced.
+    val removing = (change.toDoubleOrNull() ?: 0.0) < 0
+    val refund = (change.toDoubleOrNull() ?: 0.0) * -1 * (purchaseCost.toDoubleOrNull() ?: 0.0)
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.adjust_title)) },
@@ -877,6 +886,14 @@ private fun AdjustDialog(onDismiss: () -> Unit, onConfirm: (Double, String) -> U
                     singleLine = true,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+                if (removing && refund > 0) {
+                    Text(
+                        stringResource(R.string.adjust_refund_notice, formatAmount(refund.toString())),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
         },
         confirmButton = {
