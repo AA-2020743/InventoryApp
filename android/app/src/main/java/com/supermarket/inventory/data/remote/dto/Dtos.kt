@@ -285,6 +285,15 @@ data class SaleDto(
     val amountCollected: String = "0",
 )
 
+// One month that has sales in it, with the count and what they came to -
+// enough for a folded month card without loading the month's receipts.
+@JsonClass(generateAdapter = true)
+data class SalesMonthDto(
+    val month: String,
+    val count: Int,
+    val revenue: String,
+)
+
 @JsonClass(generateAdapter = true)
 data class SalesForRangeResponse(
     val period: String,

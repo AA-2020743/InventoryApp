@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
@@ -57,6 +58,7 @@ import com.supermarket.inventory.ui.invoices.AssetsTabContent
 import com.supermarket.inventory.ui.invoices.InvoicesTabContent
 import com.supermarket.inventory.ui.othersales.OtherSalesTabContent
 import com.supermarket.inventory.ui.sales.DeferredSalesTabContent
+import com.supermarket.inventory.ui.sales.ReceiptsTabContent
 import com.supermarket.inventory.ui.theme.lossColor
 import com.supermarket.inventory.ui.theme.profitColor
 import com.supermarket.inventory.ui.theme.warningColor
@@ -67,14 +69,15 @@ private enum class OthersTab(val titleRes: Int, val captionRes: Int, val icon: I
     DEFERRED_SALES(R.string.deferred_sales_title, R.string.others_caption_deferred, Icons.Filled.Schedule),
     DEBTS(R.string.debts_title, R.string.others_caption_debts, Icons.Filled.AccountBalanceWallet),
     OTHER_SALES(R.string.other_sales_title, R.string.others_caption_other_sales, Icons.Filled.Savings),
+    RECEIPTS(R.string.receipts_title, R.string.others_caption_receipts, Icons.Filled.ReceiptLong),
     ASSETS(R.string.assets_title, R.string.others_caption_assets, Icons.Filled.Inventory2),
 }
 
 // Everything under this destination is money the shop owes, is owed, or is
-// holding - six sibling views of the same subject.
+// holding - sibling views of the same subject.
 //
-// They used to sit behind a scrolling row of six text tabs, which meant
-// never seeing more than three at once, no sense of which was worth opening,
+// They used to sit behind a scrolling row of text tabs, which meant never
+// seeing more than three at once, no sense of which was worth opening,
 // and (in Arabic, where the labels run longer) a row you had to drag before
 // you could read it. It's a hub instead now: one tile per section, each
 // carrying the figure that section is about - what's still owed to
@@ -83,7 +86,10 @@ private enum class OthersTab(val titleRes: Int, val captionRes: Int, val icon: I
 // where to go is a glance rather than a hunt.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OthersScreen(viewModel: OthersViewModel = hiltViewModel()) {
+fun OthersScreen(
+    onEditSale: (String) -> Unit,
+    viewModel: OthersViewModel = hiltViewModel(),
+) {
     // null = the hub itself. Opening a section swaps the whole screen for
     // it, so each one gets the full height it used to share with the tabs.
     var openTab by remember { mutableStateOf<OthersTab?>(null) }
@@ -130,6 +136,7 @@ fun OthersScreen(viewModel: OthersViewModel = hiltViewModel()) {
                             OthersTab.DEFERRED_SALES -> summary?.deferredReceivablesTotal to warningColor()
                             OthersTab.DEBTS -> summary?.debtReceivableTotal to warningColor()
                             OthersTab.OTHER_SALES -> summary?.month?.otherSales to profitColor()
+                            OthersTab.RECEIPTS -> summary?.month?.revenue to profitColor()
                             OthersTab.ASSETS -> summary?.assetsValue to MaterialTheme.colorScheme.tertiary
                         }
                         HubTile(
@@ -149,6 +156,7 @@ fun OthersScreen(viewModel: OthersViewModel = hiltViewModel()) {
                     OthersTab.DEFERRED_SALES -> DeferredSalesTabContent()
                     OthersTab.DEBTS -> DebtsTabContent()
                     OthersTab.OTHER_SALES -> OtherSalesTabContent()
+                    OthersTab.RECEIPTS -> ReceiptsTabContent(onEditSale = onEditSale)
                     OthersTab.CASH_REGISTER -> CashRegisterTabContent()
                 }
             }

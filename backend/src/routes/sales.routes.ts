@@ -160,6 +160,31 @@ salesRouter.get(
   })
 );
 
+// GET /api/sales/months - one row per month that has sales, newest first,
+// with what they came to. This is what the receipts browser's folded month
+// cards show; a month's own receipts are then fetched from /for-range only
+// when that month is opened.
+//
+// Months are cut on the business's own clock (Africa/Cairo), the same
+// boundary /for-range uses, so a sale just after midnight belongs to the
+// day - and the month - the shop would say it belongs to.
+salesRouter.get(
+  "/months",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.$queryRaw<
+      { month: string; count: bigint; revenue: Prisma.Decimal }[]
+    >`
+      SELECT to_char("createdAt" AT TIME ZONE 'Africa/Cairo', 'YYYY-MM') AS month,
+             COUNT(*) AS count,
+             COALESCE(SUM("totalAmount"), 0) AS revenue
+      FROM "Sale"
+      GROUP BY 1
+      ORDER BY 1 DESC
+    `;
+    res.json(rows.map((row) => ({ month: row.month, count: Number(row.count), revenue: row.revenue })));
+  })
+);
+
 // Distinct customer names already used on a deferred sale, so the app can
 // suggest them while recording a new one instead of the owner having to
 // remember/retype exact spelling - typing a new one just creates it

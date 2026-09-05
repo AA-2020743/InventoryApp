@@ -427,4 +427,12 @@
     <string name="deferred_collected_label">Collected in full</string>
     <string name="deferred_collected_on">Collected %1$s</string>
     <string name="deferred_sale_no_customer">No customer name</string>
+    <!-- Receipts: browsing past sales -->
+    <string name="receipts_title">Receipts</string>
+    <string name="others_caption_receipts">Sales this month</string>
+    <string name="receipts_empty">No sales yet</string>
+    <string name="receipts_empty_hint">Every sale you ring up shows up here, month by month.</string>
+    <string name="receipts_count">%1$d receipts</string>
+    <string name="receipts_more_items">+ %1$d more</string>
+    <string name="history_movement_count">%1$d movements</string>
 </resources>

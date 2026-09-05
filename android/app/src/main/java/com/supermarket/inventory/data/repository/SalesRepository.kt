@@ -36,6 +36,8 @@ class SalesRepository @Inject constructor(private val api: ApiService) {
     suspend fun getSalesForRange(period: String, date: String, limit: Int? = null): ApiResult<SalesForRangeResponse> =
         apiCall { api.getSalesForRange(period, date, limit) }
 
+    suspend fun getMonths(): ApiResult<List<SalesMonthDto>> = apiCall { api.getSalesMonths() }
+
     suspend fun createSale(
         items: List<Pair<String, Double>>,
         clientId: String? = null,

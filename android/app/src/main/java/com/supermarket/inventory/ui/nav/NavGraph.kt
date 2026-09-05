@@ -178,7 +178,9 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                     )
                 }
                 composable(Routes.EXPENSES) { ExpensesScreen() }
-                composable(Routes.INVOICES) { OthersScreen() }
+                composable(Routes.INVOICES) {
+                    OthersScreen(onEditSale = { saleId -> navController.navigate(Routes.editSale(saleId)) })
+                }
                 composable(
                     route = Routes.EDIT_SALE,
                     arguments = listOf(navArgument("saleId") { type = NavType.StringType }),

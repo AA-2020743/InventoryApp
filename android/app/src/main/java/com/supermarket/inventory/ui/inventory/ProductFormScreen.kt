@@ -58,8 +58,13 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.SupplierDto
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.ui.common.copyUriToCacheFile
+import com.supermarket.inventory.ui.common.MonthGroupHeader
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
+import com.supermarket.inventory.ui.common.formatMonth
+import com.supermarket.inventory.ui.common.groupByMonth
+import java.time.YearMonth
+import java.util.Locale
 import java.time.Instant
 import java.time.ZoneOffset
 import androidx.compose.material3.AlertDialog
@@ -442,6 +447,24 @@ private fun PurchaseHistoryDialog(
     var rowError by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 
+    // A product that has been restocked for a year has a year of rows here,
+    // in a dialog with a screen's worth of room. Folded by month instead,
+    // with the month in progress open - that's the one a correction is
+    // usually reaching for - and each month carrying what its movements came
+    // to: deliveries positive, write-offs negative, revaluations nothing at
+    // all since they moved no goods.
+    val locale = Locale.getDefault()
+    val monthBuckets = remember(state.purchaseHistory) {
+        groupByMonth(
+            state.purchaseHistory,
+            { it.createdAt },
+            { (it.quantityChange.toDoubleOrNull() ?: 0.0) * (it.unitCost?.toDoubleOrNull() ?: 0.0) },
+        )
+    }
+    var expandedMonths by remember(monthBuckets) {
+        mutableStateOf(setOfNotNull(monthBuckets.firstOrNull()?.yearMonth))
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.purchase_history_title)) },
@@ -457,7 +480,22 @@ private fun PurchaseHistoryDialog(
                         stringResource(R.string.purchase_history_empty),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    else -> state.purchaseHistory.forEach { txn ->
+                    else -> monthBuckets.forEach { bucket ->
+                        val isOpen = bucket.yearMonth in expandedMonths
+                        MonthGroupHeader(
+                            label = formatMonth(bucket.yearMonth, locale),
+                            detail = stringResource(R.string.history_movement_count, bucket.items.size),
+                            total = formatAmount(bucket.total.toString()),
+                            expanded = isOpen,
+                            accent = MaterialTheme.colorScheme.tertiary,
+                            onToggle = {
+                                expandedMonths = if (isOpen) expandedMonths - bucket.yearMonth
+                                else expandedMonths + bucket.yearMonth
+                            },
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                        if (!isOpen) return@forEach
+                        bucket.items.forEach { txn ->
                         if (txn.type == "SPOILAGE") {
                             SpoilageHistoryRow(
                                 txn = txn,
@@ -610,6 +648,7 @@ private fun PurchaseHistoryDialog(
                                 }
                             }
                             Divider(Modifier.padding(top = 4.dp))
+                        }
                         }
                     }
                 }

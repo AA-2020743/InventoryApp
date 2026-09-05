@@ -49,7 +49,7 @@ import com.supermarket.inventory.ui.theme.warningColor
 import androidx.compose.material.icons.filled.Inventory2
 import com.supermarket.inventory.ui.common.EmptyState
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun InventoryListScreen(
     onAddProduct: () -> Unit,
@@ -126,19 +126,23 @@ fun InventoryListScreen(
                 )
             }
             if (state.availableCategories.isNotEmpty()) {
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                // Wraps onto further lines rather than running off the side.
+                // A sideways-scrolling row hid whichever categories didn't
+                // fit, which on a shop with more than three or four of them
+                // meant dragging to find out what its own categories were.
+                androidx.compose.foundation.layout.FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    item {
-                        FilterChip(
-                            selected = state.selectedCategory == null,
-                            onClick = { viewModel.onCategorySelected(null) },
-                            label = { Text(stringResource(R.string.inventory_all_categories)) },
-                        )
-                    }
-                    items(state.availableCategories) { category ->
+                    FilterChip(
+                        selected = state.selectedCategory == null,
+                        onClick = { viewModel.onCategorySelected(null) },
+                        label = { Text(stringResource(R.string.inventory_all_categories)) },
+                    )
+                    state.availableCategories.forEach { category ->
                         FilterChip(
                             selected = state.selectedCategory == category,
                             onClick = { viewModel.onCategorySelected(category) },
@@ -156,7 +160,13 @@ fun InventoryListScreen(
                     title = stringResource(R.string.inventory_empty),
                     hint = stringResource(R.string.inventory_empty_hint),
                 )
-                else -> LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+                // Bottom padding clears the add/scan buttons, which
+                // otherwise sit on top of the last product's row.
+                else -> LazyColumn(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 12.dp, top = 12.dp, end = 12.dp, bottom = 96.dp,
+                    ),
+                ) {
                     items(state.products, key = { it.id }) { product ->
                         ProductRow(
                             product = product,

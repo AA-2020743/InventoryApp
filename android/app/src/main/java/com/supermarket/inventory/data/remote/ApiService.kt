@@ -135,6 +135,11 @@ interface ApiService {
         @Query("limit") limit: Int? = null,
     ): SalesForRangeResponse
 
+    // One row per month that has sales, for the receipts browser's folded
+    // month cards - the receipts themselves come from for-range on demand.
+    @GET("api/sales/months")
+    suspend fun getSalesMonths(): List<SalesMonthDto>
+
     @GET("api/sales/customers")
     suspend fun getCustomerNames(): List<String>
 

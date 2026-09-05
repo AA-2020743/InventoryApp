@@ -427,4 +427,12 @@
     <string name="deferred_collected_label">تم تحصيلها بالكامل</string>
     <string name="deferred_collected_on">حُصِّلت في %1$s</string>
     <string name="deferred_sale_no_customer">بدون اسم عميل</string>
+    <!-- Receipts: browsing past sales -->
+    <string name="receipts_title">الفواتير</string>
+    <string name="others_caption_receipts">مبيعات هذا الشهر</string>
+    <string name="receipts_empty">لا توجد مبيعات بعد</string>
+    <string name="receipts_empty_hint">تظهر هنا كل عملية بيع تسجلها، شهرًا بشهر.</string>
+    <string name="receipts_count">%1$d فاتورة</string>
+    <string name="receipts_more_items">+ %1$d أخرى</string>
+    <string name="history_movement_count">%1$d حركة</string>
 </resources>
