@@ -436,4 +436,5 @@
     <string name="receipts_more_items">+ %1$d more</string>
     <string name="history_movement_count">%1$d movements</string>
     <string name="inventory_filter_categories">Filter by category</string>
+    <string name="expense_spoiled_name">Spoiled: %1$s</string>
 </resources>

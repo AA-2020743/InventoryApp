@@ -55,6 +55,7 @@ import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.remote.dto.TopProductItemDto
 import com.supermarket.inventory.ui.common.PieChart
+import com.supermarket.inventory.ui.common.expenseDisplayName
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
@@ -293,7 +294,8 @@ private fun CategoryBreakdownCard(
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
-                            row.category?.takeIf { it.isNotBlank() } ?: uncategorizedLabel,
+                            row.category?.takeIf { it.isNotBlank() }?.let { expenseDisplayName(it) }
+                                ?: uncategorizedLabel,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )

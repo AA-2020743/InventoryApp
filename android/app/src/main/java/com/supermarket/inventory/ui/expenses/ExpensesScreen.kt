@@ -58,6 +58,7 @@ import com.supermarket.inventory.data.repository.ExpenseRepository
 import com.supermarket.inventory.ui.common.MonthGroupHeader
 import com.supermarket.inventory.ui.common.PeriodSummaryCard
 import com.supermarket.inventory.ui.common.PeriodTabs
+import com.supermarket.inventory.ui.common.expenseDisplayName
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
 import com.supermarket.inventory.ui.common.formatMonth
@@ -325,7 +326,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     expenseToDelete?.let { expense ->
         AlertDialog(
             onDismissRequest = { expenseToDelete = null },
-            title = { Text(stringResource(R.string.confirm_delete_named_title, expense.name)) },
+            title = { Text(stringResource(R.string.confirm_delete_named_title, expenseDisplayName(expense.name))) },
             text = { Text(stringResource(R.string.confirm_delete_message)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.delete(expense.id); expenseToDelete = null }) {
@@ -345,7 +346,7 @@ fun ExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(expense.name, style = MaterialTheme.typography.titleMedium)
+                Text(expenseDisplayName(expense.name), style = MaterialTheme.typography.titleMedium)
                 Text(formatIsoDate(expense.date), style = MaterialTheme.typography.bodySmall)
                 if (deficit > 0) {
                     Text(

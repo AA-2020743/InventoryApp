@@ -1,5 +1,8 @@
 package com.supermarket.inventory.ui.common
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.supermarket.inventory.R
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.Instant
@@ -67,3 +70,21 @@ fun formatIsoDateTime(iso: String, locale: Locale = Locale.getDefault()): String
 } catch (_: Exception) {
     iso
 }
+
+// The server composes a spoilage write-off's expense name itself
+// ("Spoiled: <product>") so the write-off and the stock movement that
+// caused it can find each other again later. That name is storage, not
+// display: rendered raw it left an English word sitting in an otherwise
+// Arabic list.
+//
+// This translates it where it is shown and leaves the stored name alone -
+// the backend still matches on the English form, and so does the undo.
+private const val SPOILAGE_NAME_PREFIX = "Spoiled: "
+
+@Composable
+fun expenseDisplayName(name: String): String =
+    if (name.startsWith(SPOILAGE_NAME_PREFIX)) {
+        stringResource(R.string.expense_spoiled_name, name.removePrefix(SPOILAGE_NAME_PREFIX))
+    } else {
+        name
+    }
