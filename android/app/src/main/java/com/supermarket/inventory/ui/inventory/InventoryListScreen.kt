@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,6 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +37,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +70,8 @@ fun InventoryListScreen(
     viewModel: InventoryViewModel = hiltViewModel(),
 ) {
     val state = viewModel.uiState
+    // The category picker starts closed so the products have the screen.
+    var categoriesExpanded by remember { mutableStateOf(false) }
 
     // Refresh whenever this screen (re-)enters composition - e.g. returning
     // here after saving a new product on the form - since the ViewModel
@@ -118,56 +128,111 @@ fun InventoryListScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
-            Row(Modifier.padding(horizontal = 12.dp)) {
-                FilterChip(
-                    selected = state.lowStockOnly,
-                    onClick = viewModel::onToggleLowStockOnly,
-                    label = { Text(stringResource(R.string.inventory_low_stock_badge)) },
-                )
-            }
-            if (state.availableCategories.isNotEmpty()) {
-                // Wraps onto further lines rather than running off the side.
-                // A sideways-scrolling row hid whichever categories didn't
-                // fit, which on a shop with more than three or four of them
-                // meant dragging to find out what its own categories were.
-                androidx.compose.foundation.layout.FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    FilterChip(
-                        selected = state.selectedCategory == null,
-                        onClick = { viewModel.onCategorySelected(null) },
-                        label = { Text(stringResource(R.string.inventory_all_categories)) },
-                    )
-                    state.availableCategories.forEach { category ->
+            // The filters ride along with the list rather than sitting in a
+            // fixed band above it. A shop with twenty categories wraps to
+            // eight rows of chips, and a fixed band that tall left the
+            // products themselves a sliver at the bottom of the screen.
+            //
+            // Bottom padding clears the add/scan buttons, which otherwise
+            // sit on top of the last product's row.
+            LazyColumn(
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    start = 12.dp, top = 4.dp, end = 12.dp, bottom = 96.dp,
+                ),
+            ) {
+                item(key = "filters") {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         FilterChip(
-                            selected = state.selectedCategory == category,
-                            onClick = { viewModel.onCategorySelected(category) },
-                            label = { Text(category) },
+                            selected = state.lowStockOnly,
+                            onClick = viewModel::onToggleLowStockOnly,
+                            label = { Text(stringResource(R.string.inventory_low_stock_badge)) },
                         )
+                        if (state.availableCategories.isNotEmpty()) {
+                            // Closed, this is one line that names the filter
+                            // in force. Open, every category is on screen at
+                            // once - no sideways drag, no band to scroll
+                            // inside, and the list is a scroll away rather
+                            // than pushed off the bottom.
+                            FilterChip(
+                                selected = state.selectedCategory != null,
+                                onClick = { categoriesExpanded = !categoriesExpanded },
+                                label = {
+                                    Text(
+                                        state.selectedCategory
+                                            ?: stringResource(R.string.inventory_all_categories),
+                                        maxLines = 1,
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.FilterList,
+                                        contentDescription = stringResource(R.string.inventory_filter_categories),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        if (categoriesExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
-            }
-            Spacer(Modifier.padding(4.dp))
 
-            when {
-                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.products.isEmpty() -> EmptyState(
-                    icon = Icons.Filled.Inventory2,
-                    title = stringResource(R.string.inventory_empty),
-                    hint = stringResource(R.string.inventory_empty_hint),
-                )
-                // Bottom padding clears the add/scan buttons, which
-                // otherwise sit on top of the last product's row.
-                else -> LazyColumn(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 12.dp, top = 12.dp, end = 12.dp, bottom = 96.dp,
-                    ),
-                ) {
-                    items(state.products, key = { it.id }) { product ->
+                if (categoriesExpanded && state.availableCategories.isNotEmpty()) {
+                    item(key = "categories") {
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            FilterChip(
+                                selected = state.selectedCategory == null,
+                                onClick = { viewModel.onCategorySelected(null); categoriesExpanded = false },
+                                label = { Text(stringResource(R.string.inventory_all_categories)) },
+                            )
+                            state.availableCategories.forEach { category ->
+                                FilterChip(
+                                    selected = state.selectedCategory == category,
+                                    // Choosing one closes the picker: the
+                                    // choice is made, and the products are
+                                    // what you wanted to see.
+                                    onClick = { viewModel.onCategorySelected(category); categoriesExpanded = false },
+                                    label = { Text(category) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item(key = "filters-gap") { Spacer(Modifier.height(8.dp)) }
+
+                when {
+                    // Fixed heights: a lazy item is measured with unbounded
+                    // height, so anything asking to fill it has nothing to
+                    // fill.
+                    state.isLoading -> item(key = "loading") {
+                        Box(
+                            Modifier.fillMaxWidth().height(240.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { CircularProgressIndicator() }
+                    }
+                    state.products.isEmpty() -> item(key = "empty") {
+                        EmptyState(
+                            icon = Icons.Filled.Inventory2,
+                            title = stringResource(R.string.inventory_empty),
+                            hint = stringResource(R.string.inventory_empty_hint),
+                            modifier = Modifier.height(320.dp),
+                        )
+                    }
+                    else -> items(state.products, key = { it.id }) { product ->
                         ProductRow(
                             product = product,
                             imageUrl = viewModel.fullImageUrl(product.imageUrl),

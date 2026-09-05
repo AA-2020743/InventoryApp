@@ -360,8 +360,8 @@
     <string name="invoice_line_new_quantity">الكمية الجديدة</string>
     <string name="invoice_delete_message">سيؤدي هذا أيضًا إلى إزالة المخزون الذي وردته هذه الفاتورة من مخزونك. لن تتم إعادة أي أموال مقابل هذا المخزون - فلم يُدفع ثمنه من الخزينة أصلًا.</string>
     <!-- Supplier invoices: open vs settled shelves -->
-    <string name="invoices_filter_open">مفتوحة · %1$d</string>
-    <string name="invoices_filter_settled">مسددة · %1$d</string>
+    <string name="invoices_filter_open">مفتوحة</string>
+    <string name="invoices_filter_settled">مسددة</string>
     <string name="invoices_outstanding_label">المستحق عليك</string>
     <string name="invoices_settled_total_label">إجمالي المسدد</string>
     <string name="invoices_overdue_count">%1$d متأخرة</string>
@@ -403,8 +403,8 @@
     <string name="invoice_delete_empty">حذف هذه الفاتورة</string>
     <string name="purchase_history_revaluation">تم ضبط التكلفة على %1$s</string>
     <!-- Month-by-month history, shared by every section that records as it goes -->
-    <string name="history_tab_current">%1$s · %2$d</string>
-    <string name="history_tab_earlier">السجل · %1$d</string>
+    <string name="history_tab_current">%1$s</string>
+    <string name="history_tab_earlier">السجل</string>
     <string name="history_entry_count">%1$d حركة</string>
     <string name="history_earlier_label">كل ما قبل هذا الشهر</string>
     <string name="history_nothing_this_month">لم تُسجَّل أي حركة هذا الشهر بعد.</string>
@@ -418,12 +418,12 @@
     <string name="others_caption_other_sales">دخل هذا الشهر</string>
     <string name="others_caption_assets">ما يملكه المحل</string>
     <!-- Settled debts and collected tabs -->
-    <string name="debts_tab_outstanding">قائمة · %1$d</string>
-    <string name="debts_tab_settled">مسددة · %1$d</string>
+    <string name="debts_tab_outstanding">قائمة</string>
+    <string name="debts_tab_settled">مسددة</string>
     <string name="debts_settled_label">تم سدادها بالكامل</string>
     <string name="debt_repaid_on">سُددت في %1$s</string>
-    <string name="deferred_tab_open">مفتوحة · %1$d</string>
-    <string name="deferred_tab_collected">محصَّلة · %1$d</string>
+    <string name="deferred_tab_open">مفتوحة</string>
+    <string name="deferred_tab_collected">محصَّلة</string>
     <string name="deferred_collected_label">تم تحصيلها بالكامل</string>
     <string name="deferred_collected_on">حُصِّلت في %1$s</string>
     <string name="deferred_sale_no_customer">بدون اسم عميل</string>
@@ -435,4 +435,5 @@
     <string name="receipts_count">%1$d فاتورة</string>
     <string name="receipts_more_items">+ %1$d أخرى</string>
     <string name="history_movement_count">%1$d حركة</string>
+    <string name="inventory_filter_categories">تصفية حسب التصنيف</string>
 </resources>

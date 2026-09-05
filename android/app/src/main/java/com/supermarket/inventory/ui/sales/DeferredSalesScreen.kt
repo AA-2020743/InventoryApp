@@ -97,8 +97,8 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
         Column(Modifier.fillMaxSize()) {
         if (state.collected.isNotEmpty()) {
             PeriodTabs(
-                currentText = stringResource(R.string.deferred_tab_open, state.sales.size),
-                historyText = stringResource(R.string.deferred_tab_collected, state.collected.size),
+                currentText = stringResource(R.string.deferred_tab_open),
+                historyText = stringResource(R.string.deferred_tab_collected),
                 showHistory = showHistory,
                 onChange = { showHistory = it },
                 modifier = Modifier.padding(top = 8.dp),

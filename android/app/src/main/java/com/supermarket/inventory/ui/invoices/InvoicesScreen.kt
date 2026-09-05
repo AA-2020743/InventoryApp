@@ -145,12 +145,12 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                         selected = !showSettled,
                         onClick = { showSettled = false },
                         shape = SegmentedButtonDefaults.itemShape(0, 2),
-                    ) { Text(stringResource(R.string.invoices_filter_open, openInvoices.size), maxLines = 1) }
+                    ) { Text(stringResource(R.string.invoices_filter_open), maxLines = 1) }
                     SegmentedButton(
                         selected = showSettled,
                         onClick = { showSettled = true },
                         shape = SegmentedButtonDefaults.itemShape(1, 2),
-                    ) { Text(stringResource(R.string.invoices_filter_settled, settledInvoices.size), maxLines = 1) }
+                    ) { Text(stringResource(R.string.invoices_filter_settled), maxLines = 1) }
                 }
 
                 // One number that says where you stand on whichever shelf is

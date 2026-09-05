@@ -360,8 +360,8 @@
     <string name="invoice_line_new_quantity">New quantity</string>
     <string name="invoice_delete_message">This also removes the stock this invoice delivered from your inventory. No money is returned for that stock - it was never paid for from the cash register.</string>
     <!-- Supplier invoices: open vs settled shelves -->
-    <string name="invoices_filter_open">Open · %1$d</string>
-    <string name="invoices_filter_settled">Settled · %1$d</string>
+    <string name="invoices_filter_open">Open</string>
+    <string name="invoices_filter_settled">Settled</string>
     <string name="invoices_outstanding_label">Still owed</string>
     <string name="invoices_settled_total_label">Settled total</string>
     <string name="invoices_overdue_count">%1$d overdue</string>
@@ -403,8 +403,8 @@
     <string name="invoice_delete_empty">Delete this invoice</string>
     <string name="purchase_history_revaluation">Cost set to %1$s</string>
     <!-- Month-by-month history, shared by every section that records as it goes -->
-    <string name="history_tab_current">%1$s · %2$d</string>
-    <string name="history_tab_earlier">History · %1$d</string>
+    <string name="history_tab_current">%1$s</string>
+    <string name="history_tab_earlier">History</string>
     <string name="history_entry_count">%1$d entries</string>
     <string name="history_earlier_label">Everything before this month</string>
     <string name="history_nothing_this_month">Nothing recorded this month yet.</string>
@@ -418,12 +418,12 @@
     <string name="others_caption_other_sales">Income this month</string>
     <string name="others_caption_assets">What the shop owns</string>
     <!-- Settled debts and collected tabs -->
-    <string name="debts_tab_outstanding">Outstanding · %1$d</string>
-    <string name="debts_tab_settled">Settled · %1$d</string>
+    <string name="debts_tab_outstanding">Outstanding</string>
+    <string name="debts_tab_settled">Settled</string>
     <string name="debts_settled_label">Paid back in full</string>
     <string name="debt_repaid_on">Repaid %1$s</string>
-    <string name="deferred_tab_open">Open · %1$d</string>
-    <string name="deferred_tab_collected">Collected · %1$d</string>
+    <string name="deferred_tab_open">Open</string>
+    <string name="deferred_tab_collected">Collected</string>
     <string name="deferred_collected_label">Collected in full</string>
     <string name="deferred_collected_on">Collected %1$s</string>
     <string name="deferred_sale_no_customer">No customer name</string>
@@ -435,4 +435,5 @@
     <string name="receipts_count">%1$d receipts</string>
     <string name="receipts_more_items">+ %1$d more</string>
     <string name="history_movement_count">%1$d movements</string>
+    <string name="inventory_filter_categories">Filter by category</string>
 </resources>

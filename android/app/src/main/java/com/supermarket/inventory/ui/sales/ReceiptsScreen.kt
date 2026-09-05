@@ -70,15 +70,8 @@ fun ReceiptsTabContent(
         Column(Modifier.fillMaxSize()) {
             if (earlierMonths.isNotEmpty()) {
                 PeriodTabs(
-                    currentText = stringResource(
-                        R.string.history_tab_current,
-                        formatMonth(YearMonth.now(), locale),
-                        thisMonth?.count ?: state.currentMonthSales.size,
-                    ),
-                    historyText = stringResource(
-                        R.string.history_tab_earlier,
-                        earlierMonths.sumOf { it.count },
-                    ),
+                    currentText = stringResource(R.string.history_tab_current, formatMonth(YearMonth.now(), locale)),
+                    historyText = stringResource(R.string.history_tab_earlier),
                     showHistory = showHistory,
                     onChange = { showHistory = it },
                     modifier = Modifier.padding(top = 8.dp),

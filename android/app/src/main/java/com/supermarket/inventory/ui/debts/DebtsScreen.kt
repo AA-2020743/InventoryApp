@@ -181,8 +181,8 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
         Column(Modifier.fillMaxSize()) {
         if (state.settled.isNotEmpty()) {
             PeriodTabs(
-                currentText = stringResource(R.string.debts_tab_outstanding, state.debts.size),
-                historyText = stringResource(R.string.debts_tab_settled, state.settled.size),
+                currentText = stringResource(R.string.debts_tab_outstanding),
+                historyText = stringResource(R.string.debts_tab_settled),
                 showHistory = showHistory,
                 onChange = { showHistory = it },
                 modifier = Modifier.padding(top = 8.dp),

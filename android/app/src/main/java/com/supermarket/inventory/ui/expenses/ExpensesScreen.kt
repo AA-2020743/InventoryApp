@@ -189,12 +189,8 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                 // Only worth a switch once there is something behind it.
                 if (earlier.isNotEmpty()) {
                     PeriodTabs(
-                        currentText = stringResource(
-                            R.string.history_tab_current,
-                            formatMonth(thisMonth, locale),
-                            current?.items?.size ?: 0,
-                        ),
-                        historyText = stringResource(R.string.history_tab_earlier, earlierCount),
+                        currentText = stringResource(R.string.history_tab_current, formatMonth(thisMonth, locale)),
+                        historyText = stringResource(R.string.history_tab_earlier),
                         showHistory = showHistory,
                         onChange = { showHistory = it },
                         modifier = Modifier.padding(top = 4.dp),
