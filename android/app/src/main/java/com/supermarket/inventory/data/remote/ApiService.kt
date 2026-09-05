@@ -233,8 +233,13 @@ interface ApiService {
     suspend fun deleteDebt(@Path("id") id: String)
 
     // Cash register
+    // Without a month: the most recent entries, capped. With one
+    // ("YYYY-MM"): that month in full, for the history view.
     @GET("api/cash-register")
-    suspend fun getCashRegister(): CashRegisterResponse
+    suspend fun getCashRegister(@Query("month") month: String? = null): CashRegisterResponse
+
+    @GET("api/cash-register/months")
+    suspend fun getCashRegisterMonths(): List<CashMonthDto>
 
     @POST("api/cash-register/set")
     suspend fun setCashRegister(@Body request: SetCashRegisterRequest): CashRegisterEntryResponse

@@ -15,6 +15,9 @@ import javax.inject.Inject
 data class DeferredSalesUiState(
     val isLoading: Boolean = true,
     val sales: List<SaleDto> = emptyList(),
+    // Deferred sales that have since been collected in full. They used to
+    // vanish on collection, leaving no way to see who settled up and when.
+    val collected: List<SaleDto> = emptyList(),
     val customerSuggestions: List<String> = emptyList(),
     val error: String? = null,
 )
@@ -38,6 +41,14 @@ class DeferredSalesViewModel @Inject constructor(
             when (val result = salesRepository.getSales(paymentStatus = "DEFERRED", limit = 200)) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, sales = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
+            }
+            // A collectedAt is what separates a tab that was settled from an
+            // ordinary sale paid at the counter - only the former belongs in
+            // this screen's history.
+            when (val collectedResult = salesRepository.getSales(paymentStatus = "PAID", limit = 200)) {
+                is ApiResult.Success ->
+                    uiState = uiState.copy(collected = collectedResult.data.filter { it.collectedAt != null })
+                is ApiResult.Error -> Unit
             }
         }
     }

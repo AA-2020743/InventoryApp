@@ -12,7 +12,10 @@ import javax.inject.Singleton
 
 @Singleton
 class CashRegisterRepository @Inject constructor(private val api: ApiService) {
-    suspend fun getRegister(): ApiResult<CashRegisterResponse> = apiCall { api.getCashRegister() }
+    suspend fun getRegister(month: String? = null): ApiResult<CashRegisterResponse> =
+        apiCall { api.getCashRegister(month) }
+
+    suspend fun getMonths(): ApiResult<List<CashMonthDto>> = apiCall { api.getCashRegisterMonths() }
 
     suspend fun setBalance(value: Double, note: String?): ApiResult<CashRegisterEntryResponse> =
         apiCall { api.setCashRegister(SetCashRegisterRequest(value, note)) }

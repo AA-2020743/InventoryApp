@@ -402,4 +402,29 @@
     <string name="invoice_now_empty">This invoice covers nothing now, so it is worth 0.00.</string>
     <string name="invoice_delete_empty">Delete this invoice</string>
     <string name="purchase_history_revaluation">Cost set to %1$s</string>
+    <!-- Month-by-month history, shared by every section that records as it goes -->
+    <string name="history_tab_current">%1$s · %2$d</string>
+    <string name="history_tab_earlier">History · %1$d</string>
+    <string name="history_entry_count">%1$d entries</string>
+    <string name="history_earlier_label">Everything before this month</string>
+    <string name="history_nothing_this_month">Nothing recorded this month yet.</string>
+    <string name="history_cash_flows">In %1$s · Out %2$s</string>
+    <!-- The Other hub -->
+    <string name="others_back_to_hub">Back to Other</string>
+    <string name="others_caption_invoices">Owed to suppliers</string>
+    <string name="others_caption_cash">In the till now</string>
+    <string name="others_caption_deferred">Owed by customers</string>
+    <string name="others_caption_debts">Lent to workers</string>
+    <string name="others_caption_other_sales">Income this month</string>
+    <string name="others_caption_assets">What the shop owns</string>
+    <!-- Settled debts and collected tabs -->
+    <string name="debts_tab_outstanding">Outstanding · %1$d</string>
+    <string name="debts_tab_settled">Settled · %1$d</string>
+    <string name="debts_settled_label">Paid back in full</string>
+    <string name="debt_repaid_on">Repaid %1$s</string>
+    <string name="deferred_tab_open">Open · %1$d</string>
+    <string name="deferred_tab_collected">Collected · %1$d</string>
+    <string name="deferred_collected_label">Collected in full</string>
+    <string name="deferred_collected_on">Collected %1$s</string>
+    <string name="deferred_sale_no_customer">No customer name</string>
 </resources>

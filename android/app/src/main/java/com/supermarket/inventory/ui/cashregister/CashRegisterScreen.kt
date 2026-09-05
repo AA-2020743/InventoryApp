@@ -38,12 +38,18 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.CashRegisterEntryDto
+import com.supermarket.inventory.ui.common.MonthGroupHeader
+import com.supermarket.inventory.ui.common.PeriodSummaryCard
+import com.supermarket.inventory.ui.common.PeriodTabs
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDateTime
+import com.supermarket.inventory.ui.common.formatMonth
 import com.supermarket.inventory.ui.theme.lossColor
 import com.supermarket.inventory.ui.theme.profitColor
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.IconButton
+import java.time.YearMonth
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +59,9 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
     var showSetBalanceDialog by remember { mutableStateOf(false) }
     var showAddEntryDialog by remember { mutableStateOf(false) }
     var showZeroConfirm by remember { mutableStateOf(false) }
+    val locale = Locale.getDefault()
+    var showHistory by remember { mutableStateOf(false) }
+    var expandedMonths by remember { mutableStateOf(emptySet<String>()) }
 
     Box(Modifier.fillMaxSize()) {
         if (state.isLoading) {
@@ -82,24 +91,118 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
-                if (state.entries.isEmpty()) {
+                // The ledger grows faster than anything else in the app, so
+                // the month in progress stays open and every month before it
+                // is folded into one card carrying its own in/out totals.
+                // Opening one fetches that month, so the history costs
+                // nothing until it's looked at.
+                val thisMonthKey = YearMonth.now().toString()
+                val earlierMonths = state.months.filter { it.month != thisMonthKey }
+                val thisMonthSummary = state.months.firstOrNull { it.month == thisMonthKey }
+                if (earlierMonths.isNotEmpty()) {
+                    PeriodTabs(
+                        currentText = stringResource(
+                            R.string.history_tab_current,
+                            formatMonth(YearMonth.now(), locale),
+                            thisMonthSummary?.count ?: state.entries.size,
+                        ),
+                        historyText = stringResource(
+                            R.string.history_tab_earlier,
+                            earlierMonths.sumOf { it.count },
+                        ),
+                        showHistory = showHistory,
+                        onChange = { showHistory = it },
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                if (!showHistory && state.entries.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.cash_register_ledger_empty))
                     }
                 } else {
-                    LazyColumn(contentPadding = PaddingValues(12.dp)) {
-                        items(state.entries, key = { it.id }) { entry ->
-                            LedgerRow(
-                                entry = entry,
-                                // Only a hand-made entry can be removed
-                                // here; one created for an expense, sale,
-                                // invoice, restock or debt is corrected
-                                // through that record instead.
-                                onDelete = if (entry.isManual) {
-                                    { entryToDelete = entry }
-                                } else null,
-                            )
-                            Spacer(Modifier.height(6.dp))
+                    LazyColumn(
+                        contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 88.dp),
+                    ) {
+                        if (!showHistory) {
+                            if (thisMonthSummary != null) {
+                                item(key = "summary") {
+                                    PeriodSummaryCard(
+                                        label = formatMonth(YearMonth.now(), locale),
+                                        detail = stringResource(
+                                            R.string.history_cash_flows,
+                                            formatAmount(thisMonthSummary.inflow),
+                                            formatAmount(thisMonthSummary.outflow),
+                                        ),
+                                        total = formatAmount(thisMonthSummary.net),
+                                        accent = if ((thisMonthSummary.net.toDoubleOrNull() ?: 0.0) < 0) lossColor() else profitColor(),
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                    )
+                                }
+                            }
+                            items(state.entries, key = { it.id }) { entry ->
+                                LedgerRow(
+                                    entry = entry,
+                                    // Only a hand-made entry can be removed
+                                    // here; one created for an expense, sale,
+                                    // invoice, restock or debt is corrected
+                                    // through that record instead.
+                                    onDelete = if (entry.isManual) {
+                                        { entryToDelete = entry }
+                                    } else null,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                            }
+                        } else {
+                            earlierMonths.forEach { month ->
+                                val isOpen = month.month in expandedMonths
+                                val net = month.net.toDoubleOrNull() ?: 0.0
+                                item(key = "m-${month.month}") {
+                                    MonthGroupHeader(
+                                        label = formatMonth(
+                                            runCatching { YearMonth.parse(month.month) }.getOrDefault(YearMonth.now()),
+                                            locale,
+                                        ),
+                                        detail = stringResource(
+                                            R.string.history_cash_flows,
+                                            formatAmount(month.inflow),
+                                            formatAmount(month.outflow),
+                                        ),
+                                        total = formatAmount(month.net),
+                                        expanded = isOpen,
+                                        accent = if (net < 0) lossColor() else profitColor(),
+                                        onToggle = {
+                                            if (isOpen) {
+                                                expandedMonths = expandedMonths - month.month
+                                                viewModel.forgetMonth(month.month)
+                                            } else {
+                                                expandedMonths = expandedMonths + month.month
+                                                viewModel.loadMonth(month.month)
+                                            }
+                                        },
+                                        modifier = Modifier.padding(bottom = 6.dp),
+                                    )
+                                }
+                                if (isOpen) {
+                                    val rows = state.monthEntries[month.month]
+                                    if (rows == null) {
+                                        item(key = "loading-${month.month}") {
+                                            Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                                                CircularProgressIndicator(Modifier.height(24.dp))
+                                            }
+                                        }
+                                    } else {
+                                        items(rows, key = { it.id }) { entry ->
+                                            LedgerRow(
+                                                entry = entry,
+                                                onDelete = if (entry.isManual) {
+                                                    { entryToDelete = entry }
+                                                } else null,
+                                            )
+                                            Spacer(Modifier.height(6.dp))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

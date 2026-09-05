@@ -48,19 +48,67 @@ export async function applyCashDeduction(
   }
 }
 
+// The ledger. Without a month it returns the most recent entries, capped,
+// because the register accumulates faster than anything else in the app.
+// With ?month=YYYY-MM it returns that month in full instead - what the
+// app's history view asks for when a folded month is opened, so an old
+// month is never shown as a truncated fragment of itself.
+const monthQuery = /^(\d{4})-(\d{2})$/;
+
+function monthRange(month: string): { gte: Date; lt: Date } | null {
+  const match = monthQuery.exec(month);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  if (monthIndex < 0 || monthIndex > 11) return null;
+  return { gte: new Date(Date.UTC(year, monthIndex, 1)), lt: new Date(Date.UTC(year, monthIndex + 1, 1)) };
+}
+
 cashRegisterRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    const range = month ? monthRange(month) : null;
+    if (month && !range) throw new HttpError(400, "month must look like YYYY-MM");
+
     const entries = await prisma.cashRegisterEntry.findMany({
+      where: range ? { createdAt: range } : undefined,
       orderBy: { createdAt: "desc" },
-      take: 100,
+      ...(range ? {} : { take: 100 }),
     });
-    const balance = entries.reduce((acc, e) => acc.add(e.amount), new Prisma.Decimal(0));
-    // Balance above only covers the most recent 100 entries fetched for
-    // display; recompute the true balance from every entry so it can't
-    // silently drift once history exceeds that page size.
-    const trueBalance = await getCashRegisterBalance();
-    res.json({ balance: trueBalance, entries });
+    // The balance is the register's, not this page's: recompute it from
+    // every entry so it can't drift once history outgrows the page above.
+    const balance = await getCashRegisterBalance();
+    res.json({ balance, entries });
+  })
+);
+
+// One row per month the register has entries in, newest first, with what
+// went in and what went out. This is what the folded month cards show
+// without having to load the months themselves.
+cashRegisterRouter.get(
+  "/months",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.$queryRaw<
+      { month: string; count: bigint; inflow: Prisma.Decimal; outflow: Prisma.Decimal }[]
+    >`
+      SELECT to_char("createdAt", 'YYYY-MM') AS month,
+             COUNT(*) AS count,
+             COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS inflow,
+             COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS outflow
+      FROM "CashRegisterEntry"
+      GROUP BY 1
+      ORDER BY 1 DESC
+    `;
+    res.json(
+      rows.map((row) => ({
+        month: row.month,
+        count: Number(row.count),
+        inflow: row.inflow,
+        outflow: row.outflow,
+        net: new Prisma.Decimal(row.inflow).sub(row.outflow),
+      }))
+    );
   })
 );
 

@@ -50,8 +50,17 @@ import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.SaleDto
+import com.supermarket.inventory.ui.common.MonthGroupHeader
+import com.supermarket.inventory.ui.common.PeriodSummaryCard
+import com.supermarket.inventory.ui.common.PeriodTabs
 import com.supermarket.inventory.ui.common.formatAmount
+import com.supermarket.inventory.ui.common.formatIsoDate
 import com.supermarket.inventory.ui.common.formatIsoDateTime
+import com.supermarket.inventory.ui.common.formatMonth
+import com.supermarket.inventory.ui.common.groupByMonth
+import com.supermarket.inventory.ui.theme.profitColor
+import java.time.YearMonth
+import java.util.Locale
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Schedule
 import com.supermarket.inventory.ui.common.EmptyState
@@ -75,9 +84,65 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
     }
     val unnamedSales = remember(state.sales) { state.sales.filter { it.customerName.isNullOrBlank() } }
 
+    // Settled tabs, folded by the month they were collected in.
+    val locale = Locale.getDefault()
+    val collectedMonths = remember(state.collected) {
+        groupByMonth(state.collected, { it.collectedAt ?: it.createdAt }, { it.totalAmount.toDoubleOrNull() ?: 0.0 })
+    }
+    val collectedTotal = collectedMonths.sumOf { it.total }
+    var showHistory by remember { mutableStateOf(false) }
+    var expandedMonths by remember { mutableStateOf(emptySet<YearMonth>()) }
+
     Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+        if (state.collected.isNotEmpty()) {
+            PeriodTabs(
+                currentText = stringResource(R.string.deferred_tab_open, state.sales.size),
+                historyText = stringResource(R.string.deferred_tab_collected, state.collected.size),
+                showHistory = showHistory,
+                onChange = { showHistory = it },
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            showHistory -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 88.dp),
+            ) {
+                item(key = "collected-summary") {
+                    PeriodSummaryCard(
+                        label = stringResource(R.string.deferred_collected_label),
+                        detail = stringResource(R.string.history_entry_count, state.collected.size),
+                        total = formatAmount(collectedTotal.toString()),
+                        accent = profitColor(),
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                collectedMonths.forEach { bucket ->
+                    val isOpen = bucket.yearMonth in expandedMonths
+                    item(key = "m-${bucket.yearMonth}") {
+                        MonthGroupHeader(
+                            label = formatMonth(bucket.yearMonth, locale),
+                            detail = stringResource(R.string.history_entry_count, bucket.items.size),
+                            total = formatAmount(bucket.total.toString()),
+                            expanded = isOpen,
+                            accent = profitColor(),
+                            onToggle = {
+                                expandedMonths = if (isOpen) expandedMonths - bucket.yearMonth
+                                else expandedMonths + bucket.yearMonth
+                            },
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                    if (isOpen) {
+                        items(bucket.items, key = { it.id }) { sale ->
+                            CollectedSaleRow(sale)
+                            Spacer(Modifier.height(6.dp))
+                        }
+                    }
+                }
+            }
             state.sales.isEmpty() -> EmptyState(
                 icon = Icons.Filled.Schedule,
                 title = stringResource(R.string.deferred_sales_empty),
@@ -85,7 +150,7 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
             )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
+                contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 88.dp),
             ) {
                 items(namedGroups.entries.toList(), key = { it.key }) { (customerName, sales) ->
                     CustomerDeferredGroupCard(
@@ -111,6 +176,7 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
                     Spacer(Modifier.height(8.dp))
                 }
             }
+        }
         }
         FloatingActionButton(
             onClick = { showAddDialog = true },
@@ -140,6 +206,33 @@ fun DeferredSalesTabContent(viewModel: DeferredSalesViewModel = hiltViewModel())
 // across all of them, and an expandable log of the individual entries that
 // add up to it - so adding a new deferred amount for a repeat customer
 // just grows this one total instead of piling up separate rows.
+// A deferred tab that has since been settled. Nothing left to collect - it
+// is here so "who paid up, and when" has an answer.
+@Composable
+private fun CollectedSaleRow(sale: SaleDto) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    sale.customerName?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.deferred_sale_no_customer),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    stringResource(R.string.deferred_collected_on, formatIsoDate(sale.collectedAt ?: sale.createdAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(formatAmount(sale.totalAmount), style = MaterialTheme.typography.bodyMedium, color = profitColor())
+        }
+    }
+}
+
 @Composable
 private fun CustomerDeferredGroupCard(
     customerName: String,

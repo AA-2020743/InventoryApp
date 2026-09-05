@@ -466,6 +466,17 @@ data class DebtInput(
 @JsonClass(generateAdapter = true)
 data class DebtRepayPartialRequest(val amount: Double)
 
+// One month the cash register has entries in, with what went in and what
+// went out - enough for a folded month card without loading the month.
+@JsonClass(generateAdapter = true)
+data class CashMonthDto(
+    val month: String,
+    val count: Int,
+    val inflow: String,
+    val outflow: String,
+    val net: String,
+)
+
 @JsonClass(generateAdapter = true)
 data class CashRegisterEntryDto(
     val id: String,

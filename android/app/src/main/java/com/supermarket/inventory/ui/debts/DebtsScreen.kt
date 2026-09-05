@@ -52,8 +52,18 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.DebtDto
 import com.supermarket.inventory.data.repository.DebtRepository
+import com.supermarket.inventory.ui.common.MonthGroupHeader
+import com.supermarket.inventory.ui.common.PeriodSummaryCard
+import com.supermarket.inventory.ui.common.PeriodTabs
 import com.supermarket.inventory.ui.common.formatAmount
+import com.supermarket.inventory.ui.common.formatIsoDate
 import com.supermarket.inventory.ui.common.formatIsoDateTime
+import com.supermarket.inventory.ui.common.formatMonth
+import com.supermarket.inventory.ui.common.groupByMonth
+import com.supermarket.inventory.ui.theme.profitColor
+import com.supermarket.inventory.ui.theme.warningColor
+import java.time.YearMonth
+import java.util.Locale
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -63,6 +73,8 @@ import com.supermarket.inventory.ui.common.EmptyState
 data class DebtsUiState(
     val isLoading: Boolean = true,
     val debts: List<DebtDto> = emptyList(),
+    // Debts already paid back in full, kept for the Settled tab.
+    val settled: List<DebtDto> = emptyList(),
     val workerSuggestions: List<String> = emptyList(),
 )
 
@@ -85,6 +97,14 @@ class DebtsViewModel @Inject constructor(
             when (val result = repository.getDebts(status = "OUTSTANDING")) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, debts = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false)
+            }
+            // Settled debts used to disappear the moment they were repaid,
+            // leaving no way to answer "did he ever pay that back?". They
+            // live in the Settled tab now, folded by the month they were
+            // repaid in.
+            when (val settledResult = repository.getDebts(status = "REPAID")) {
+                is ApiResult.Success -> uiState = uiState.copy(settled = settledResult.data)
+                is ApiResult.Error -> Unit
             }
         }
     }
@@ -147,10 +167,66 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
     val groups = remember(state.debts) {
         state.debts.groupBy { it.workerName.trim() }.toSortedMap()
     }
+    // Settled debts, folded by the month they were paid back in - the record
+    // of who cleared what, which the outstanding list can't hold.
+    val locale = Locale.getDefault()
+    val settledMonths = remember(state.settled) {
+        groupByMonth(state.settled, { it.repaidAt ?: it.createdAt }, { it.amount.toDoubleOrNull() ?: 0.0 })
+    }
+    val settledTotal = settledMonths.sumOf { it.total }
+    var showHistory by remember { mutableStateOf(false) }
+    var expandedMonths by remember { mutableStateOf(emptySet<YearMonth>()) }
 
     Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+        if (state.settled.isNotEmpty()) {
+            PeriodTabs(
+                currentText = stringResource(R.string.debts_tab_outstanding, state.debts.size),
+                historyText = stringResource(R.string.debts_tab_settled, state.settled.size),
+                showHistory = showHistory,
+                onChange = { showHistory = it },
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            showHistory -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 88.dp),
+            ) {
+                item(key = "settled-summary") {
+                    PeriodSummaryCard(
+                        label = stringResource(R.string.debts_settled_label),
+                        detail = stringResource(R.string.history_entry_count, state.settled.size),
+                        total = formatAmount(settledTotal.toString()),
+                        accent = profitColor(),
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                settledMonths.forEach { bucket ->
+                    val isOpen = bucket.yearMonth in expandedMonths
+                    item(key = "m-${bucket.yearMonth}") {
+                        MonthGroupHeader(
+                            label = formatMonth(bucket.yearMonth, locale),
+                            detail = stringResource(R.string.history_entry_count, bucket.items.size),
+                            total = formatAmount(bucket.total.toString()),
+                            expanded = isOpen,
+                            accent = profitColor(),
+                            onToggle = {
+                                expandedMonths = if (isOpen) expandedMonths - bucket.yearMonth
+                                else expandedMonths + bucket.yearMonth
+                            },
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                    if (isOpen) {
+                        items(bucket.items, key = { it.id }) { debt ->
+                            SettledDebtRow(debt)
+                            Spacer(Modifier.height(6.dp))
+                        }
+                    }
+                }
+            }
             state.debts.isEmpty() -> EmptyState(
                 icon = Icons.Filled.AccountBalanceWallet,
                 title = stringResource(R.string.debts_empty),
@@ -158,7 +234,7 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
             )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
+                contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 88.dp),
             ) {
                 items(groups.entries.toList(), key = { it.key }) { (workerName, debts) ->
                     WorkerDebtGroupCard(
@@ -174,6 +250,7 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
                     Spacer(Modifier.height(8.dp))
                 }
             }
+        }
         }
         FloatingActionButton(
             onClick = { addError = null; showAddDialog = true },
@@ -195,6 +272,29 @@ fun DebtsTabContent(viewModel: DebtsViewModel = hiltViewModel()) {
                 }
             },
         )
+    }
+}
+
+// A debt that has been paid back in full. Nothing to act on - it's here so
+// the question "did that ever come back?" has an answer.
+@Composable
+private fun SettledDebtRow(debt: DebtDto) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(debt.workerName, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.debt_repaid_on, formatIsoDate(debt.repaidAt ?: debt.createdAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(formatAmount(debt.amount), style = MaterialTheme.typography.bodyMedium, color = profitColor())
+        }
     }
 }
 

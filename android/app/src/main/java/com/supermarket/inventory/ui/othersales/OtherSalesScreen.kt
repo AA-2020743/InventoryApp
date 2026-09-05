@@ -53,8 +53,16 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.OtherSaleDto
 import com.supermarket.inventory.data.repository.OtherSaleRepository
+import com.supermarket.inventory.ui.common.MonthGroupHeader
+import com.supermarket.inventory.ui.common.PeriodSummaryCard
+import com.supermarket.inventory.ui.common.PeriodTabs
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatIsoDate
+import com.supermarket.inventory.ui.common.formatMonth
+import com.supermarket.inventory.ui.common.groupByMonth
+import com.supermarket.inventory.ui.theme.profitColor
+import java.time.YearMonth
+import java.util.Locale
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -124,6 +132,20 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
     var entryToEdit by remember { mutableStateOf<OtherSaleDto?>(null) }
     var entryToDelete by remember { mutableStateOf<OtherSaleDto?>(null) }
 
+    // Same shelving as expenses: the month in progress stays a plain list,
+    // older months fold into one card each.
+    val locale = Locale.getDefault()
+    val buckets = remember(state.entries) {
+        groupByMonth(state.entries, { it.date }, { it.amount.toDoubleOrNull() ?: 0.0 })
+    }
+    val thisMonth = remember(buckets) { YearMonth.now() }
+    val current = buckets.firstOrNull { it.yearMonth == thisMonth }
+    val earlier = buckets.filter { it.yearMonth != thisMonth }
+    val earlierCount = earlier.sumOf { it.items.size }
+    val earlierTotal = earlier.sumOf { it.total }
+    var showHistory by remember { mutableStateOf(false) }
+    var expandedMonths by remember { mutableStateOf(emptySet<YearMonth>()) }
+
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             // One chip per category already in use - the common case is
@@ -136,13 +158,11 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
                     modifier = Modifier.padding(start = 12.dp, top = 12.dp),
                 )
                 // Wraps rather than scrolling sideways, same as the expense
-                // chips, with a height cap so a long list can't crowd out
-                // the entries below.
+                // chips, and at full height - all of them visible at once
+                // instead of a band you have to scroll inside.
                 FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 148.dp)
-                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -156,6 +176,19 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
                     }
                 }
             }
+            if (earlier.isNotEmpty()) {
+                PeriodTabs(
+                    currentText = stringResource(
+                        R.string.history_tab_current,
+                        formatMonth(thisMonth, locale),
+                        current?.items?.size ?: 0,
+                    ),
+                    historyText = stringResource(R.string.history_tab_earlier, earlierCount),
+                    showHistory = showHistory,
+                    onChange = { showHistory = it },
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             // weight(1f) rather than fillMaxSize(): the chip row above already
             // consumed part of the column, so the list has to take what's
             // left over instead of asking for the full height and overflowing.
@@ -167,9 +200,69 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
                         title = stringResource(R.string.other_sales_empty),
                         hint = stringResource(R.string.other_sales_empty_hint),
                     )
-                    else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
-                        items(state.entries, key = { it.id }) { entry ->
-                            OtherSaleRow(entry, onEdit = { entryToEdit = entry }, onDelete = { entryToDelete = entry })
+                    // Bottom padding so the add button doesn't sit on top of
+                    // the last row's controls.
+                    else -> LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 88.dp),
+                    ) {
+                        if (!showHistory) {
+                            item(key = "summary") {
+                                PeriodSummaryCard(
+                                    label = formatMonth(thisMonth, locale),
+                                    detail = stringResource(R.string.history_entry_count, current?.items?.size ?: 0),
+                                    total = formatAmount((current?.total ?: 0.0).toString()),
+                                    accent = profitColor(),
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                            if (current == null) {
+                                item(key = "empty-month") {
+                                    Text(
+                                        stringResource(R.string.history_nothing_this_month),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            items(current?.items.orEmpty(), key = { it.id }) { entry ->
+                                OtherSaleRow(entry, onEdit = { entryToEdit = entry }, onDelete = { entryToDelete = entry })
+                            }
+                        } else {
+                            item(key = "summary-history") {
+                                PeriodSummaryCard(
+                                    label = stringResource(R.string.history_earlier_label),
+                                    detail = stringResource(R.string.history_entry_count, earlierCount),
+                                    total = formatAmount(earlierTotal.toString()),
+                                    accent = profitColor(),
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                            earlier.forEach { bucket ->
+                                val isOpen = bucket.yearMonth in expandedMonths
+                                item(key = "m-${bucket.yearMonth}") {
+                                    MonthGroupHeader(
+                                        label = formatMonth(bucket.yearMonth, locale),
+                                        detail = stringResource(R.string.history_entry_count, bucket.items.size),
+                                        total = formatAmount(bucket.total.toString()),
+                                        expanded = isOpen,
+                                        accent = profitColor(),
+                                        onToggle = {
+                                            expandedMonths = if (isOpen) {
+                                                expandedMonths - bucket.yearMonth
+                                            } else {
+                                                expandedMonths + bucket.yearMonth
+                                            }
+                                        },
+                                        modifier = Modifier.padding(bottom = 6.dp),
+                                    )
+                                }
+                                if (isOpen) {
+                                    items(bucket.items, key = { it.id }) { entry ->
+                                        OtherSaleRow(entry, onEdit = { entryToEdit = entry }, onDelete = { entryToDelete = entry })
+                                    }
+                                }
+                            }
                         }
                     }
                 }

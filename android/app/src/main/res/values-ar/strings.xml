@@ -402,4 +402,29 @@
     <string name="invoice_now_empty">هذه الفاتورة لم تعد تغطي شيئًا، لذا قيمتها 0.00.</string>
     <string name="invoice_delete_empty">حذف هذه الفاتورة</string>
     <string name="purchase_history_revaluation">تم ضبط التكلفة على %1$s</string>
+    <!-- Month-by-month history, shared by every section that records as it goes -->
+    <string name="history_tab_current">%1$s · %2$d</string>
+    <string name="history_tab_earlier">السجل · %1$d</string>
+    <string name="history_entry_count">%1$d حركة</string>
+    <string name="history_earlier_label">كل ما قبل هذا الشهر</string>
+    <string name="history_nothing_this_month">لم تُسجَّل أي حركة هذا الشهر بعد.</string>
+    <string name="history_cash_flows">وارد %1$s · صادر %2$s</string>
+    <!-- The Other hub -->
+    <string name="others_back_to_hub">العودة إلى أخرى</string>
+    <string name="others_caption_invoices">مستحق للموردين</string>
+    <string name="others_caption_cash">الموجود في الخزينة</string>
+    <string name="others_caption_deferred">مستحق على العملاء</string>
+    <string name="others_caption_debts">مُقرَض للعاملين</string>
+    <string name="others_caption_other_sales">دخل هذا الشهر</string>
+    <string name="others_caption_assets">ما يملكه المحل</string>
+    <!-- Settled debts and collected tabs -->
+    <string name="debts_tab_outstanding">قائمة · %1$d</string>
+    <string name="debts_tab_settled">مسددة · %1$d</string>
+    <string name="debts_settled_label">تم سدادها بالكامل</string>
+    <string name="debt_repaid_on">سُددت في %1$s</string>
+    <string name="deferred_tab_open">مفتوحة · %1$d</string>
+    <string name="deferred_tab_collected">محصَّلة · %1$d</string>
+    <string name="deferred_collected_label">تم تحصيلها بالكامل</string>
+    <string name="deferred_collected_on">حُصِّلت في %1$s</string>
+    <string name="deferred_sale_no_customer">بدون اسم عميل</string>
 </resources>
