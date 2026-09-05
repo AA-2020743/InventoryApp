@@ -403,7 +403,7 @@
     <string name="invoice_delete_empty">حذف هذه الفاتورة</string>
     <string name="purchase_history_revaluation">تم ضبط التكلفة على %1$s</string>
     <!-- Month-by-month history, shared by every section that records as it goes -->
-    <string name="history_tab_current">%1$s</string>
+    <string name="history_tab_current">هذا الشهر</string>
     <string name="history_tab_earlier">السجل</string>
     <string name="history_entry_count">%1$d حركة</string>
     <string name="history_earlier_label">كل ما قبل هذا الشهر</string>

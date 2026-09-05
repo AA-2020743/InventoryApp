@@ -101,7 +101,7 @@ fun CashRegisterTabContent(viewModel: CashRegisterViewModel = hiltViewModel()) {
                 val thisMonthSummary = state.months.firstOrNull { it.month == thisMonthKey }
                 if (earlierMonths.isNotEmpty()) {
                     PeriodTabs(
-                        currentText = stringResource(R.string.history_tab_current, formatMonth(YearMonth.now(), locale)),
+                        currentText = stringResource(R.string.history_tab_current),
                         historyText = stringResource(R.string.history_tab_earlier),
                         showHistory = showHistory,
                         onChange = { showHistory = it },

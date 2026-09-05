@@ -178,7 +178,7 @@ fun OtherSalesTabContent(viewModel: OtherSalesViewModel = hiltViewModel()) {
             }
             if (earlier.isNotEmpty()) {
                 PeriodTabs(
-                    currentText = stringResource(R.string.history_tab_current, formatMonth(thisMonth, locale)),
+                    currentText = stringResource(R.string.history_tab_current),
                     historyText = stringResource(R.string.history_tab_earlier),
                     showHistory = showHistory,
                     onChange = { showHistory = it },

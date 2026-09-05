@@ -17,6 +17,21 @@ export const salesRouter = Router();
 // blindly adding. Explicitly excludes isPartialSaleCollection entries
 // (collectSaleAmount's own ledger rows) from that lookup, and only ever
 // syncs totalAmount-amountCollected - the part partial payments haven't
+// What a sale's cash-register entry says in the ledger. The entry carries
+// its saleId as a column, so spelling the id out in the note bought nothing
+// and cost a line of unreadable hex on the one screen the owner scans by
+// eye. The customer's name, when there is one, is the part that actually
+// helps place a row.
+function saleNote(customerName: string | null | undefined): string {
+  const name = customerName?.trim();
+  return name ? `Sale to ${name}` : "Sale";
+}
+
+function saleCollectionNote(customerName: string | null | undefined): string {
+  const name = customerName?.trim();
+  return name ? `Payment received from ${name}` : "Payment received";
+}
+
 // already covered - so a sale that's been partially collected and then
 // force-flipped to PAID via a direct edit doesn't get double-credited.
 async function syncSaleCashEntry(
@@ -24,7 +39,8 @@ async function syncSaleCashEntry(
   saleId: string,
   paymentStatus: "PAID" | "DEFERRED",
   totalAmount: Prisma.Decimal,
-  amountCollected: Prisma.Decimal
+  amountCollected: Prisma.Decimal,
+  customerName: string | null
 ): Promise<void> {
   const existing = await tx.cashRegisterEntry.findFirst({ where: { saleId, isPartialSaleCollection: false } });
   const syncAmount = totalAmount.sub(amountCollected);
@@ -34,7 +50,9 @@ async function syncSaleCashEntry(
         await tx.cashRegisterEntry.update({ where: { id: existing.id }, data: { amount: syncAmount } });
       }
     } else {
-      await tx.cashRegisterEntry.create({ data: { amount: syncAmount, note: `Sale ${saleId}`, saleId } });
+      await tx.cashRegisterEntry.create({
+        data: { amount: syncAmount, note: saleNote(customerName), saleId },
+      });
     }
   } else if (existing) {
     await tx.cashRegisterEntry.delete({ where: { id: existing.id } });
@@ -48,7 +66,12 @@ async function syncSaleCashEntry(
 // once the running total reaches its totalAmount.
 async function collectSaleAmount(
   tx: Prisma.TransactionClient,
-  sale: { id: string; totalAmount: Prisma.Decimal; amountCollected: Prisma.Decimal },
+  sale: {
+    id: string;
+    totalAmount: Prisma.Decimal;
+    amountCollected: Prisma.Decimal;
+    customerName: string | null;
+  },
   amount: Prisma.Decimal
 ) {
   const remaining = sale.totalAmount.sub(sale.amountCollected);
@@ -62,7 +85,7 @@ async function collectSaleAmount(
   await tx.cashRegisterEntry.create({
     data: {
       amount,
-      note: `Payment received for sale ${sale.id}`,
+      note: saleCollectionNote(sale.customerName),
       saleId: sale.id,
       isPartialSaleCollection: true,
     },
@@ -253,7 +276,9 @@ salesRouter.post(
           },
           include: { items: { include: { product: true } } },
         });
-        await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount, created.amountCollected);
+        await syncSaleCashEntry(
+        tx, created.id, created.paymentStatus, created.totalAmount, created.amountCollected, created.customerName,
+      );
         return created;
       });
       res.status(201).json(sale);
@@ -322,7 +347,9 @@ salesRouter.post(
         });
       }
 
-      await syncSaleCashEntry(tx, created.id, created.paymentStatus, created.totalAmount, created.amountCollected);
+      await syncSaleCashEntry(
+        tx, created.id, created.paymentStatus, created.totalAmount, created.amountCollected, created.customerName,
+      );
 
       return created;
     });
@@ -474,7 +501,9 @@ salesRouter.put(
           });
         }
 
-        await syncSaleCashEntry(tx, sale.id, sale.paymentStatus, sale.totalAmount, sale.amountCollected);
+        await syncSaleCashEntry(
+          tx, sale.id, sale.paymentStatus, sale.totalAmount, sale.amountCollected, sale.customerName,
+        );
 
         return sale;
       },

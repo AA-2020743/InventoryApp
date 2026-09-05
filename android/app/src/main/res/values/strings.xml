@@ -403,7 +403,7 @@
     <string name="invoice_delete_empty">Delete this invoice</string>
     <string name="purchase_history_revaluation">Cost set to %1$s</string>
     <!-- Month-by-month history, shared by every section that records as it goes -->
-    <string name="history_tab_current">%1$s</string>
+    <string name="history_tab_current">This month</string>
     <string name="history_tab_earlier">History</string>
     <string name="history_entry_count">%1$d entries</string>
     <string name="history_earlier_label">Everything before this month</string>
