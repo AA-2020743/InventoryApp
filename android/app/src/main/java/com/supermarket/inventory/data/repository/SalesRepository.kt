@@ -9,6 +9,7 @@ import com.supermarket.inventory.data.remote.dto.SaleEditInput
 import com.supermarket.inventory.data.remote.dto.SaleInput
 import com.supermarket.inventory.data.remote.dto.SaleItemInput
 import com.supermarket.inventory.data.remote.dto.SalesForRangeResponse
+import com.supermarket.inventory.data.remote.dto.SalesMonthDto
 import javax.inject.Inject
 import javax.inject.Singleton
 

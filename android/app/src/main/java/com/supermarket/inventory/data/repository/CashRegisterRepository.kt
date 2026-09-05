@@ -3,6 +3,7 @@ package com.supermarket.inventory.data.repository
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.apiCall
 import com.supermarket.inventory.data.remote.ApiService
+import com.supermarket.inventory.data.remote.dto.CashMonthDto
 import com.supermarket.inventory.data.remote.dto.CashRegisterEntryRequest
 import com.supermarket.inventory.data.remote.dto.CashRegisterEntryResponse
 import com.supermarket.inventory.data.remote.dto.CashRegisterResponse
