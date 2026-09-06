@@ -438,4 +438,8 @@
     <string name="inventory_filter_categories">تصفية حسب التصنيف</string>
     <string name="expense_spoiled_name">تالف: %1$s</string>
     <string name="login_session_expired">انتهت جلستك. من فضلك سجّل الدخول مرة أخرى.</string>
+    <!-- Finding a product on an invoice line -->
+    <string name="product_search_hint">اكتب الاسم أو الباركود للعثور على منتج.</string>
+    <string name="product_search_no_matches">لا يوجد منتج مطابق.</string>
+    <string name="product_search_more">%1$d نتيجة أخرى. تابع الكتابة لتضييق البحث.</string>
 </resources>

@@ -438,4 +438,8 @@
     <string name="inventory_filter_categories">Filter by category</string>
     <string name="expense_spoiled_name">Spoiled: %1$s</string>
     <string name="login_session_expired">Your session has ended. Please sign in again.</string>
+    <!-- Finding a product on an invoice line -->
+    <string name="product_search_hint">Type a name or barcode to find a product.</string>
+    <string name="product_search_no_matches">No product matches that.</string>
+    <string name="product_search_more">%1$d more match. Keep typing to narrow it down.</string>
 </resources>

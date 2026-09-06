@@ -1,6 +1,7 @@
 package com.supermarket.inventory.ui.invoices
 
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -386,7 +387,6 @@ private fun LinkedStockDialog(
     val scope = rememberCoroutineScope()
     var productQuery by remember { mutableStateOf("") }
     var selectedProduct by remember { mutableStateOf<ProductDto?>(null) }
-    var productExpanded by remember { mutableStateOf(false) }
     var quantity by remember { mutableStateOf("") }
     var unitCost by remember { mutableStateOf("") }
     var addError by remember { mutableStateOf<String?>(null) }
@@ -398,15 +398,6 @@ private fun LinkedStockDialog(
     var lineError by remember { mutableStateOf<String?>(null) }
     var lineBusy by remember { mutableStateOf(false) }
 
-    // Every match, not a capped slice of them: the cap that used to be here
-    // silently hid everything past the twentieth product, so a shop with
-    // more than that had items it simply could not pick. The list below is
-    // lazy and bounded in height instead, which handles a long catalogue
-    // without composing all of it.
-    val matches = state.products.filter {
-        productQuery.isBlank() || it.name.contains(productQuery, ignoreCase = true) ||
-            (it.barcode?.contains(productQuery, ignoreCase = true) == true)
-    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -581,43 +572,21 @@ private fun LinkedStockDialog(
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(R.string.invoice_add_stock), style = MaterialTheme.typography.titleSmall)
 
-                ExposedDropdownMenuBox(
-                    expanded = productExpanded && matches.isNotEmpty(),
-                    onExpandedChange = { productExpanded = it },
+                ProductPicker(
+                    products = state.products,
+                    query = productQuery,
+                    onQueryChange = { productQuery = it; selectedProduct = null },
+                    selected = selectedProduct,
+                    onSelect = { product ->
+                        selectedProduct = product
+                        productQuery = product.name
+                        // Seed with the product's known cost; the owner
+                        // overrides it when this invoice charged a
+                        // different price.
+                        if (unitCost.isBlank()) unitCost = product.purchaseCost
+                    },
                     modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = selectedProduct?.name ?: productQuery,
-                        onValueChange = { productQuery = it; selectedProduct = null; productExpanded = true },
-                        label = { Text(stringResource(R.string.invoice_pick_product)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    )
-                    DropdownMenu(
-                        expanded = productExpanded && matches.isNotEmpty(),
-                        onDismissRequest = { productExpanded = false },
-                    ) {
-                        // Bounded height so the lazy list has something to
-                        // measure against inside the menu's own scroll, and
-                        // so only the visible rows are ever composed.
-                        LazyColumn(Modifier.heightIn(max = 320.dp)) {
-                            items(matches, key = { it.id }) { product ->
-                                DropdownMenuItem(
-                                    text = { Text(product.name) },
-                                    onClick = {
-                                        selectedProduct = product
-                                        productQuery = product.name
-                                        // Seed with the product's known cost;
-                                        // the owner overrides it when this
-                                        // invoice charged a different price.
-                                        if (unitCost.isBlank()) unitCost = product.purchaseCost
-                                        productExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
+                )
                 OutlinedTextField(
                     value = quantity,
                     onValueChange = { quantity = it },
@@ -815,7 +784,6 @@ private fun PurchaseInvoiceDialog(
     // The line being typed, before it's added to the list above.
     var productQuery by remember { mutableStateOf("") }
     var selectedProduct by remember { mutableStateOf<ProductDto?>(null) }
-    var productExpanded by remember { mutableStateOf(false) }
     var quantity by remember { mutableStateOf("") }
     var unitCost by remember { mutableStateOf("") }
     var showQuickAddProduct by remember { mutableStateOf(false) }
@@ -826,15 +794,6 @@ private fun PurchaseInvoiceDialog(
     val linesOrAmountMessage = stringResource(R.string.invoice_needs_lines_or_amount)
     val dueDateMessage = stringResource(R.string.invoice_needs_due_date)
 
-    // Every match, not a capped slice of them: the cap that used to be here
-    // silently hid everything past the twentieth product, so a shop with
-    // more than that had items it simply could not pick. The list below is
-    // lazy and bounded in height instead, which handles a long catalogue
-    // without composing all of it.
-    val matches = state.products.filter {
-        productQuery.isBlank() || it.name.contains(productQuery, ignoreCase = true) ||
-            (it.barcode?.contains(productQuery, ignoreCase = true) == true)
-    }
     val linesTotal = lines.sumOf { it.total }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -960,52 +919,24 @@ private fun PurchaseInvoiceDialog(
                     )
                 }
 
-                // Unlike the picker on an existing invoice, this one opens
-                // even when nothing matches - "no such product" is exactly
-                // when the create-new entry at the bottom is wanted.
-                ExposedDropdownMenuBox(
-                    expanded = productExpanded,
-                    onExpandedChange = { productExpanded = it },
+                // A delivery often brings something the shop has never
+                // stocked, so this picker also offers to create it - always
+                // visible, since "no such product" is exactly when it's
+                // wanted and exactly when there are no results to scroll
+                // past to reach it.
+                ProductPicker(
+                    products = state.products,
+                    query = productQuery,
+                    onQueryChange = { productQuery = it; selectedProduct = null },
+                    selected = selectedProduct,
+                    onSelect = { product ->
+                        selectedProduct = product
+                        productQuery = product.name
+                        if (unitCost.isBlank()) unitCost = product.purchaseCost
+                    },
                     modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = selectedProduct?.name ?: productQuery,
-                        onValueChange = { productQuery = it; selectedProduct = null; productExpanded = true },
-                        label = { Text(stringResource(R.string.invoice_pick_product)) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = productExpanded) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    )
-                    DropdownMenu(
-                        expanded = productExpanded,
-                        onDismissRequest = { productExpanded = false },
-                    ) {
-                        LazyColumn(Modifier.heightIn(max = 320.dp)) {
-                            items(matches, key = { it.id }) { product ->
-                                DropdownMenuItem(
-                                    text = { Text(product.name) },
-                                    onClick = {
-                                        selectedProduct = product
-                                        productQuery = product.name
-                                        if (unitCost.isBlank()) unitCost = product.purchaseCost
-                                        productExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                        // A delivery often brings something the shop has
-                        // never stocked. Creating it here keeps the invoice
-                        // being typed intact instead of sending the owner
-                        // off to Inventory and back. It sits outside the
-                        // scrolling list so it stays reachable however many
-                        // products there are.
-                        if (matches.isNotEmpty()) Divider()
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.product_quick_add)) },
-                            onClick = { productExpanded = false; showQuickAddProduct = true },
-                        )
-                    }
-                }
+                    onCreateNew = { showQuickAddProduct = true },
+                )
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = quantity,
@@ -1564,6 +1495,121 @@ private fun InvoiceDialog(
                 }
             },
         )
+    }
+}
+
+// Finding a product to put on an invoice line.
+//
+// A search box with its results beneath it, not a dropdown of everything.
+// A catalogue runs to hundreds of items: listing them all in a menu is
+// unusable, and a menu that needs its own scrolling list cannot be built at
+// all - a dropdown measures its content's intrinsic width, which a lazy
+// list has no answer for, and asking crashes.
+//
+// Results are capped so the dialog stays a dialog, but the cap says so.
+// A silent one is what hid products here before.
+private const val MAX_PRODUCT_MATCHES = 8
+
+@Composable
+private fun ProductPicker(
+    products: List<ProductDto>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    selected: ProductDto?,
+    onSelect: (ProductDto) -> Unit,
+    modifier: Modifier = Modifier,
+    onCreateNew: (() -> Unit)? = null,
+) {
+    val trimmed = query.trim()
+    val matches = remember(products, trimmed, selected) {
+        if (trimmed.isBlank() || selected != null) {
+            emptyList()
+        } else {
+            products.filter {
+                it.name.contains(trimmed, ignoreCase = true) ||
+                    (it.barcode?.contains(trimmed, ignoreCase = true) == true)
+            }
+        }
+    }
+    val shown = matches.take(MAX_PRODUCT_MATCHES)
+
+    Column(modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text(stringResource(R.string.invoice_pick_product)) },
+            singleLine = true,
+            trailingIcon = {
+                Icon(
+                    if (selected != null) Icons.Filled.CheckCircle else Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = if (selected != null) profitColor() else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        when {
+            selected != null -> Unit
+            trimmed.isBlank() -> Text(
+                stringResource(R.string.product_search_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            matches.isEmpty() -> Text(
+                stringResource(R.string.product_search_no_matches),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            else -> {
+                shown.forEach { product ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(product) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(product.name, style = MaterialTheme.typography.bodyMedium)
+                            product.barcode?.takeIf { it.isNotBlank() }?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        // What's on the shelf already, so a delivery can be
+                        // checked against it without leaving the dialog.
+                        Text(
+                            formatQuantity(product.quantity),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Divider()
+                }
+                if (matches.size > shown.size) {
+                    Text(
+                        stringResource(R.string.product_search_more, matches.size - shown.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
+
+        onCreateNew?.let { create ->
+            TextButton(onClick = create, modifier = Modifier.padding(top = 4.dp)) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.product_quick_add))
+            }
+        }
     }
 }
 
