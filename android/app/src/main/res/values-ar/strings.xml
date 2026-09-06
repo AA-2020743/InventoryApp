@@ -446,5 +446,9 @@
     <string name="stats_net_day">صافي اليوم</string>
     <string name="stats_net_month">صافي الشهر</string>
     <string name="stats_flow_cost">تكلفة البضاعة</string>
-    <string name="stats_flow_left">المتبقي</string>
+    <string name="stats_margin_highest">الأعلى</string>
+    <string name="stats_margin_lowest">الأدنى</string>
+    <string name="stats_margin_detail">التكلفة %1$s · البيع %2$s · الهامش %3$s</string>
+    <string name="stats_product_revenue">إيراد %1$s</string>
+    <string name="stats_pick_month">اختر الشهر</string>
 </resources>

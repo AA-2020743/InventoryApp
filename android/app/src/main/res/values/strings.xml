@@ -446,5 +446,9 @@
     <string name="stats_net_day">Net for the day</string>
     <string name="stats_net_month">Net for the month</string>
     <string name="stats_flow_cost">Cost of goods</string>
-    <string name="stats_flow_left">Left over</string>
+    <string name="stats_margin_highest">Highest</string>
+    <string name="stats_margin_lowest">Lowest</string>
+    <string name="stats_margin_detail">Cost %1$s · Sells %2$s · Margin %3$s</string>
+    <string name="stats_product_revenue">Revenue %1$s</string>
+    <string name="stats_pick_month">Pick a month</string>
 </resources>
