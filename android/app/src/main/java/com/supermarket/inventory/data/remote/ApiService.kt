@@ -126,6 +126,9 @@ interface ApiService {
         @Query("to") to: String? = null,
         @Query("limit") limit: Int? = null,
         @Query("paymentStatus") paymentStatus: String? = null,
+        // Only tabs that were settled, as opposed to sales paid at the
+        // counter. Filtered server-side because the limit applies first.
+        @Query("collected") collected: Boolean? = null,
     ): List<SaleDto>
 
     @GET("api/sales/for-range")

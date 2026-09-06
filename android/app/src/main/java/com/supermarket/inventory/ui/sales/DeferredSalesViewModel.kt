@@ -38,16 +38,18 @@ class DeferredSalesViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
-            when (val result = salesRepository.getSales(paymentStatus = "DEFERRED", limit = 200)) {
+            when (val result = salesRepository.getSales(paymentStatus = "DEFERRED")) {
                 is ApiResult.Success -> uiState = uiState.copy(isLoading = false, sales = result.data)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
             }
             // A collectedAt is what separates a tab that was settled from an
-            // ordinary sale paid at the counter - only the former belongs in
-            // this screen's history.
-            when (val collectedResult = salesRepository.getSales(paymentStatus = "PAID", limit = 200)) {
-                is ApiResult.Success ->
-                    uiState = uiState.copy(collected = collectedResult.data.filter { it.collectedAt != null })
+            // ordinary sale paid at the counter. The server does that
+            // filtering: asked for "the last 200 paid sales" and then
+            // filtered here, a shop that rings up mostly counter sales
+            // would see an almost empty history however many tabs it had
+            // actually collected.
+            when (val collectedResult = salesRepository.getSales(paymentStatus = "PAID", collected = true)) {
+                is ApiResult.Success -> uiState = uiState.copy(collected = collectedResult.data)
                 is ApiResult.Error -> Unit
             }
         }

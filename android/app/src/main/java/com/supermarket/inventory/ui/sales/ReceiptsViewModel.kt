@@ -49,7 +49,7 @@ class ReceiptsViewModel @Inject constructor(
                 is ApiResult.Error -> uiState = uiState.copy(error = monthsResult.message)
             }
             val current = YearMonth.now().toString()
-            when (val result = salesRepository.getSalesForRange("month", anyDayIn(current), limit = 500)) {
+            when (val result = salesRepository.getSalesForRange("month", anyDayIn(current))) {
                 is ApiResult.Success ->
                     uiState = uiState.copy(isLoading = false, currentMonthSales = result.data.items)
                 is ApiResult.Error -> uiState = uiState.copy(isLoading = false, error = result.message)
@@ -64,7 +64,7 @@ class ReceiptsViewModel @Inject constructor(
         if (!force && uiState.monthSales.containsKey(month)) return
         viewModelScope.launch {
             uiState = uiState.copy(loadingMonth = month)
-            when (val result = salesRepository.getSalesForRange("month", anyDayIn(month), limit = 500)) {
+            when (val result = salesRepository.getSalesForRange("month", anyDayIn(month))) {
                 is ApiResult.Success ->
                     uiState = uiState.copy(
                         loadingMonth = null,

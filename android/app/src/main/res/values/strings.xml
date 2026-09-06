@@ -451,4 +451,7 @@
     <string name="stats_margin_detail">Cost %1$s · Sells %2$s · Margin %3$s</string>
     <string name="stats_product_revenue">Revenue %1$s</string>
     <string name="stats_pick_month">Pick a month</string>
+    <string name="inventory_report_units">%1$s units</string>
+    <string name="inventory_report_categories">%1$d categories</string>
+    <string name="inventory_report_low_stock_count">%1$d products low on stock</string>
 </resources>

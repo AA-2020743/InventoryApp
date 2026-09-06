@@ -28,7 +28,11 @@ statsRouter.get(
   asyncHandler(async (req, res) => {
     const period = typeof req.query.period === "string" ? req.query.period : "day";
     const date = typeof req.query.date === "string" ? req.query.date : undefined;
-    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    // Uncapped by default, for the same reason as /margins: the app draws
+    // its by-category and by-item charts from what this returns, and a
+    // capped list makes those charts describe the top few products rather
+    // than the period.
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const sortBy = req.query.sortBy === "profit" ? "profit" : "quantity";
     const { from, to } = rangeFor(period, date);
 
@@ -74,20 +78,30 @@ statsRouter.get(
       .map((p) => ({ ...p, profit: p.revenue.sub(p.cost) }))
       .sort((a, b) =>
         sortBy === "profit" ? b.profit.sub(a.profit).toNumber() : b.quantitySold - a.quantitySold
-      )
-      .slice(0, limit);
+      );
 
-    res.json({ period, from, to, sortBy, items: ranked });
+    res.json({
+      period,
+      from,
+      to,
+      sortBy,
+      items: limit === undefined ? ranked : ranked.slice(0, limit),
+    });
   })
 );
 
 // Static per-product margin ranking (independent of sales volume) — which
 // items are the most profitable *per unit* to sell, e.g. to prioritize
 // promoting or restocking. marginPercent is relative to selling price.
+//
+// Uncapped by default: this is every product's margin, not a top-N. The app
+// reports the catalogue's highest, average and lowest margin from what this
+// returns, and a cap would make "lowest" mean "lowest of the ones we sent",
+// which is a different and misleading number.
 statsRouter.get(
   "/margins",
   asyncHandler(async (req, res) => {
-    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
 
     const products = await prisma.product.findMany({ where: { active: true } });
 
@@ -105,10 +119,9 @@ statsRouter.get(
           marginPercent,
         };
       })
-      .sort((a, b) => b.marginPercent.sub(a.marginPercent).toNumber())
-      .slice(0, limit);
+      .sort((a, b) => b.marginPercent.sub(a.marginPercent).toNumber());
 
-    res.json({ items: ranked });
+    res.json({ items: limit === undefined ? ranked : ranked.slice(0, limit) });
   })
 );
 

@@ -133,11 +133,21 @@ salesRouter.get(
   asyncHandler(async (req, res) => {
     const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
     const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
-    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    // Uncapped when no limit is asked for. Its callers are the deferred-tab
+    // lists, which fold their own results by month and so need all of them;
+    // a default cap there silently hid tabs, and hid them after the
+    // filtering rather than before it.
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const paymentStatus =
       req.query.paymentStatus === "PAID" || req.query.paymentStatus === "DEFERRED"
         ? req.query.paymentStatus
         : undefined;
+    // A sale with a collectedAt is a tab that was settled, as opposed to one
+    // paid at the counter. Filtering for it here rather than in the app
+    // matters: the limit applies before any client-side filter, so asking
+    // for "the last 200 paid sales" and then keeping the collected ones
+    // could return almost none of them however many there really are.
+    const collectedOnly = req.query.collected === "true";
 
     const sales = await prisma.sale.findMany({
       where: {
@@ -146,10 +156,11 @@ salesRouter.get(
           ...(to ? { lte: to } : {}),
         },
         ...(paymentStatus ? { paymentStatus } : {}),
+        ...(collectedOnly ? { collectedAt: { not: null } } : {}),
       },
       include: { items: { include: { product: true } } },
       orderBy: { createdAt: "desc" },
-      take: limit,
+      ...(limit === undefined ? {} : { take: limit }),
     });
     res.json(sales);
   })
@@ -170,13 +181,16 @@ salesRouter.get(
     const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
     const from = period === "month" ? startOfMonth(dateParam) : startOfDay(dateParam);
     const to = period === "month" ? startOfNextMonth(dateParam) : startOfNextDay(dateParam);
-    const limit = req.query.limit ? Number(req.query.limit) : 200;
+    // Uncapped when no limit is asked for: this returns one day or one
+    // month, which is bounded by the calendar rather than by a number
+    // somebody picked, and its callers show every row they get.
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
 
     const sales = await prisma.sale.findMany({
       where: { createdAt: { gte: from, lt: to } },
       include: { items: { include: { product: true } } },
       orderBy: { createdAt: "desc" },
-      take: limit,
+      ...(limit === undefined ? {} : { take: limit }),
     });
 
     res.json({ period, date: dateOnlyKey(dateParam).toISOString().slice(0, 10), items: sales });

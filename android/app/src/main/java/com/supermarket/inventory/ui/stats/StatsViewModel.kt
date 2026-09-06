@@ -79,8 +79,11 @@ class StatsViewModel @Inject constructor(
             // Overview tab's day/month toggle) - it's the month containing
             // whichever date is currently selected, since a single day's
             // worth of sales is too thin a sample to be a useful ranking.
-            val topProductsDeferred = statsRepository.getTopProducts("month", dateIso, sortParam, 20)
-            val marginsDeferred = statsRepository.getMargins(20)
+            // No limits: the charts on those tabs are drawn from these
+            // lists, so a capped list would make them describe the top few
+            // rows rather than the period or the catalogue.
+            val topProductsDeferred = statsRepository.getTopProducts("month", dateIso, sortParam)
+            val marginsDeferred = statsRepository.getMargins()
 
             var salesForDay: List<SaleDto> = emptyList()
             var expensesForRange: ExpensesForRangeResponse? = null
@@ -95,14 +98,22 @@ class StatsViewModel @Inject constructor(
                 // business's Egypt timezone (see utils/dates.ts server-side),
                 // so this list can't drift with the phone's own clock/tz.
                 val dayStart = uiState.selectedDate.toString()
-                when (val salesResult = salesRepository.getSalesForRange(period = "day", date = dayStart, limit = 200)) {
+                when (val salesResult = salesRepository.getSalesForRange(period = "day", date = dayStart)) {
+                    is ApiResult.Success -> salesForDay = salesResult.data.items
+                    is ApiResult.Error -> Unit
+                }
+                // The day's totals come from the server's own aggregate, not
+                // from summing the list above. Summing a list that arrives
+                // capped gives a total that is quietly short by however much
+                // the cap cut off - a wrong figure, not just a short list.
+                val dayFrom = uiState.selectedDate.atStartOfDay(ZoneOffset.UTC).toInstant().toString()
+                val dayTo = uiState.selectedDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toString()
+                when (val revenueResult = statsRepository.getRevenueSeries("day", dayFrom, dayTo)) {
                     is ApiResult.Success -> {
-                        salesForDay = salesResult.data.items
-                        val totalRevenue = salesResult.data.items.sumOf { it.totalAmount.toDoubleOrNull() ?: 0.0 }
-                        val totalCost = salesResult.data.items.sumOf { it.totalCost.toDoubleOrNull() ?: 0.0 }
-                        revenue = totalRevenue.toString()
-                        cost = totalCost.toString()
-                        profit = (totalRevenue - totalCost).toString()
+                        val bucket = revenueResult.data.series.firstOrNull()
+                        revenue = bucket?.revenue ?: "0"
+                        cost = bucket?.cost ?: "0"
+                        profit = bucket?.profit ?: "0"
                     }
                     is ApiResult.Error -> Unit
                 }
