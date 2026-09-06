@@ -54,7 +54,44 @@ for f in files:
         if re.search(r'\.' + name + r'\s*\(', body):
             problems.append((f, name, sorted(pkgs)[0]))
 
+# Members of a Compose *scope* - LazyListScope, RowScope, BoxScope and the
+# rest. They are available inside the scope's lambda and cannot be imported
+# at all, so an import of one is always a typo that fails to compile.
+#
+# This bit exists because `import androidx.compose.foundation.lazy.stickyHeader`
+# was written by hand and looks exactly like the real
+# `...foundation.lazy.items` next to it. The learned map above could not
+# catch it: nothing imports a scope member anywhere, so the name was never
+# in the map to begin with.
+NEVER_IMPORTABLE = {
+    "stickyHeader": "LazyListScope",
+    "item": "LazyListScope",
+    "weight": "RowScope / ColumnScope",
+    "align": "BoxScope / RowScope / ColumnScope",
+    "alignByBaseline": "RowScope",
+    "matchParentSize": "BoxScope",
+    "menuAnchor": "ExposedDropdownMenuBoxScope",
+    "animateItemPlacement": "LazyItemScope",
+    "fillParentMaxSize": "LazyItemScope",
+    "fillParentMaxWidth": "LazyItemScope",
+    "fillParentMaxHeight": "LazyItemScope",
+}
+
+for _f in files:
+    for _lineno, _line in enumerate(open(_f).read().splitlines(), 1):
+        _m = re.match(r'\s*import\s+(\S+)', _line)
+        if not _m:
+            continue
+        _name = _m.group(1).rpartition(".")[2]
+        if _name in NEVER_IMPORTABLE:
+            problems.append(
+                (_f, _name + f" (a {NEVER_IMPORTABLE[_name]} member - use it inside the scope, do not import it)", "")
+            )
+
 for f, n, pkg in sorted(set(problems)):
-    print(f"MISSING-IMPORT  {f}: .{n}(  -> import {pkg}.{n}")
+    if pkg:
+        print(f"MISSING-IMPORT  {f}: .{n}(  -> import {pkg}.{n}")
+    else:
+        print(f"BAD-IMPORT      {f}: {n}")
 print("compose extension imports:", "FAIL" if problems else "ok")
 sys.exit(1 if problems else 0)
