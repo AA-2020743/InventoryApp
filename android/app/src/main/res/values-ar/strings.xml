@@ -442,4 +442,9 @@
     <string name="product_search_hint">اكتب الاسم أو الباركود للعثور على منتج.</string>
     <string name="product_search_no_matches">لا يوجد منتج مطابق.</string>
     <string name="product_search_more">%1$d نتيجة أخرى. تابع الكتابة لتضييق البحث.</string>
+    <!-- Statistics overview -->
+    <string name="stats_net_day">صافي اليوم</string>
+    <string name="stats_net_month">صافي الشهر</string>
+    <string name="stats_flow_cost">تكلفة البضاعة</string>
+    <string name="stats_flow_left">المتبقي</string>
 </resources>

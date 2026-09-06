@@ -20,6 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+// Shared so a category keeps the same colour whether it is drawn as a pie
+// slice or as a rank dot beside a bar - the same category reading as two
+// different colours on one screen is worse than no colour at all.
+fun categoryColor(index: Int): Color = PieSliceColors[index % PieSliceColors.size]
+
 private val PieSliceColors = listOf(
     Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF10B981), Color(0xFFF59E0B),
     Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF6366F1),

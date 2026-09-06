@@ -442,4 +442,9 @@
     <string name="product_search_hint">Type a name or barcode to find a product.</string>
     <string name="product_search_no_matches">No product matches that.</string>
     <string name="product_search_more">%1$d more match. Keep typing to narrow it down.</string>
+    <!-- Statistics overview -->
+    <string name="stats_net_day">Net for the day</string>
+    <string name="stats_net_month">Net for the month</string>
+    <string name="stats_flow_cost">Cost of goods</string>
+    <string name="stats_flow_left">Left over</string>
 </resources>
