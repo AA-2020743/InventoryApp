@@ -31,8 +31,8 @@ android {
         // build, versionName as MAJOR.MINOR.PATCH. Both are shown on the
         // Settings screen so staff can report exactly which build they are
         // running.
-        versionCode = 11
-        versionName = "1.4.4"
+        versionCode = 12
+        versionName = "1.4.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

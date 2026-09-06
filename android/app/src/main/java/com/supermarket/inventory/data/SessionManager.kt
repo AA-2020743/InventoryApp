@@ -5,8 +5,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +38,10 @@ class SessionManager @Inject constructor(
     }
 
     val token = MutableStateFlow<String?>(null)
+    // True when the session ended because the server rejected the token
+    // rather than because the owner chose to sign out - the login screen
+    // says so, so being sent back there doesn't look like a fault.
+    val sessionExpired = MutableStateFlow(false)
     val serverUrl = MutableStateFlow(DEFAULT_SERVER_URL)
     val language = MutableStateFlow("system")
     val theme = MutableStateFlow(ThemeMode.SYSTEM)
@@ -52,6 +60,7 @@ class SessionManager @Inject constructor(
 
     suspend fun setToken(value: String?) {
         token.value = value
+        if (value != null) sessionExpired.value = false
         context.dataStore.edit { prefs ->
             if (value == null) prefs.remove(Keys.TOKEN) else prefs[Keys.TOKEN] = value
         }
@@ -74,6 +83,24 @@ class SessionManager @Inject constructor(
     }
 
     suspend fun logout() = setToken(null)
+
+    // Called from the network layer when the server rejects the token.
+    //
+    // Not a suspend function on purpose: it runs on an OkHttp thread, in an
+    // interceptor that cannot suspend. Clearing the in-memory flow is what
+    // matters and is immediate - the navigation watches it, so the app drops
+    // to the login screen on its own - and erasing the stored copy follows
+    // in the background so a restart doesn't resurrect the dead token.
+    fun onUnauthorized() {
+        if (token.value == null) return
+        token.value = null
+        sessionExpired.value = true
+        scope.launch { context.dataStore.edit { it.remove(Keys.TOKEN) } }
+    }
+
+    // Outlives any screen: the write below has to finish even though the
+    // caller is an interceptor with no scope of its own.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val DEFAULT_SERVER_URL = "http://10.0.2.2:4000"

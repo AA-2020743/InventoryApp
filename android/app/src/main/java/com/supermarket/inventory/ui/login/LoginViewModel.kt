@@ -18,6 +18,9 @@ data class LoginUiState(
     val password: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
+    // Set when the previous session ended because the server rejected the
+    // token, so this screen can say why it is being shown.
+    val sessionExpired: Boolean = false,
 )
 
 @HiltViewModel
@@ -26,7 +29,12 @@ class LoginViewModel @Inject constructor(
     private val sessionManager: SessionManager,
 ) : ViewModel() {
 
-    var uiState by mutableStateOf(LoginUiState(serverUrl = sessionManager.serverUrl.value))
+    var uiState by mutableStateOf(
+        LoginUiState(
+            serverUrl = sessionManager.serverUrl.value,
+            sessionExpired = sessionManager.sessionExpired.value,
+        )
+    )
         private set
 
     fun onServerUrlChange(value: String) {

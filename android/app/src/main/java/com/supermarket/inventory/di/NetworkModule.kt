@@ -63,16 +63,36 @@ object NetworkModule {
             chain.proceed(request)
         }
 
+    // A token the server no longer accepts is the session ending, not an
+    // error for a screen to render. Signing out here drops the app to the
+    // login screen by itself, instead of leaving "Invalid or expired token"
+    // on a dead dashboard with the only way out buried in Settings.
+    //
+    // Logging in is exempt: a 401 there is a wrong password, not an expiry.
+    @Provides
+    @Singleton
+    @Named("unauthorized")
+    fun provideUnauthorizedInterceptor(sessionManager: SessionManager): Interceptor =
+        Interceptor { chain ->
+            val response = chain.proceed(chain.request())
+            if (response.code == 401 && !chain.request().url.encodedPath.endsWith("/api/auth/login")) {
+                sessionManager.onUnauthorized()
+            }
+            response
+        }
+
     @Provides
     @Singleton
     fun provideOkHttpClient(
         @Named("baseUrl") baseUrlInterceptor: Interceptor,
         @Named("auth") authInterceptor: Interceptor,
+        @Named("unauthorized") unauthorizedInterceptor: Interceptor,
     ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         return OkHttpClient.Builder()
             .addInterceptor(baseUrlInterceptor)
             .addInterceptor(authInterceptor)
+            .addInterceptor(unauthorizedInterceptor)
             .addInterceptor(logging)
             .build()
     }

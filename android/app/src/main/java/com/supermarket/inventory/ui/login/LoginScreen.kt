@@ -44,6 +44,16 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             text = stringResource(R.string.login_title),
             style = MaterialTheme.typography.titleMedium,
         )
+        // Being returned here after a token expiry reads as a fault unless
+        // the screen says otherwise.
+        if (state.sessionExpired) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.login_session_expired),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Spacer(Modifier.height(24.dp))
 
         OutlinedTextField(
