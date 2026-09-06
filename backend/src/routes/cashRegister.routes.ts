@@ -48,11 +48,13 @@ export async function applyCashDeduction(
   }
 }
 
-// The ledger. Without a month it returns the most recent entries, capped,
-// because the register accumulates faster than anything else in the app.
-// With ?month=YYYY-MM it returns that month in full instead - what the
-// app's history view asks for when a folded month is opened, so an old
-// month is never shown as a truncated fragment of itself.
+// The ledger, a month at a time: ?month=YYYY-MM returns that month in full,
+// which is what the app's history view asks for when a folded month is
+// opened, so a month is never shown as a truncated fragment of itself.
+//
+// Without a month it returns everything. There used to be a cap of a
+// hundred here; nothing in the app takes that path, and a cap nobody asked
+// for is how a list quietly stops being the whole list.
 const monthQuery = /^(\d{4})-(\d{2})$/;
 
 function monthRange(month: string): { gte: Date; lt: Date } | null {
@@ -74,7 +76,6 @@ cashRegisterRouter.get(
     const entries = await prisma.cashRegisterEntry.findMany({
       where: range ? { createdAt: range } : undefined,
       orderBy: { createdAt: "desc" },
-      ...(range ? {} : { take: 100 }),
     });
     // The balance is the register's, not this page's: recompute it from
     // every entry so it can't drift once history outgrows the page above.
