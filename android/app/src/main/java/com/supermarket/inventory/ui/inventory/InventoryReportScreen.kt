@@ -1,11 +1,13 @@
 package com.supermarket.inventory.ui.inventory
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,12 +21,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,7 +61,8 @@ import com.supermarket.inventory.R
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.repository.ProductRepository
-import com.supermarket.inventory.ui.common.PieChart
+import com.supermarket.inventory.ui.common.CategoryLegend
+import com.supermarket.inventory.ui.common.DonutChart
 import com.supermarket.inventory.ui.common.categoryColor
 import com.supermarket.inventory.ui.common.formatAmount
 import com.supermarket.inventory.ui.common.formatPercent
@@ -126,17 +130,12 @@ class InventoryReportViewModel @Inject constructor(
     }
 }
 
-// A category subtotal header, interleaved with InventoryValueItem rows in
-// the display list when sorted by category - kept as its own type so the
-// LazyColumn can tell the two apart with a single `when`.
-private data class CategoryHeader(val category: String, val total: Double)
-
 // Total inventory value (at purchase cost, same figure the dashboard's
 // inventoryValue reflects) plus a full per-product breakdown - a category
 // pie chart for the shape of where that value sits, and a sortable list
 // with each row's own value bar so the biggest contributors are visually
 // obvious at a glance, not just numerically.
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun InventoryReportScreen(
     onBack: () -> Unit,
@@ -151,27 +150,32 @@ fun InventoryReportScreen(
             .groupBy { it.product.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
             .map { (category, items) -> category to items.sumOf { it.value } }
     }
-    val categoryTotals = remember(categoryData) { categoryData.toMap() }
     // Position by value, so a category's colour is the same one the pie and
     // the card's strip give it.
     val categoryRank = remember(categoryData) {
         categoryData.sortedByDescending { it.second }.mapIndexed { index, (name, _) -> name to index }.toMap()
     }
+    val chartShares = remember(categoryData, otherLabel) {
+        topSlicesWithOther(categoryData, 6, otherLabel)
+    }
     val maxValue = remember(state.items) { state.items.maxOfOrNull { it.value } ?: 0.0 }
 
-    val displayRows: List<Any> = remember(state.items, state.sortBy, uncategorizedLabel) {
+    // Grouped by category, or one flat run - kept as two shapes rather than
+    // one list of mixed types so the grouped view can pin its headers while
+    // its products scroll under them.
+    val grouped = remember(state.items, uncategorizedLabel) {
+        state.items
+            .groupBy { it.product.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
+            .entries
+            .sortedByDescending { (_, items) -> items.sumOf { it.value } }
+            .map { (category, items) -> category to items.sortedByDescending { it.value } }
+    }
+    val flatRows = remember(state.items, state.sortBy) {
         when (state.sortBy) {
             InventoryReportSort.VALUE -> state.items.sortedByDescending { it.value }
             InventoryReportSort.NAME -> state.items.sortedBy { it.product.name.lowercase() }
             InventoryReportSort.QUANTITY -> state.items.sortedByDescending { it.quantity }
-            InventoryReportSort.CATEGORY -> {
-                val grouped = state.items.groupBy { it.product.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
-                grouped.entries
-                    .sortedByDescending { (_, items) -> items.sumOf { it.value } }
-                    .flatMap { (category, items) ->
-                        listOf(CategoryHeader(category, items.sumOf { it.value })) + items.sortedByDescending { it.value }
-                    }
-            }
+            InventoryReportSort.CATEGORY -> emptyList()
         }
     }
 
@@ -199,11 +203,15 @@ fun InventoryReportScreen(
                 contentPadding = PaddingValues(12.dp),
             ) {
                 item {
-                    TotalValueCard(
+                    InventoryValueCard(
                         total = state.totalValue,
                         itemCount = state.items.size,
                         unitCount = state.items.sumOf { it.quantity },
-                        categoryShares = categoryData.sortedByDescending { it.second },
+                        // The ring keeps the biggest categories distinct and
+                        // folds the tail into one slice, so a shop with
+                        // thirty categories still gets a readable shape - the
+                        // list below is where every one of them is.
+                        categoryShares = chartShares,
                         lowStockCount = state.items.count {
                             val threshold = it.product.lowStockThreshold.toDoubleOrNull() ?: 0.0
                             threshold > 0 && it.quantity <= threshold
@@ -211,51 +219,52 @@ fun InventoryReportScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                 }
-                if (categoryTotals.size > 1) {
-                    item {
-                        Card(
-                            Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                            ),
-                        ) {
-                            Column(Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.PieChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.stats_by_category), style = MaterialTheme.typography.titleMedium)
-                                }
-                                Spacer(Modifier.height(12.dp))
-                                PieChart(topSlicesWithOther(categoryData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
-                            }
-                        }
-                        Spacer(Modifier.height(12.dp))
-                    }
-                }
                 item {
                     SortRow(sortBy = state.sortBy, onSortChange = viewModel::onSortChange)
                     Spacer(Modifier.height(8.dp))
                 }
-                items(
-                    displayRows,
-                    key = {
-                        when (it) {
-                            is CategoryHeader -> "header_${it.category}"
-                            is InventoryValueItem -> it.product.id
-                            else -> it.toString()
+                if (state.sortBy == InventoryReportSort.CATEGORY) {
+                    grouped.forEach { (category, items) ->
+                        val color = categoryColor(categoryRank[category] ?: 0)
+                        val categoryTotal = items.sumOf { it.value }
+                        // Pinned: scrolling a long category should never
+                        // leave you looking at rows without knowing whose
+                        // they are.
+                        stickyHeader(key = "header_$category") {
+                            CategoryHeaderRow(
+                                category = category,
+                                total = categoryTotal,
+                                share = if (state.totalValue > 0) (categoryTotal / state.totalValue) * 100 else 0.0,
+                                // The same colour the category carries in the
+                                // ring above, so the two are one picture.
+                                color = color,
+                            )
                         }
-                    },
-                ) { row ->
-                    when (row) {
-                        is CategoryHeader -> CategoryHeaderRow(
-                            category = row.category,
-                            total = row.total,
-                            share = if (state.totalValue > 0) (row.total / state.totalValue) * 100 else 0.0,
-                            // The same colour the category carries in the pie
-                            // and in the strip on the card above.
-                            color = categoryColor(categoryRank[row.category] ?: 0),
+                        items(items, key = { it.product.id }) { row ->
+                            ProductValueRow(
+                                item = row,
+                                maxValue = maxValue,
+                                totalValue = state.totalValue,
+                                categoryColor = color,
+                            )
+                        }
+                    }
+                } else {
+                    itemsIndexed(flatRows, key = { _, row -> row.product.id }) { index, row ->
+                        ProductValueRow(
+                            item = row,
+                            maxValue = maxValue,
+                            totalValue = state.totalValue,
+                            categoryColor = categoryColor(
+                                categoryRank[
+                                    row.product.category?.takeIf { it.isNotBlank() } ?: uncategorizedLabel
+                                ] ?: 0
+                            ),
+                            // A place number only where the order is a
+                            // ranking. Sorted by name, "1" would mean
+                            // nothing but alphabetical luck.
+                            rank = if (state.sortBy == InventoryReportSort.VALUE) index + 1 else null,
                         )
-                        is InventoryValueItem -> ProductValueRow(row, maxValue, state.totalValue)
                     }
                 }
             }
@@ -263,12 +272,14 @@ fun InventoryReportScreen(
     }
 }
 
-// What the shelves are worth, and the shape of it: how many lines make it
-// up, how many units that is, how many categories it spans, and how much of
-// the value sits in each - the strip is the pie's information in the space
-// of a line, so the headline figure answers "where is it?" too.
+// What the shelves are worth, and what that is made of, in one shape.
+//
+// The total sits inside its own breakdown rather than above it: a ring with
+// the figure in the hole says "this is what it is, and this is what it is
+// made of" once, where a headline card followed by a separate pie said it
+// twice and left the reader to join them up.
 @Composable
-private fun TotalValueCard(
+private fun InventoryValueCard(
     total: Double,
     itemCount: Int,
     unitCount: Double,
@@ -279,19 +290,28 @@ private fun TotalValueCard(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        Column(Modifier.padding(20.dp)) {
-            Text(
-                stringResource(R.string.inventory_report_total_value),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                formatAmount(total.toString()),
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(6.dp))
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            DonutChart(data = categoryShares) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        stringResource(R.string.inventory_report_total_value),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        formatAmount(total.toString()),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
             Text(
                 stringResource(R.string.inventory_report_item_count, itemCount) + " · " +
                     stringResource(R.string.inventory_report_units, formatQuantity(unitCount.toString())) +
@@ -304,45 +324,37 @@ private fun TotalValueCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (categoryShares.isNotEmpty() && total > 0) {
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                ) {
-                    categoryShares.forEachIndexed { index, (_, value) ->
-                        if (value <= 0.0) return@forEachIndexed
-                        Box(
-                            Modifier
-                                .fillMaxHeight()
-                                .weight((value / total).toFloat())
-                                .background(categoryColor(index)),
-                        )
-                    }
-                }
-            }
-
             // Worth knowing while looking at a valuation: some of this value
             // is about to need replacing.
             if (lowStockCount > 0) {
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(warningColor().copy(alpha = 0.16f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Icon(
                         Icons.Filled.Warning,
                         contentDescription = null,
                         tint = warningColor(),
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(15.dp),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         stringResource(R.string.inventory_report_low_stock_count, lowStockCount),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = warningColor(),
                     )
                 }
+            }
+
+            if (categoryShares.size > 1) {
+                Spacer(Modifier.height(14.dp))
+                Divider()
+                Spacer(Modifier.height(8.dp))
+                CategoryLegend(categoryShares)
             }
         }
     }
@@ -384,7 +396,12 @@ private fun SortRow(sortBy: InventoryReportSort, onSortChange: (InventoryReportS
 @Composable
 private fun CategoryHeaderRow(category: String, total: Double, share: Double, color: Color) {
     Row(
-        Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 4.dp),
+        Modifier
+            .fillMaxWidth()
+            // Opaque: a pinned header with rows sliding under it has to
+            // have a floor of its own.
+            .background(MaterialTheme.colorScheme.background)
+            .padding(top = 14.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
@@ -416,7 +433,13 @@ private fun CategoryHeaderRow(category: String, total: Double, share: Double, co
 // the single most valuable item in stock) so the breakdown reads like an
 // embedded bar chart, not just a plain list of numbers.
 @Composable
-private fun ProductValueRow(item: InventoryValueItem, maxValue: Double, totalValue: Double) {
+private fun ProductValueRow(
+    item: InventoryValueItem,
+    maxValue: Double,
+    totalValue: Double,
+    categoryColor: Color,
+    rank: Int? = null,
+) {
     val fraction = if (maxValue > 0) (item.value / maxValue).toFloat().coerceIn(0f, 1f) else 0f
     val share = if (totalValue > 0) (item.value / totalValue) * 100 else 0.0
     val threshold = item.product.lowStockThreshold.toDoubleOrNull() ?: 0.0
@@ -432,13 +455,31 @@ private fun ProductValueRow(item: InventoryValueItem, maxValue: Double, totalVal
                     .fillMaxHeight()
                     .fillMaxWidth(fraction)
                     .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                    .background(categoryColor.copy(alpha = 0.14f)),
             )
             Row(
-                Modifier.fillMaxWidth().padding(12.dp),
+                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.weight(1f)) {
+                // A stripe in the category's colour, so a row can be placed
+                // against the ring without reading its label.
+                Box(
+                    Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(categoryColor),
+                )
+                Spacer(Modifier.width(12.dp))
+                if (rank != null) {
+                    Text(
+                        rank.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (rank <= 3) categoryColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (rank <= 3) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.width(22.dp),
+                    )
+                }
+                Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // A line that is nearly out is worth flagging on a
                         // valuation: this is value about to need spending.
@@ -470,7 +511,10 @@ private fun ProductValueRow(item: InventoryValueItem, maxValue: Double, totalVal
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.End) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.padding(end = 12.dp),
+                ) {
                     Text(
                         formatAmount(item.value.toString()),
                         style = MaterialTheme.typography.titleMedium,
