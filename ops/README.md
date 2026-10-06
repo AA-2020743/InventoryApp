@@ -115,12 +115,52 @@ ports:
   - "127.0.0.1:5432:5432"
 ```
 
-A changed port mapping only applies when the container is recreated — a
-restart keeps the old one. The data lives in the named volume, so recreating
-loses nothing — **provided the running container came from this compose
-file.** If it was started some other way, `up` builds a second container on a
-fresh, empty volume, and the API comes back pointed at a blank database.
-Check first; this should print the backend directory:
+A changed mapping only applies when the container is **recreated** — a
+restart keeps the old one. If the database was ever published on `0.0.0.0`
+with the default `inventory` / `inventory` credentials, treat it as having
+been readable by anyone, and do the steps below **in this order**: recreating
+the container discards its logs, so they're read first.
+
+All commands run from `~/InventoryApp/backend`. (On older Docker, write
+`docker-compose` where these say `docker compose`.)
+
+### 1. Take a backup
+
+Nothing below should touch the data, but this is the moment to have a copy.
+
+```bash
+docker compose exec -T postgres pg_dump -U inventory inventory > ~/pre-hardening-$(date +%F).sql
+ls -lh ~/pre-hardening-*.sql          # should be well over a few KB
+```
+
+### 2. Look for signs anyone got in
+
+The bots that find open Postgres instances tend to leave traces: a dropped or
+emptied schema with a single ransom table in its place, a new superuser role,
+or a function created to run shell commands.
+
+```bash
+docker compose exec postgres psql -U inventory -d inventory -c '\dt'      # only the app's own tables
+docker compose exec postgres psql -U inventory -d inventory -c '\du'      # only the inventory role
+docker compose exec postgres psql -U inventory -d inventory -c '\df public.*'
+docker compose exec postgres psql -U inventory -d inventory \
+  -c 'SELECT count(*) FROM "Product";'                                    # the data is still there
+docker compose logs postgres | grep -i 'authentication failed' | tail -40
+docker compose logs postgres | grep -i 'authentication failed' | wc -l
+```
+
+A run of `password authentication failed` lines means it was being probed.
+The log can only show the failures, though: Postgres doesn't record
+successful connections unless `log_connections` is on, which it isn't in the
+stock image — so a probe that guessed right leaves no line here at all. The
+table, role and function listings are the evidence that matters.
+
+### 3. Recreate it on loopback
+
+Recreating keeps the data, which lives in the named volume — **provided the
+running container came from this compose file.** If it was started some other
+way, `up` builds a second container on a fresh, empty volume and the API comes
+back pointed at a blank database. This should print the backend directory:
 
 ```bash
 docker inspect $(docker ps -q --filter publish=5432) \
@@ -130,58 +170,29 @@ docker inspect $(docker ps -q --filter publish=5432) \
 Then:
 
 ```bash
-cd ~/InventoryApp/backend
 docker compose up -d --force-recreate postgres
 sudo netstat -antp | grep 5432     # want 127.0.0.1:5432, never 0.0.0.0:5432
 ```
 
-### If it was ever exposed: change the password
-
-The compose file's default credentials are `inventory` / `inventory`, and
-automated scanners try exactly that kind of pair against every open 5432 they
-find. A database that was published on `0.0.0.0` with the default password
-should be treated as having been readable by anyone, and its password changed.
+### 4. Change the password
 
 `POSTGRES_PASSWORD` is only read when the volume is first initialised, so the
-change has to be made inside Postgres; editing the compose file does nothing
-to an existing database:
+change is made inside Postgres; editing the compose file does nothing to an
+existing database. The backend's `DATABASE_URL` is the only other place that
+holds it.
 
 ```bash
 NEW_PW="$(openssl rand -hex 24)"
 docker compose exec postgres psql -U inventory -d inventory \
   -c "ALTER USER inventory WITH PASSWORD '$NEW_PW';"
-echo "$NEW_PW"                     # copy it before the shell forgets it
-```
-
-Then put it in `DATABASE_URL` in `backend/.env` — hex only, so nothing in it
-needs URL-escaping — and restart the API:
-
-```
-DATABASE_URL="postgresql://inventory:<NEW_PW>@localhost:5432/inventory"
-```
-
-```bash
+cp .env .env.before-password-change
+sed -i "s#^DATABASE_URL=.*#DATABASE_URL=\"postgresql://inventory:$NEW_PW@localhost:5432/inventory\"#" .env
+grep ^DATABASE_URL .env
 sudo systemctl restart inventory-backend
-curl -s http://127.0.0.1:4000/health
+sleep 3 && curl -s http://127.0.0.1:4000/health   # want {"status":"ok"}
 ```
 
-### Checking whether anyone got in
-
-The bots that find open Postgres instances tend to leave traces: a dropped or
-emptied schema with a single ransom table in its place, a new superuser role,
-or a function created to run shell commands. Worth a look:
-
-```bash
-docker compose exec postgres psql -U inventory -d inventory -c '\dt'      # only the app's own tables
-docker compose exec postgres psql -U inventory -d inventory -c '\du'      # only the inventory role
-docker compose exec postgres psql -U inventory -d inventory -c '\df public.*'
-docker compose exec postgres psql -U inventory -d inventory \
-  -c 'SELECT count(*) FROM "Product";'                                    # the data is still there
-docker compose logs postgres | grep -i 'authentication failed' | tail -40
-```
-
-A run of `password authentication failed` lines means it was being probed.
-The log can only show the failures, though: Postgres doesn't record
-successful connections unless `log_connections` is on, which it isn't in the
-stock image — so a probe that guessed right leaves no line here at all. The
-table, role and function listings above are the evidence that matters.
+The password is hex, so nothing in it needs URL-escaping. If the health check
+fails, `.env.before-password-change` has the old line — but the old password
+no longer works, so the fix is to correct the new line, not restore the old.
+Once it's healthy, delete the copy: `rm .env.before-password-change`.
