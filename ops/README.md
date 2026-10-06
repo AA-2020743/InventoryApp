@@ -108,12 +108,80 @@ and knowing it launched.
 
 Docker publishes container ports by writing its own rules ahead of ufw, so a
 database mapped as `5432:5432` is reachable from the internet even with ufw
-denying everything. Bind it to loopback instead:
+denying everything. `backend/docker-compose.yml` binds it to loopback:
 
 ```yaml
 ports:
   - "127.0.0.1:5432:5432"
 ```
 
-`sudo netstat -antp | grep 5432` should show `127.0.0.1:5432`, never
-`0.0.0.0:5432`.
+A changed port mapping only applies when the container is recreated — a
+restart keeps the old one. The data lives in the named volume, so recreating
+loses nothing — **provided the running container came from this compose
+file.** If it was started some other way, `up` builds a second container on a
+fresh, empty volume, and the API comes back pointed at a blank database.
+Check first; this should print the backend directory:
+
+```bash
+docker inspect $(docker ps -q --filter publish=5432) \
+  --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}'
+```
+
+Then:
+
+```bash
+cd ~/InventoryApp/backend
+docker compose up -d --force-recreate postgres
+sudo netstat -antp | grep 5432     # want 127.0.0.1:5432, never 0.0.0.0:5432
+```
+
+### If it was ever exposed: change the password
+
+The compose file's default credentials are `inventory` / `inventory`, and
+automated scanners try exactly that kind of pair against every open 5432 they
+find. A database that was published on `0.0.0.0` with the default password
+should be treated as having been readable by anyone, and its password changed.
+
+`POSTGRES_PASSWORD` is only read when the volume is first initialised, so the
+change has to be made inside Postgres; editing the compose file does nothing
+to an existing database:
+
+```bash
+NEW_PW="$(openssl rand -hex 24)"
+docker compose exec postgres psql -U inventory -d inventory \
+  -c "ALTER USER inventory WITH PASSWORD '$NEW_PW';"
+echo "$NEW_PW"                     # copy it before the shell forgets it
+```
+
+Then put it in `DATABASE_URL` in `backend/.env` — hex only, so nothing in it
+needs URL-escaping — and restart the API:
+
+```
+DATABASE_URL="postgresql://inventory:<NEW_PW>@localhost:5432/inventory"
+```
+
+```bash
+sudo systemctl restart inventory-backend
+curl -s http://127.0.0.1:4000/health
+```
+
+### Checking whether anyone got in
+
+The bots that find open Postgres instances tend to leave traces: a dropped or
+emptied schema with a single ransom table in its place, a new superuser role,
+or a function created to run shell commands. Worth a look:
+
+```bash
+docker compose exec postgres psql -U inventory -d inventory -c '\dt'      # only the app's own tables
+docker compose exec postgres psql -U inventory -d inventory -c '\du'      # only the inventory role
+docker compose exec postgres psql -U inventory -d inventory -c '\df public.*'
+docker compose exec postgres psql -U inventory -d inventory \
+  -c 'SELECT count(*) FROM "Product";'                                    # the data is still there
+docker compose logs postgres | grep -i 'authentication failed' | tail -40
+```
+
+A run of `password authentication failed` lines means it was being probed.
+The log can only show the failures, though: Postgres doesn't record
+successful connections unless `log_connections` is on, which it isn't in the
+stock image — so a probe that guessed right leaves no line here at all. The
+table, role and function listings above are the evidence that matters.

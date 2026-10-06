@@ -2,12 +2,21 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # POSTGRES_PASSWORD is read once, when the data volume is first created,
+    # and ignored ever after - so the default below only seeds a fresh dev
+    # database. A deployed one keeps whatever password it has until it is
+    # changed from inside Postgres (ALTER USER; see ops/README.md), and
+    # editing this line does nothing to it.
     environment:
       POSTGRES_USER: inventory
-      POSTGRES_PASSWORD: inventory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventory}
       POSTGRES_DB: inventory
+    # Loopback only. A bare "5432:5432" publishes on every interface, and
+    # Docker writes its publish rules ahead of ufw's, so a firewall denying
+    # everything does not cover it - the database would answer the internet.
+    # The backend runs on this same host and reaches it at localhost.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
