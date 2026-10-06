@@ -216,8 +216,12 @@ export async function restoreFromArchive(buffer: Buffer): Promise<void> {
   }
   for (const entry of zip.getEntries()) {
     if (entry.isDirectory || !entry.entryName.startsWith(ARCHIVE_UPLOADS_PREFIX)) continue;
-    const filename = entry.entryName.slice(ARCHIVE_UPLOADS_PREFIX.length);
-    if (!filename) continue;
+    // basename, not the raw remainder: an entry named "uploads/../../x" would
+    // otherwise be joined onto uploadsDir and written wherever it pointed.
+    // Archives this server builds are flat (addLocalFile into "uploads"), so
+    // a legitimate entry's name is already its basename and passes unchanged.
+    const filename = path.basename(entry.entryName.slice(ARCHIVE_UPLOADS_PREFIX.length));
+    if (!filename || filename === "." || filename === "..") continue;
     fs.writeFileSync(path.join(uploadsDir, filename), entry.getData());
   }
 }

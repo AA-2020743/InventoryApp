@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { env } from "../env";
 import { HttpError } from "../middleware/errorHandler";
+import { MAX_IMAGE_BYTES } from "../uploadLimits";
 
 export const uploadsRouter = Router();
 
@@ -17,7 +18,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: MAX_IMAGE_BYTES },
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
       cb(new HttpError(400, "Only image uploads are allowed") as unknown as Error);
