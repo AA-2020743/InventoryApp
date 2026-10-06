@@ -186,11 +186,16 @@ NEW_PW="$(openssl rand -hex 24)"
 docker compose exec postgres psql -U inventory -d inventory \
   -c "ALTER USER inventory WITH PASSWORD '$NEW_PW';"
 cp .env .env.before-password-change
-sed -i "s#^DATABASE_URL=.*#DATABASE_URL=\"postgresql://inventory:$NEW_PW@localhost:5432/inventory\"#" .env
+sed -i "s#^DATABASE_URL=.*#DATABASE_URL=\"postgresql://inventory:$NEW_PW@127.0.0.1:5432/inventory\"#" .env
 grep ^DATABASE_URL .env
 sudo systemctl restart inventory-backend
 sleep 3 && curl -s http://127.0.0.1:4000/health   # want {"status":"ok"}
 ```
+
+The host is `127.0.0.1`, not `localhost`, on purpose. Postgres is now
+published on IPv4 loopback only, and on a host where `localhost` resolves to
+`::1` first, a `localhost` URL points at an address nothing listens on any
+more - working only if the client happens to fall back to IPv4.
 
 The password is hex, so nothing in it needs URL-escaping. If the health check
 fails, `.env.before-password-change` has the old line — but the old password
