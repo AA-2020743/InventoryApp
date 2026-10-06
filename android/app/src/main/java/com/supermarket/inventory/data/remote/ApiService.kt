@@ -11,8 +11,24 @@ interface ApiService {
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
 
+    // Signed-in devices
+    @GET("api/auth/sessions")
+    suspend fun getSessions(): List<SessionDto>
+
+    @DELETE("api/auth/sessions/{id}")
+    suspend fun signOutSession(@Path("id") id: String)
+
+    @DELETE("api/auth/sessions")
+    suspend fun signOutOtherSessions(): SignedOutDevicesDto
+
+    @POST("api/auth/logout")
+    suspend fun logout()
+
+    @GET("api/auth/new-devices")
+    suspend fun getNewDevices(@Query("since") since: String?): NewDevicesDto
+
     @POST("api/auth/change-password")
-    suspend fun changePassword(@Body request: ChangePasswordRequest)
+    suspend fun changePassword(@Body request: ChangePasswordRequest): SignedOutDevicesDto
 
     // Products
     @GET("api/products")

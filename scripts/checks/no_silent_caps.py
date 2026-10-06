@@ -44,6 +44,9 @@ ALLOWED: dict[tuple[str, str], str] = {
         "search results, with the remainder counted out in the UI",
     ("ui/common/PieChart.kt", ".take(maxSlices - 1)"):
         "smallest slices are merged into an 'other' slice, not dropped",
+    ("data/DeviceDetails.kt", ".take(MAX_NAME)"):
+        "truncates a device-name string to the server's length limit - "
+        "characters of one label, not records from a list",
 }
 
 failures: list[str] = []

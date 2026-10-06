@@ -15,6 +15,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.supermarket.inventory.MainActivity
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.ui.dashboard.DashboardScreen
@@ -42,6 +44,7 @@ import com.supermarket.inventory.ui.sales.EditSaleScreen
 import com.supermarket.inventory.ui.sales.SalesScreen
 import com.supermarket.inventory.ui.sales.SellFab
 import com.supermarket.inventory.ui.scan.BarcodeScannerScreen
+import com.supermarket.inventory.ui.settings.DevicesScreen
 import com.supermarket.inventory.ui.settings.SettingsScreen
 import com.supermarket.inventory.ui.spoilage.SpoiledProductScreen
 import com.supermarket.inventory.ui.stats.StatsScreen
@@ -59,8 +62,15 @@ private fun NavBackStackEntry.clearScannedBarcode() {
     savedStateHandle[SCANNED_BARCODE_KEY] = null
 }
 
+// pendingOpen is a screen a notification asked for (MainActivity.OPEN_*).
+// It's taken once the app is signed in - a tap that lands on the login
+// screen keeps it until then - and reported back so it isn't taken twice.
 @Composable
-fun InventoryNavHost(sessionManager: SessionManager) {
+fun InventoryNavHost(
+    sessionManager: SessionManager,
+    pendingOpen: String? = null,
+    onPendingOpenHandled: () -> Unit = {},
+) {
     val token by sessionManager.token.collectAsState()
 
     if (token == null) {
@@ -69,6 +79,16 @@ fun InventoryNavHost(sessionManager: SessionManager) {
     }
 
     val navController = rememberNavController()
+    LaunchedEffect(pendingOpen) {
+        when (pendingOpen) {
+            MainActivity.OPEN_DEVICES -> {
+                navController.navigate(Routes.DEVICES) { launchSingleTop = true }
+                onPendingOpenHandled()
+            }
+            null -> Unit
+            else -> onPendingOpenHandled()
+        }
+    }
     val tabs = listOf(
         BottomTab(Routes.DASHBOARD, R.string.nav_dashboard, Icons.Filled.Dashboard),
         BottomTab(Routes.INVENTORY, R.string.nav_inventory, Icons.Filled.Inventory2),
@@ -188,7 +208,13 @@ fun InventoryNavHost(sessionManager: SessionManager) {
                 composable(Routes.STATS) {
                     StatsScreen(onEditSale = { saleId -> navController.navigate(Routes.editSale(saleId)) })
                 }
-                composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.SETTINGS) {
+                    SettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDevices = { navController.navigate(Routes.DEVICES) },
+                    )
+                }
+                composable(Routes.DEVICES) { DevicesScreen(onBack = { navController.popBackStack() }) }
                 composable(Routes.SPOILED_PRODUCT) { backStackEntry ->
                     val scannedBarcode by backStackEntry.scannedBarcodeState()
                     SpoiledProductScreen(

@@ -463,4 +463,34 @@
     <string name="inventory_report_units">%1$s units</string>
     <string name="inventory_report_categories">%1$d categories</string>
     <string name="inventory_report_low_stock_count">%1$d products low on stock</string>
+    <!-- Signed-in devices -->
+    <string name="devices_title">Signed-in devices</string>
+    <string name="devices_settings_subtitle">See where you\'re signed in, and sign out devices you don\'t recognise</string>
+    <string name="devices_intro">These devices are signed in to your account. Sign out any you don\'t recognise.</string>
+    <string name="devices_this_device">This device</string>
+    <string name="devices_other_devices">Other devices</string>
+    <string name="devices_none_other">No other devices are signed in.</string>
+    <string name="devices_active_now">Active now</string>
+    <string name="devices_active_ago">Active %1$s</string>
+    <string name="devices_signed_in_at">Signed in %1$s</string>
+    <string name="devices_last_ip">Last seen from %1$s</string>
+    <string name="devices_new_badge">New device</string>
+    <string name="devices_unknown">Unknown device (older app version)</string>
+    <string name="devices_sign_out">Sign out</string>
+    <string name="devices_sign_out_all">Sign out all other devices</string>
+    <string name="devices_confirm_one_title">Sign out %1$s?</string>
+    <string name="devices_confirm_one_body">It will need your password to sign in again.</string>
+    <string name="devices_confirm_all_title">Sign out all other devices?</string>
+    <string name="devices_confirm_all_body">Every device except this one will need your password to sign in again.</string>
+    <string name="devices_signed_out_all">Other devices signed out.</string>
+    <string name="devices_refresh">Refresh</string>
+    <string name="settings_password_changed">Password changed.</string>
+    <string name="settings_password_changed_signed_out">Password changed. Your other devices were signed out.</string>
+    <!-- New sign-in alerts -->
+    <string name="notif_signin_channel_name">Sign-in alerts</string>
+    <string name="notif_signin_channel_description">When a device signs in to your account for the first time</string>
+    <string name="notif_signin_title">New sign-in to your account</string>
+    <string name="notif_signin_body">%1$s signed in at %2$s</string>
+    <string name="notif_signin_body_with_ip">%1$s signed in at %2$s from %3$s</string>
+    <string name="notif_signin_advice">If this wasn\'t you, sign that device out from Settings → Signed-in devices, and change your password.</string>
 </resources>

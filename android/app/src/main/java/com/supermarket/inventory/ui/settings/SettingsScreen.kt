@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,8 +17,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -38,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -78,7 +83,8 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun logout() = authRepository.logout()
 
-    suspend fun changePassword(current: String, new: String): ApiResult<Unit> =
+    // Success carries how many other devices were signed out with the change.
+    suspend fun changePassword(current: String, new: String): ApiResult<Int> =
         authRepository.changePassword(current, new)
 
     suspend fun exportBackup(): ApiResult<ByteArray> = backupRepository.exportBackup()
@@ -92,7 +98,11 @@ class SettingsViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenDevices: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val themeMode by viewModel.sessionManager.theme.collectAsState()
@@ -105,6 +115,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var passwordMessage by remember { mutableStateOf<String?>(null) }
+    // Confirmation after a change. Said out loud because changing the
+    // password now also signs out every other device - which, unannounced,
+    // would look like those devices had broken.
+    var passwordSuccess by remember { mutableStateOf<String?>(null) }
 
     var startingValueInput by remember { mutableStateOf("") }
     var startingValueMessage by remember { mutableStateOf<String?>(null) }
@@ -245,12 +259,33 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 
             Divider(Modifier.padding(vertical = 24.dp))
 
+            // Signed-in devices
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDevices),
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.devices_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.devices_settings_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                }
+            }
+
+            Divider(Modifier.padding(vertical = 24.dp))
+
             // Change password
             Text(stringResource(R.string.settings_change_password), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = currentPassword,
-                onValueChange = { currentPassword = it; passwordMessage = null },
+                onValueChange = { currentPassword = it; passwordMessage = null; passwordSuccess = null },
                 label = { Text(stringResource(R.string.settings_current_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -259,7 +294,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = newPassword,
-                onValueChange = { newPassword = it; passwordMessage = null },
+                onValueChange = { newPassword = it; passwordMessage = null; passwordSuccess = null },
                 label = { Text(stringResource(R.string.settings_new_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -269,6 +304,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Spacer(Modifier.height(4.dp))
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
+            passwordSuccess?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, color = MaterialTheme.colorScheme.primary)
+            }
             Spacer(Modifier.height(8.dp))
             Button(onClick = {
                 scope.launch {
@@ -277,6 +316,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                             passwordMessage = null
                             currentPassword = ""
                             newPassword = ""
+                            passwordSuccess = context.getString(
+                                if (result.data > 0) R.string.settings_password_changed_signed_out
+                                else R.string.settings_password_changed
+                            )
                         }
                         is ApiResult.Error -> passwordMessage = result.message
                     }

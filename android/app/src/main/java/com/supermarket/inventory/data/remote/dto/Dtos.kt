@@ -4,7 +4,18 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
-data class LoginRequest(val email: String, val password: String)
+data class LoginRequest(
+    val email: String,
+    val password: String,
+    // Recognises this install on later sign-ins, so only a genuinely new one
+    // raises an alert on the owner's other devices.
+    val installId: String? = null,
+    // How this device appears in the signed-in devices list.
+    val deviceName: String? = null,
+    val deviceModel: String? = null,
+    val osVersion: String? = null,
+    val appVersion: String? = null,
+)
 
 @JsonClass(generateAdapter = true)
 data class LoginResponse(val token: String, val user: UserDto)
@@ -14,6 +25,40 @@ data class UserDto(val id: String, val email: String, val name: String)
 
 @JsonClass(generateAdapter = true)
 data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
+
+// One signed-in device. [current] marks the one making the request.
+@JsonClass(generateAdapter = true)
+data class SessionDto(
+    val id: String,
+    val deviceName: String,
+    val deviceModel: String?,
+    val osVersion: String?,
+    val appVersion: String?,
+    val createdAt: String,
+    val lastSeenAt: String,
+    val lastIp: String?,
+    // This was the install's first ever sign-in.
+    val newDevice: Boolean = false,
+    val current: Boolean,
+)
+
+// A device that signed in for the first time inside the window just checked.
+@JsonClass(generateAdapter = true)
+data class NewDeviceDto(
+    val id: String,
+    val deviceName: String,
+    val deviceModel: String?,
+    val osVersion: String?,
+    val ip: String?,
+    val signedInAt: String,
+)
+
+// [serverTime] is the end of the window checked - the next check starts there.
+@JsonClass(generateAdapter = true)
+data class NewDevicesDto(val serverTime: String, val devices: List<NewDeviceDto>)
+
+@JsonClass(generateAdapter = true)
+data class SignedOutDevicesDto(val signedOutDevices: Int)
 
 @JsonClass(generateAdapter = true)
 data class ProductDto(

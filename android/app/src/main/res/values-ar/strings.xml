@@ -463,4 +463,34 @@
     <string name="inventory_report_units">%1$s وحدة</string>
     <string name="inventory_report_categories">%1$d تصنيف</string>
     <string name="inventory_report_low_stock_count">%1$d صنف مخزونه منخفض</string>
+    <!-- Signed-in devices -->
+    <string name="devices_title">الأجهزة المسجّل دخولها</string>
+    <string name="devices_settings_subtitle">اعرف أين سجّلت الدخول، وسجّل خروج الأجهزة التي لا تعرفها</string>
+    <string name="devices_intro">هذه الأجهزة مسجّل دخولها إلى حسابك. سجّل خروج أي جهاز لا تعرفه.</string>
+    <string name="devices_this_device">هذا الجهاز</string>
+    <string name="devices_other_devices">الأجهزة الأخرى</string>
+    <string name="devices_none_other">لا توجد أجهزة أخرى مسجّل دخولها.</string>
+    <string name="devices_active_now">نشط الآن</string>
+    <string name="devices_active_ago">آخر نشاط %1$s</string>
+    <string name="devices_signed_in_at">سجّل الدخول %1$s</string>
+    <string name="devices_last_ip">آخر ظهور من %1$s</string>
+    <string name="devices_new_badge">جهاز جديد</string>
+    <string name="devices_unknown">جهاز غير معروف (إصدار قديم من التطبيق)</string>
+    <string name="devices_sign_out">تسجيل الخروج</string>
+    <string name="devices_sign_out_all">تسجيل خروج كل الأجهزة الأخرى</string>
+    <string name="devices_confirm_one_title">تسجيل خروج %1$s؟</string>
+    <string name="devices_confirm_one_body">سيحتاج إلى كلمة المرور لتسجيل الدخول مرة أخرى.</string>
+    <string name="devices_confirm_all_title">تسجيل خروج كل الأجهزة الأخرى؟</string>
+    <string name="devices_confirm_all_body">سيحتاج كل جهاز عدا هذا الجهاز إلى كلمة المرور لتسجيل الدخول مرة أخرى.</string>
+    <string name="devices_signed_out_all">تم تسجيل خروج الأجهزة الأخرى.</string>
+    <string name="devices_refresh">تحديث</string>
+    <string name="settings_password_changed">تم تغيير كلمة المرور.</string>
+    <string name="settings_password_changed_signed_out">تم تغيير كلمة المرور، وتم تسجيل خروج أجهزتك الأخرى.</string>
+    <!-- New sign-in alerts -->
+    <string name="notif_signin_channel_name">تنبيهات تسجيل الدخول</string>
+    <string name="notif_signin_channel_description">عند تسجيل جهاز الدخول إلى حسابك لأول مرة</string>
+    <string name="notif_signin_title">تسجيل دخول جديد إلى حسابك</string>
+    <string name="notif_signin_body">سجّل %1$s الدخول في %2$s</string>
+    <string name="notif_signin_body_with_ip">سجّل %1$s الدخول في %2$s من %3$s</string>
+    <string name="notif_signin_advice">إذا لم تكن أنت، سجّل خروج هذا الجهاز من الإعدادات ← الأجهزة المسجّل دخولها، وغيّر كلمة المرور.</string>
 </resources>

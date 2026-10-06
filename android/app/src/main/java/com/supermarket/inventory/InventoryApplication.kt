@@ -7,6 +7,7 @@ import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.notifications.AlertsWorker
 import com.supermarket.inventory.notifications.BackupWorker
 import com.supermarket.inventory.notifications.SalesSyncWorker
+import com.supermarket.inventory.notifications.SignInWatchWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -25,6 +26,7 @@ class InventoryApplication : Application(), Configuration.Provider {
         }
         AlertsWorker.schedule(this)
         BackupWorker.schedule(this)
+        SignInWatchWorker.schedule(this)
         // Catches any sales left in the offline queue from a previous
         // session (e.g. the process was killed before connectivity came
         // back) so they still get a sync attempt without waiting on a

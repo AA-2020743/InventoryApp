@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,6 +36,8 @@ class SessionManager @Inject constructor(
         val SERVER_URL = stringPreferencesKey("server_url")
         val LANGUAGE = stringPreferencesKey("language") // "system" | "en" | "ar"
         val THEME = stringPreferencesKey("theme") // "system" | "light" | "dark"
+        val INSTALL_ID = stringPreferencesKey("install_id")
+        val SIGN_IN_WATERMARK = stringPreferencesKey("sign_in_watermark")
     }
 
     val token = MutableStateFlow<String?>(null)
@@ -62,8 +65,41 @@ class SessionManager @Inject constructor(
         token.value = value
         if (value != null) sessionExpired.value = false
         context.dataStore.edit { prefs ->
-            if (value == null) prefs.remove(Keys.TOKEN) else prefs[Keys.TOKEN] = value
+            if (value == null) {
+                prefs.remove(Keys.TOKEN)
+                // Signed out, so this device stops watching for new sign-ins.
+                // Keeping the old watermark would, on signing back in, report
+                // every device that appeared in the meantime at once - stale
+                // alerts about sign-ins the owner was in no position to see
+                // live. The next check after signing in starts afresh.
+                prefs.remove(Keys.SIGN_IN_WATERMARK)
+            } else {
+                prefs[Keys.TOKEN] = value
+            }
         }
+    }
+
+    // A random id for this install, made on first use and kept until the app
+    // is uninstalled. The server uses it to recognise this phone when it
+    // signs in again, so only a genuinely unfamiliar install raises a
+    // new-device alert. Random rather than derived from the hardware: it
+    // identifies the install to this one server and nothing else.
+    suspend fun installId(): String {
+        context.dataStore.data.first()[Keys.INSTALL_ID]?.let { return it }
+        val fresh = UUID.randomUUID().toString()
+        var stored = fresh
+        context.dataStore.edit { prefs ->
+            // Re-read inside the edit: two first callers racing must agree.
+            stored = prefs[Keys.INSTALL_ID] ?: fresh.also { prefs[Keys.INSTALL_ID] = it }
+        }
+        return stored
+    }
+
+    // Server time up to which new-device sign-ins have been reported here.
+    suspend fun signInWatermark(): String? = context.dataStore.data.first()[Keys.SIGN_IN_WATERMARK]
+
+    suspend fun setSignInWatermark(value: String) {
+        context.dataStore.edit { it[Keys.SIGN_IN_WATERMARK] = value }
     }
 
     suspend fun setServerUrl(value: String) {
@@ -82,7 +118,15 @@ class SessionManager @Inject constructor(
         context.dataStore.edit { it[Keys.THEME] = value.name.lowercase() }
     }
 
-    suspend fun logout() = setToken(null)
+    // A deliberate sign-out, so the login screen shouldn't then say the
+    // session "ended". The server call that precedes this can itself come
+    // back 401 - the session already revoked from elsewhere - and that
+    // trips onUnauthorized, which sets the flag; it's cleared here because
+    // the owner asked to leave either way.
+    suspend fun logout() {
+        setToken(null)
+        sessionExpired.value = false
+    }
 
     // Called from the network layer when the server rejects the token.
     //
@@ -95,7 +139,12 @@ class SessionManager @Inject constructor(
         if (token.value == null) return
         token.value = null
         sessionExpired.value = true
-        scope.launch { context.dataStore.edit { it.remove(Keys.TOKEN) } }
+        scope.launch {
+            context.dataStore.edit {
+                it.remove(Keys.TOKEN)
+                it.remove(Keys.SIGN_IN_WATERMARK)
+            }
+        }
     }
 
     // Outlives any screen: the write below has to finish even though the
