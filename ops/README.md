@@ -37,6 +37,12 @@ is unreachable except through nginx, and 4000 never needs to be open.
    A registrar parking address (Namecheap's are `162.255.119.x`) means the
    record was never repointed, and no amount of server-side fixing will help.
 
+   On Namecheap specifically, the bare domain usually ships as a **URL
+   Redirect Record** on `@` rather than an A record. It cannot coexist with
+   an A record on the same host, so it has to be deleted before `@` can
+   point anywhere. A subdomain — `api` — sidesteps that entirely and is the
+   easier name to give the app.
+
 2. **Firewall.** Open 80 and 443. On a ufw host use ufw rather than raw
    iptables — a hand-inserted `iptables -I INPUT` rule is both easy to place
    in the wrong chain and gone at the next reboot unless
