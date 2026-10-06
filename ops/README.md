@@ -4,6 +4,7 @@ Standalone infrastructure pieces that live outside the app itself.
 
 | Path | What it is |
 | --- | --- |
+| `redeploy.sh` | Pulls the current code, migrates, builds and restarts the API |
 | `fetch-offsite-backup.sh` | Pulls a copy of the nightly backup to a machine other than the server |
 | `nginx/inventory.conf` | The public entry point: TLS on 443, proxying to node on loopback |
 
@@ -85,6 +86,23 @@ curl -i https://alkheer-zadah.online/health
 doesn't return it is the layer at fault: a 404 from nginx means the site
 config isn't installed, a 502 means node is down, and a connection that never
 opens from outside means DNS or the firewall.
+
+## Deploying
+
+```bash
+cd ~/InventoryApp && ./ops/redeploy.sh
+```
+
+Deploys `main`; `BRANCH=some/branch ./ops/redeploy.sh` deploys something else.
+`SERVICE` and `HEALTH_URL` override the unit name and the endpoint it checks.
+
+It ends by polling `/health` until the API answers rather than reporting
+`systemctl status`. systemd calls a unit active the moment the process is
+spawned, which is before node has opened the port — so a service that starts
+and then dies on a bad migration or a missing environment variable still
+shows as "active (running)" for the couple of seconds a status check looks at
+it. Polling the endpoint is the difference between knowing the deploy worked
+and knowing it launched.
 
 ## Keeping Postgres off the internet
 
