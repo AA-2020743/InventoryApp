@@ -34,8 +34,16 @@ jobs:
       - run: npx tsc --noEmit
 
   android:
-    # The one that would have caught every build break so far. It needs the
-    # Android SDK, which the toolchain below installs.
+    # The one that would have caught every build break so far.
+    #
+    # It uses the Android SDK the ubuntu runner image already ships, rather
+    # than installing one. It used to run android-actions/setup-android,
+    # which re-installs the legacy "tools" package by default; once the
+    # image's command-line tools moved to a version where that package no
+    # longer exists, the step failed in seconds on every push - before
+    # Gradle ran - so for weeks this job compiled nothing while reading as
+    # an ordinary red X. AGP fetches any platform or build-tools the image
+    # lacks on its own.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +51,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      - name: Check the runner's Android SDK
+        # Fails here, by name, if a future image stops shipping the SDK -
+        # rather than as a Gradle error about sdk.dir further down.
+        run: |
+          test -n "$ANDROID_HOME" && test -d "$ANDROID_HOME/platforms" \
+            || { echo "::error::No Android SDK on this runner (ANDROID_HOME='$ANDROID_HOME')"; exit 1; }
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms"
       - name: Compile
         working-directory: android
         run: ./gradlew --no-daemon assembleRelease
