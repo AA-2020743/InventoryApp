@@ -14,11 +14,11 @@ const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 1000;
 
 export interface DeviceInfo {
-  installId?: string;
-  deviceName?: string;
-  deviceModel?: string;
-  osVersion?: string;
-  appVersion?: string;
+  installId?: string | null;
+  deviceName?: string | null;
+  deviceModel?: string | null;
+  osVersion?: string | null;
+  appVersion?: string | null;
 }
 
 // Express reports an IPv4 client on a dual-stack socket as "::ffff:1.2.3.4";

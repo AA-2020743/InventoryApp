@@ -24,16 +24,18 @@ const loginLimiter = rateLimit({
 });
 
 // Device details are optional so an app from before sessions existed can
-// still sign in; it shows up in the list as "Unknown device". Capped in
-// length because they're free text from the client and get shown back.
+// still sign in; it shows up in the list as "Unknown device". nullish, not
+// optional: a client that sends "appVersion": null rather than leaving it
+// out must not have its sign-in refused over a detail. Capped in length
+// because they're free text from the client and get shown back.
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
-  installId: z.string().trim().max(64).optional(),
-  deviceName: z.string().trim().max(100).optional(),
-  deviceModel: z.string().trim().max(100).optional(),
-  osVersion: z.string().trim().max(50).optional(),
-  appVersion: z.string().trim().max(30).optional(),
+  installId: z.string().trim().max(64).nullish(),
+  deviceName: z.string().trim().max(100).nullish(),
+  deviceModel: z.string().trim().max(100).nullish(),
+  osVersion: z.string().trim().max(50).nullish(),
+  appVersion: z.string().trim().max(30).nullish(),
 });
 
 authRouter.post(
