@@ -16,6 +16,8 @@ export interface AuthPayload {
   userId: string;
   email: string;
   sessionId: string;
+  // The install holding this session, when the app reported one.
+  installId: string | null;
 }
 
 declare global {
@@ -59,6 +61,6 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
   }
   await touchSession(session, req.ip);
 
-  req.user = { userId: payload.userId, email: payload.email, sessionId: session.id };
+  req.user = { userId: payload.userId, email: payload.email, sessionId: session.id, installId: session.installId };
   next();
 });

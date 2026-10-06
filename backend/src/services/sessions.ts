@@ -1,4 +1,4 @@
-import type { Session } from "@prisma/client";
+import { Prisma, type Session } from "@prisma/client";
 import { prisma } from "../db";
 
 // How long a sign-in lasts. The token's own expiry and the row's expiresAt
@@ -14,6 +14,7 @@ const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 1000;
 
 export interface DeviceInfo {
+  installId?: string;
   deviceName?: string;
   deviceModel?: string;
   osVersion?: string;
@@ -27,16 +28,54 @@ export function displayIp(ip: string | undefined): string | null {
   return ip.startsWith("::ffff:") ? ip.slice("::ffff:".length) : ip;
 }
 
+function deviceLabel(device: DeviceInfo): string {
+  // An app from before sessions existed sends no device details at all.
+  return device.deviceName || device.deviceModel || "Unknown device";
+}
+
+// Records the install as known, and says whether this is the first time it
+// has been seen. An install that has signed in before - even if it signed
+// out in between - is not new.
+async function recordDevice(userId: string, device: DeviceInfo, ip: string | undefined): Promise<boolean> {
+  const data = {
+    userId,
+    installId: device.installId || null,
+    deviceName: deviceLabel(device),
+    deviceModel: device.deviceModel || null,
+    osVersion: device.osVersion || null,
+    firstIp: displayIp(ip),
+  };
+  if (!device.installId) {
+    // Nothing to recognise it by, so every sign-in from it is reported.
+    await prisma.knownDevice.create({ data });
+    return true;
+  }
+  const existing = await prisma.knownDevice.findUnique({
+    where: { userId_installId: { userId, installId: device.installId } },
+  });
+  if (existing) return false;
+  try {
+    await prisma.knownDevice.create({ data });
+    return true;
+  } catch (e) {
+    // Two first sign-ins from one install racing: the other one recorded it.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return false;
+    throw e;
+  }
+}
+
 export async function createSession(userId: string, device: DeviceInfo, ip: string | undefined): Promise<Session> {
   const now = new Date();
   // Housekeeping at the one moment a row is being added anyway: tokens that
   // have run out are already refused, so their rows only clutter the list.
   await prisma.session.deleteMany({ where: { userId, expiresAt: { lte: now } } });
+  const newDevice = await recordDevice(userId, device, ip);
   return prisma.session.create({
     data: {
       userId,
-      // An app from before sessions existed sends no device details at all.
-      deviceName: device.deviceName || device.deviceModel || "Unknown device",
+      installId: device.installId || null,
+      newDevice,
+      deviceName: deviceLabel(device),
       deviceModel: device.deviceModel || null,
       osVersion: device.osVersion || null,
       appVersion: device.appVersion || null,

@@ -17,6 +17,32 @@ model User {
   name         String
   createdAt    DateTime  @default(now())
   sessions     Session[]
+  knownDevices KnownDevice[]
+}
+
+// Every app install that has ever signed in, kept after its session ends -
+// sessions are deleted on sign-out, so on their own they can't tell a phone
+// coming back from one never seen before. The first row for an install is
+// what makes its sign-in "from a new device", and firstSeenAt is what the
+// other devices' background check asks about, so a sign-in followed by a
+// quick sign-out still raises the alert.
+//
+// installId is a random id the app generates once per install. An app from
+// before this sends none; each of its sign-ins gets a row of its own,
+// because there is nothing to recognise it by.
+model KnownDevice {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installId   String?
+  deviceName  String
+  deviceModel String?
+  osVersion   String?
+  firstIp     String?
+  firstSeenAt DateTime @default(now())
+
+  @@unique([userId, installId])
+  @@index([userId, firstSeenAt])
 }
 
 // One row per signed-in device. The token a device holds names its row
@@ -37,6 +63,11 @@ model Session {
   deviceModel String?
   osVersion   String?
   appVersion  String?
+  // Which install holds this session, so its own background check can leave
+  // itself out of "new device" alerts.
+  installId   String?
+  // This was the install's first ever sign-in.
+  newDevice   Boolean  @default(false)
   createdAt   DateTime @default(now())
   // Refreshed at most once a minute rather than on every request, so a
   // busy screen doesn't turn every read into a write.

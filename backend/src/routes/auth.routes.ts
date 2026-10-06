@@ -29,6 +29,7 @@ const loginLimiter = rateLimit({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  installId: z.string().trim().max(64).optional(),
   deviceName: z.string().trim().max(100).optional(),
   deviceModel: z.string().trim().max(100).optional(),
   osVersion: z.string().trim().max(50).optional(),
@@ -112,9 +113,60 @@ authRouter.get(
         createdAt: s.createdAt,
         lastSeenAt: s.lastSeenAt,
         lastIp: s.lastIp,
+        newDevice: s.newDevice,
         current: s.id === sessionId,
       }))
     );
+  })
+);
+
+// Devices signing in for the first time since `since` - what each signed-in
+// device's background check asks for, to raise a "new sign-in" alert.
+//
+// Answers from KnownDevice rather than Session so a sign-in that was quickly
+// followed by a sign-out is still reported: its session is gone, but the
+// record that the install was seen is not.
+//
+// The window is (since, serverTime], with serverTime fixed before the query
+// and handed back for the caller to pass as its next `since`. The windows
+// therefore tile exactly - nothing falls between two checks, nothing is
+// reported twice - and they're measured on the server's clock alone, so a
+// phone whose clock is off can't open a gap. With no `since` (a device's
+// first check) it reports nothing and just returns the starting point, so
+// installing the app doesn't announce every device that ever signed in.
+authRouter.get(
+  "/new-devices",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { userId, installId } = req.user!;
+    const serverTime = new Date();
+    const since = typeof req.query.since === "string" ? new Date(req.query.since) : null;
+    if (!since || Number.isNaN(since.getTime())) {
+      res.json({ serverTime, devices: [] });
+      return;
+    }
+    const devices = await prisma.knownDevice.findMany({
+      where: {
+        userId,
+        firstSeenAt: { gt: since, lte: serverTime },
+        // Not the caller itself. Spelled out with an OR because SQL's
+        // "installId <> x" is never true for a NULL installId, and the rows
+        // without one - sign-ins from older apps - must still be reported.
+        ...(installId ? { OR: [{ installId: null }, { installId: { not: installId } }] } : {}),
+      },
+      orderBy: { firstSeenAt: "asc" },
+    });
+    res.json({
+      serverTime,
+      devices: devices.map((d) => ({
+        id: d.id,
+        deviceName: d.deviceName,
+        deviceModel: d.deviceModel,
+        osVersion: d.osVersion,
+        ip: d.firstIp,
+        signedInAt: d.firstSeenAt,
+      })),
+    });
   })
 );
 
