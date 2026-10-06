@@ -29,6 +29,16 @@ fs.mkdirSync(env.uploadsDir, { recursive: true });
 
 const app = express();
 
+// nginx sits in front and connects from loopback, so without this every
+// request appears to come from 127.0.0.1. That made the login rate limiter -
+// keyed by client address - count the whole internet as one client, so ten
+// wrong passwords from anyone locked the owner out; and it would make every
+// session's "last seen from" read 127.0.0.1. "loopback" trusts the
+// X-Forwarded-For hop nginx adds and nothing else: node binds loopback only,
+// so nginx is the only thing that can reach it, and the client-supplied part
+// of the header, which nginx appends to rather than replaces, is ignored.
+app.set("trust proxy", "loopback");
+
 app.use(helmet());
 app.use(cors());
 app.use(express.json());

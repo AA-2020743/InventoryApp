@@ -11,11 +11,43 @@ datasource db {
 // credentials) so a password change / future second device doesn't
 // require a code change.
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String    @id @default(uuid())
+  email        String    @unique
   passwordHash String
   name         String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+}
+
+// One row per signed-in device. The token a device holds names its row
+// (the JWT's "sid"), and a token whose row is gone is refused - so deleting
+// a row is how a device gets signed out remotely, and the table is the
+// answer to "where am I signed in?".
+//
+// Identified by what the device calls itself rather than by IP: a phone's
+// address changes with every network it joins, so the IP is kept only as
+// the last one seen, a hint rather than an identity.
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The name the owner gave the phone ("Ahmed's Galaxy"), falling back to
+  // manufacturer and model when it has none.
+  deviceName  String
+  deviceModel String?
+  osVersion   String?
+  appVersion  String?
+  createdAt   DateTime @default(now())
+  // Refreshed at most once a minute rather than on every request, so a
+  // busy screen doesn't turn every read into a write.
+  lastSeenAt  DateTime @default(now())
+  lastIp      String?
+  // Matches the token's own expiry. A device that simply stops using the
+  // app isn't signed out by anything, so without this its row would read
+  // as signed in forever after its token had stopped working.
+  expiresAt   DateTime
+
+  @@index([userId])
 }
 
 // Single settings row (singleton, like User) - always read/written via the
