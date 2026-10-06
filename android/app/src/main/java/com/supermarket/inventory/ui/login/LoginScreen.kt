@@ -56,10 +56,14 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
         }
         Spacer(Modifier.height(24.dp))
 
+        // A hint rather than a value: it shows the shape an address takes
+        // without leaving one in the field that has to be deleted first.
         OutlinedTextField(
             value = state.serverUrl,
             onValueChange = viewModel::onServerUrlChange,
             label = { Text(stringResource(R.string.login_server_url)) },
+            placeholder = { Text(stringResource(R.string.login_server_url_hint)) },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Uri),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
@@ -83,7 +87,8 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             singleLine = true,
         )
 
-        state.error?.let {
+        val errorText = state.errorRes?.let { stringResource(it) } ?: state.error
+        errorText?.let {
             Spacer(Modifier.height(12.dp))
             Text(text = it, color = MaterialTheme.colorScheme.error)
         }

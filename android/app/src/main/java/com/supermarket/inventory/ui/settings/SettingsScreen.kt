@@ -197,6 +197,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             OutlinedTextField(
                 value = serverUrlInput,
                 onValueChange = { serverUrlInput = it },
+                placeholder = { Text(stringResource(R.string.login_server_url_hint)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

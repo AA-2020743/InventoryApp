@@ -438,6 +438,15 @@
     <string name="inventory_filter_categories">Filter by category</string>
     <string name="expense_spoiled_name">Spoiled: %1$s</string>
     <string name="login_session_expired">Your session has ended. Please sign in again.</string>
+    <!-- Login: the server address, and why signing in didn't get as far as the server -->
+    <string name="login_server_url_hint">e.g. https://api.example.com</string>
+    <string name="login_error_fields_required">All fields are required.</string>
+    <string name="login_error_invalid_url">That isn\'t a valid server address.</string>
+    <string name="login_error_unknown_host">Server address not found. Check it for typos.</string>
+    <string name="login_error_connection_refused">The server refused the connection. It may be down, or the address may be wrong.</string>
+    <string name="login_error_timeout">The server took too long to respond. Check your connection and try again.</string>
+    <string name="login_error_certificate">The server\'s security certificate isn\'t trusted. Check the address, or the server\'s HTTPS setup.</string>
+    <string name="login_error_unreachable">Could not reach the server. Check your connection and server URL.</string>
     <!-- Finding a product on an invoice line -->
     <string name="product_search_hint">Type a name or barcode to find a product.</string>
     <string name="product_search_no_matches">No product matches that.</string>

@@ -438,6 +438,15 @@
     <string name="inventory_filter_categories">تصفية حسب التصنيف</string>
     <string name="expense_spoiled_name">تالف: %1$s</string>
     <string name="login_session_expired">انتهت جلستك. من فضلك سجّل الدخول مرة أخرى.</string>
+    <!-- Login: the server address, and why signing in didn't get as far as the server -->
+    <string name="login_server_url_hint">مثال: https://api.example.com</string>
+    <string name="login_error_fields_required">جميع الحقول مطلوبة.</string>
+    <string name="login_error_invalid_url">رابط الخادم غير صالح.</string>
+    <string name="login_error_unknown_host">لم يتم العثور على عنوان الخادم. تحقق من كتابته بشكل صحيح.</string>
+    <string name="login_error_connection_refused">رفض الخادم الاتصال. ربما يكون متوقفًا، أو العنوان غير صحيح.</string>
+    <string name="login_error_timeout">استغرق الخادم وقتًا طويلًا للرد. تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="login_error_certificate">شهادة الأمان الخاصة بالخادم غير موثوقة. تحقق من العنوان أو من إعدادات HTTPS على الخادم.</string>
+    <string name="login_error_unreachable">تعذّر الوصول إلى الخادم. تحقق من اتصالك ورابط الخادم.</string>
     <!-- Finding a product on an invoice line -->
     <string name="product_search_hint">اكتب الاسم أو الباركود للعثور على منتج.</string>
     <string name="product_search_no_matches">لا يوجد منتج مطابق.</string>

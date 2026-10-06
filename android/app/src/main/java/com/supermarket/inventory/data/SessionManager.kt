@@ -67,7 +67,7 @@ class SessionManager @Inject constructor(
     }
 
     suspend fun setServerUrl(value: String) {
-        val normalized = value.trimEnd('/')
+        val normalized = normalizeServerUrl(value)
         serverUrl.value = normalized
         context.dataStore.edit { it[Keys.SERVER_URL] = normalized }
     }
@@ -103,6 +103,23 @@ class SessionManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
-        const val DEFAULT_SERVER_URL = "http://10.0.2.2:4000"
+        // Empty, not a guess. This used to be the emulator's route to a dev
+        // machine (http://10.0.2.2:4000), which on a real phone is an address
+        // that goes nowhere - and pre-filling it meant the first thing anyone
+        // saw was a wrong value they had to know to delete.
+        const val DEFAULT_SERVER_URL = ""
+
+        // What the owner types is what a phone keyboard produces: often no
+        // scheme, sometimes a trailing space or slash. A bare host fails to
+        // parse as a URL at all, and a request with no parseable base falls
+        // through to localhost - which reads as "could not reach the server"
+        // even though the name was right. https is the assumption because
+        // that's what a real deployment serves; anyone on plain http types
+        // the scheme, and it's kept.
+        fun normalizeServerUrl(value: String): String {
+            val trimmed = value.trim().trimEnd('/')
+            if (trimmed.isEmpty()) return trimmed
+            return if (trimmed.contains("://")) trimmed else "https://$trimmed"
+        }
     }
 }
