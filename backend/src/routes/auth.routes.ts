@@ -132,6 +132,9 @@ authRouter.get(
         lastSeenAt: s.lastSeenAt,
         lastIp: s.lastIp,
         newDevice: s.newDevice,
+        // Signed in by an app too old to say which phone it is, and not yet
+        // attached to one by a check-in from an updated app.
+        olderApp: s.installId === null,
         current: s.id === sessionId,
       }))
     );
@@ -190,13 +193,19 @@ authRouter.get(
   })
 );
 
-// Signs out every device except the one asking.
+// Signs out every device except the one asking - or, with ?olderApps=true,
+// only the sign-ins from app versions too old to identify their phone. Those
+// can't be matched to a phone after the fact, so a one-tap way to clear them
+// is how the list stops filling up with entries nobody can place.
 authRouter.delete(
   "/sessions",
   requireAuth,
   asyncHandler(async (req, res) => {
     const { userId, sessionId } = req.user!;
-    const { count } = await prisma.session.deleteMany({ where: { userId, id: { not: sessionId } } });
+    const olderAppsOnly = req.query.olderApps === "true";
+    const { count } = await prisma.session.deleteMany({
+      where: { userId, id: { not: sessionId }, ...(olderAppsOnly ? { installId: null } : {}) },
+    });
     res.json({ signedOutDevices: count });
   })
 );

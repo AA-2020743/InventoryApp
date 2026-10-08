@@ -493,4 +493,15 @@
     <string name="notif_signin_body">%1$s signed in at %2$s</string>
     <string name="notif_signin_body_with_ip">%1$s signed in at %2$s from %3$s</string>
     <string name="notif_signin_advice">If this wasn\'t you, sign that device out from Settings → Signed-in devices, and change your password.</string>
+    <string name="devices_older_title">Older app versions</string>
+    <string name="devices_older_count">Sign-ins: %1$d</string>
+    <string name="devices_older_last_active">Most recent activity %1$s</string>
+    <string name="devices_older_body">Sign-ins from a version of the app that can\'t say which phone it is. When a phone updates the app, it moves up the list under its own name.</string>
+    <string name="devices_older_recent_warning">At least one was active in the last day, so a phone may still be using an old version. Update the app on it and it will show here by name.</string>
+    <string name="devices_older_show">Show them</string>
+    <string name="devices_older_hide">Hide</string>
+    <string name="devices_older_sign_out">Sign out all of these</string>
+    <string name="devices_confirm_older_title">Sign out older-app sign-ins?</string>
+    <string name="devices_confirm_older_body">Any phone still using an older version will need to sign in again. Devices shown by name stay signed in.</string>
+    <string name="devices_signed_out_older">Older-app sign-ins signed out.</string>
 </resources>

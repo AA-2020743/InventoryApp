@@ -88,8 +88,8 @@ class AuthRepository @Inject constructor(
 
     suspend fun signOutSession(id: String): ApiResult<Unit> = apiCall { api.signOutSession(id) }
 
-    suspend fun signOutOtherSessions(): ApiResult<Int> =
-        when (val result = apiCall { api.signOutOtherSessions() }) {
+    suspend fun signOutOtherSessions(olderAppsOnly: Boolean = false): ApiResult<Int> =
+        when (val result = apiCall { api.signOutOtherSessions(if (olderAppsOnly) true else null) }) {
             is ApiResult.Success -> ApiResult.Success(result.data.signedOutDevices)
             is ApiResult.Error -> result
         }

@@ -51,6 +51,8 @@ data class SessionDto(
     val lastIp: String?,
     // This was the install's first ever sign-in.
     val newDevice: Boolean = false,
+    // Signed in by an app version too old to say which phone it is.
+    val olderApp: Boolean = false,
     val current: Boolean,
 )
 

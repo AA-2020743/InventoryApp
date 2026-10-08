@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DevicesOther
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TabletAndroid
@@ -74,8 +75,10 @@ data class DevicesUiState(
     // a button that could be pressed twice.
     val busyId: String? = null,
     val signingOutAll: Boolean = false,
+    val signingOutOlder: Boolean = false,
     val error: String? = null,
     val signedOutAll: Boolean = false,
+    val signedOutOlder: Boolean = false,
 )
 
 @HiltViewModel
@@ -100,7 +103,7 @@ class DevicesViewModel @Inject constructor(
 
     fun signOut(id: String) {
         viewModelScope.launch {
-            uiState = uiState.copy(busyId = id, error = null, signedOutAll = false)
+            uiState = uiState.copy(busyId = id, error = null, signedOutAll = false, signedOutOlder = false)
             uiState = when (val result = authRepository.signOutSession(id)) {
                 is ApiResult.Success -> uiState.copy(busyId = null, sessions = uiState.sessions.filterNot { it.id == id })
                 is ApiResult.Error -> uiState.copy(busyId = null, error = result.message)
@@ -118,6 +121,22 @@ class DevicesViewModel @Inject constructor(
                     sessions = uiState.sessions.filter { it.current },
                 )
                 is ApiResult.Error -> uiState.copy(signingOutAll = false, error = result.message)
+            }
+        }
+    }
+
+    // Only the sign-ins from app versions that can't say which phone they
+    // are - identified devices stay signed in.
+    fun signOutOlderApps() {
+        viewModelScope.launch {
+            uiState = uiState.copy(signingOutOlder = true, error = null, signedOutAll = false)
+            uiState = when (val result = authRepository.signOutOtherSessions(olderAppsOnly = true)) {
+                is ApiResult.Success -> uiState.copy(
+                    signingOutOlder = false,
+                    signedOutOlder = true,
+                    sessions = uiState.sessions.filter { it.current || !it.olderApp },
+                )
+                is ApiResult.Error -> uiState.copy(signingOutOlder = false, error = result.message)
             }
         }
     }
@@ -157,6 +176,10 @@ fun DevicesScreen(onBack: () -> Unit, viewModel: DevicesViewModel = hiltViewMode
     val state = viewModel.uiState
     var confirmOne by remember { mutableStateOf<SessionDto?>(null) }
     var confirmAll by remember { mutableStateOf(false) }
+    var confirmOlder by remember { mutableStateOf(false) }
+    // Older-app sign-ins start folded: there can be many, none can be told
+    // apart by name, and listed one by one they bury the devices that can.
+    var showOlder by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -182,7 +205,9 @@ fun DevicesScreen(onBack: () -> Unit, viewModel: DevicesViewModel = hiltViewMode
 
         val current = state.sessions.firstOrNull { it.current }
         val others = state.sessions.filterNot { it.current }
+        val (olderApps, identified) = others.partition { it.olderApp }
         val now = System.currentTimeMillis()
+        val busyAny = state.signingOutAll || state.signingOutOlder
 
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
@@ -204,6 +229,11 @@ fun DevicesScreen(onBack: () -> Unit, viewModel: DevicesViewModel = hiltViewMode
                     Text(stringResource(R.string.devices_signed_out_all), color = MaterialTheme.colorScheme.primary)
                 }
             }
+            if (state.signedOutOlder) {
+                item {
+                    Text(stringResource(R.string.devices_signed_out_older), color = MaterialTheme.colorScheme.primary)
+                }
+            }
             current?.let { session ->
                 item { ThisDeviceCard(session) }
             }
@@ -217,18 +247,40 @@ fun DevicesScreen(onBack: () -> Unit, viewModel: DevicesViewModel = hiltViewMode
             if (others.isEmpty()) {
                 item { NoOtherDevicesCard() }
             } else {
-                items(others, key = { it.id }) { session ->
+                items(identified, key = { it.id }) { session ->
                     OtherDeviceCard(
                         session = session,
                         now = now,
-                        busy = state.busyId == session.id || state.signingOutAll,
+                        busy = state.busyId == session.id || busyAny,
                         onSignOut = { confirmOne = session },
                     )
+                }
+                if (olderApps.isNotEmpty()) {
+                    item(key = "older-apps") {
+                        OlderAppsCard(
+                            sessions = olderApps,
+                            now = now,
+                            expanded = showOlder,
+                            busy = busyAny || state.busyId != null,
+                            onToggle = { showOlder = !showOlder },
+                            onSignOutAll = { confirmOlder = true },
+                        )
+                    }
+                    if (showOlder) {
+                        items(olderApps, key = { it.id }) { session ->
+                            OtherDeviceCard(
+                                session = session,
+                                now = now,
+                                busy = state.busyId == session.id || busyAny,
+                                onSignOut = { confirmOne = session },
+                            )
+                        }
+                    }
                 }
                 item {
                     OutlinedButton(
                         onClick = { confirmAll = true },
-                        enabled = !state.signingOutAll && state.busyId == null,
+                        enabled = !busyAny && state.busyId == null,
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     ) {
                         Text(stringResource(R.string.devices_sign_out_all), color = MaterialTheme.colorScheme.error)
@@ -251,6 +303,23 @@ fun DevicesScreen(onBack: () -> Unit, viewModel: DevicesViewModel = hiltViewMode
             },
             dismissButton = {
                 TextButton(onClick = { confirmOne = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
+    if (confirmOlder) {
+        AlertDialog(
+            onDismissRequest = { confirmOlder = false },
+            title = { Text(stringResource(R.string.devices_confirm_older_title)) },
+            text = { Text(stringResource(R.string.devices_confirm_older_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.signOutOlderApps()
+                    confirmOlder = false
+                }) { Text(stringResource(R.string.devices_older_sign_out), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmOlder = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -408,6 +477,92 @@ private fun OtherDeviceCard(session: SessionDto, now: Long, busy: Boolean, onSig
             } else {
                 TextButton(onClick = onSignOut) {
                     Text(stringResource(R.string.devices_sign_out), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
+
+// Every sign-in from an app version that can't identify its phone, folded
+// into one card. What matters about them as a group is whether any is still
+// in use - which means a phone somewhere is still on the old version and
+// should be updated - so the most recent activity is what the card leads
+// with, and a recent one is called out.
+@Composable
+private fun OlderAppsCard(
+    sessions: List<SessionDto>,
+    now: Long,
+    expanded: Boolean,
+    busy: Boolean,
+    onToggle: () -> Unit,
+    onSignOutAll: () -> Unit,
+) {
+    val latest = sessions.mapNotNull { epochMillis(it.lastSeenAt) }.maxOrNull()
+    val recentlyActive = latest != null && now - latest < DateUtils.DAY_IN_MILLIS
+    val latestText = when {
+        latest == null -> null
+        now - latest < ACTIVE_NOW_MS -> stringResource(R.string.devices_active_now)
+        else -> stringResource(
+            R.string.devices_older_last_active,
+            DateUtils.getRelativeTimeSpanString(latest, now, DateUtils.MINUTE_IN_MILLIS).toString(),
+        )
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DeviceAvatar(
+                    icon = Icons.Filled.History,
+                    background = MaterialTheme.colorScheme.secondaryContainer,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    size = 44,
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.devices_older_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        stringResource(R.string.devices_older_count, sessions.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    latestText?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.devices_older_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (recentlyActive) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.devices_older_recent_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = warningColor(),
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = onToggle) {
+                    Text(stringResource(if (expanded) R.string.devices_older_hide else R.string.devices_older_show))
+                }
+                if (busy) {
+                    CircularProgressIndicator(Modifier.size(24.dp).padding(2.dp), strokeWidth = 2.dp)
+                } else {
+                    TextButton(onClick = onSignOutAll) {
+                        Text(stringResource(R.string.devices_older_sign_out), color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }

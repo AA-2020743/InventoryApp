@@ -493,4 +493,15 @@
     <string name="notif_signin_body">سجّل %1$s الدخول في %2$s</string>
     <string name="notif_signin_body_with_ip">سجّل %1$s الدخول في %2$s من %3$s</string>
     <string name="notif_signin_advice">إذا لم تكن أنت، سجّل خروج هذا الجهاز من الإعدادات ← الأجهزة المسجّل دخولها، وغيّر كلمة المرور.</string>
+    <string name="devices_older_title">إصدارات أقدم من التطبيق</string>
+    <string name="devices_older_count">عدد عمليات الدخول: %1$d</string>
+    <string name="devices_older_last_active">آخر نشاط %1$s</string>
+    <string name="devices_older_body">عمليات دخول من إصدار من التطبيق لا يحدد أي هاتف هو. عند تحديث التطبيق على الهاتف، ينتقل إلى أعلى القائمة باسمه.</string>
+    <string name="devices_older_recent_warning">واحدة منها على الأقل كانت نشطة خلال آخر يوم، فقد يكون هناك هاتف ما زال يستخدم إصدارًا قديمًا. حدّث التطبيق عليه وسيظهر هنا باسمه.</string>
+    <string name="devices_older_show">عرضها</string>
+    <string name="devices_older_hide">إخفاء</string>
+    <string name="devices_older_sign_out">تسجيل خروجها كلها</string>
+    <string name="devices_confirm_older_title">تسجيل خروج عمليات الدخول من الإصدارات الأقدم؟</string>
+    <string name="devices_confirm_older_body">سيحتاج أي هاتف ما زال يستخدم إصدارًا أقدم إلى تسجيل الدخول مرة أخرى. الأجهزة الظاهرة بأسمائها تبقى مسجّلة الدخول.</string>
+    <string name="devices_signed_out_older">تم تسجيل خروج عمليات الدخول من الإصدارات الأقدم.</string>
 </resources>

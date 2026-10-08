@@ -18,8 +18,10 @@ interface ApiService {
     @DELETE("api/auth/sessions/{id}")
     suspend fun signOutSession(@Path("id") id: String)
 
+    // olderAppsOnly = true limits it to sign-ins from app versions that don't
+    // identify their phone; null signs out every device but this one.
     @DELETE("api/auth/sessions")
-    suspend fun signOutOtherSessions(): SignedOutDevicesDto
+    suspend fun signOutOtherSessions(@Query("olderApps") olderAppsOnly: Boolean? = null): SignedOutDevicesDto
 
     @POST("api/auth/logout")
     suspend fun logout()
