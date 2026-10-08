@@ -22,6 +22,17 @@
 #      so it runs at 12:00 AM and 7:00 PM Egypt time.
 #
 # Requires: bash, curl, python3 (for JSON parsing — no extra deps needed).
+#
+# It signs in as a named, recognisable device and signs out when it's done.
+# An earlier version sent no device details and never signed out, so every
+# run added another "Unknown device" to the app's device list - one per run,
+# kept for 30 days - and, being unrecognisable, raised a "new sign-in" alert
+# on the owner's phone each time. Now the server sees the same machine on
+# every run (an id derived from /etc/machine-id), so after the first run it
+# is neither new nor duplicated, and the session ends with the run.
+#
+# Note: this uses the owner's app password. Changing that password in the
+# app means updating API_PASSWORD in .env here too, or the next run fails.
 
 set -euo pipefail
 
@@ -43,16 +54,43 @@ KEEP_COUNT="${KEEP_COUNT:-20}"
 
 mkdir -p "$BACKUP_DIR"
 
-echo "[$(date -Iseconds)] Logging in to $API_BASE_URL ..."
+# How this machine appears in the app's device list. The id is stable across
+# runs - derived from /etc/machine-id, falling back to the hostname - and
+# hashed, so the raw machine id isn't sent anywhere.
+MACHINE_KEY="$(cat /etc/machine-id 2>/dev/null || hostname)"
+DEVICE_ID="$(python3 -c 'import sys,uuid; print(uuid.uuid5(uuid.NAMESPACE_URL, "inventory-offsite-backup:" + sys.argv[1]))' "$MACHINE_KEY")"
+DEVICE_NAME="${DEVICE_NAME:-Off-site backup ($(hostname))}"
+
+# Built with python rather than pasted into a string, so a password
+# containing a quote or backslash can't break the request.
+LOGIN_BODY="$(API_EMAIL="$API_EMAIL" API_PASSWORD="$API_PASSWORD" DEVICE_ID="$DEVICE_ID" DEVICE_NAME="$DEVICE_NAME" OS="$(uname -sr)" \
+  python3 -c 'import json,os; print(json.dumps({
+    "email": os.environ["API_EMAIL"],
+    "password": os.environ["API_PASSWORD"],
+    "installId": os.environ["DEVICE_ID"],
+    "deviceName": os.environ["DEVICE_NAME"][:100],
+    "deviceModel": "fetch-offsite-backup.sh",
+    "osVersion": os.environ["OS"][:50],
+  }))')"
+
+echo "[$(date -Iseconds)] Logging in to $API_BASE_URL as \"$DEVICE_NAME\" ..."
 LOGIN_RESPONSE="$(curl -fsS -X POST "$API_BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$API_EMAIL\",\"password\":\"$API_PASSWORD\"}")"
+  -d "$LOGIN_BODY")"
 
 TOKEN="$(python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" <<< "$LOGIN_RESPONSE")"
 if [[ -z "$TOKEN" ]]; then
   echo "Login failed — check API_EMAIL/API_PASSWORD/API_BASE_URL." >&2
   exit 1
 fi
+
+# End the session however the script exits - success, a failed download, or
+# an error part-way - so a run never leaves a signed-in device behind.
+sign_out() {
+  curl -fsS -o /dev/null -X POST "$API_BASE_URL/api/auth/logout" \
+    -H "Authorization: Bearer $TOKEN" || true
+}
+trap sign_out EXIT
 
 TIMESTAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
 OUT_FILE="$BACKUP_DIR/inventory-backup-$TIMESTAMP.zip"
