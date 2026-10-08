@@ -40,6 +40,11 @@ model KnownDevice {
   osVersion   String?
   firstIp     String?
   firstSeenAt DateTime @default(now())
+  // Recorded when an already signed-in session reported its install for the
+  // first time (an app updated from a version that didn't send one), rather
+  // than by a sign-in. That sign-in already happened and was reported then,
+  // as an unrecognised device, so this row must not raise a second alert.
+  adopted     Boolean  @default(false)
 
   @@unique([userId, installId])
   @@index([userId, firstSeenAt])

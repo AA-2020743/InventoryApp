@@ -24,6 +24,9 @@ interface ApiService {
     @POST("api/auth/logout")
     suspend fun logout()
 
+    @POST("api/auth/device")
+    suspend fun checkInDevice(@Body request: DeviceCheckInRequest)
+
     @GET("api/auth/new-devices")
     suspend fun getNewDevices(@Query("since") since: String?): NewDevicesDto
 

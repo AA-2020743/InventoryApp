@@ -70,6 +70,13 @@ export async function createSession(userId: string, device: DeviceInfo, ip: stri
   // have run out are already refused, so their rows only clutter the list.
   await prisma.session.deleteMany({ where: { userId, expiresAt: { lte: now } } });
   const newDevice = await recordDevice(userId, device, ip);
+  if (device.installId) {
+    // One entry per phone. A phone signing in again means it no longer holds
+    // its previous token - it was signed out locally, or reinstalled - so
+    // that session can never be used again and would only sit in the list
+    // as a second copy of the same device.
+    await prisma.session.deleteMany({ where: { userId, installId: device.installId } });
+  }
   return prisma.session.create({
     data: {
       userId,
@@ -108,5 +115,66 @@ export async function touchSession(session: Session, ip: string | undefined): Pr
   await prisma.session.updateMany({
     where: { id: session.id },
     data: { lastSeenAt: now, lastIp: address },
+  });
+}
+
+// The app reports its install and details each time it starts while signed
+// in. Two things depend on it:
+//
+// - A session signed in by an app too old to send an install id has no way
+//   to be recognised. Once that phone runs an app that does report one, the
+//   session is attached to its install here, and any other session already
+//   held by the same install is removed, so the phone is listed once.
+// - Details recorded at sign-in go stale - the app is updated, the phone is
+//   renamed - and this keeps the list showing what the phone is now.
+//
+// Attaching an install records it as known without raising a new-device
+// alert (adopted): the sign-in it belongs to happened earlier and was
+// already reported at the time.
+export async function checkIn(session: Session, device: DeviceInfo): Promise<void> {
+  const { userId } = session;
+  const installId = device.installId || null;
+  let recognised = false;
+
+  if (installId && installId !== session.installId) {
+    const existing = await prisma.knownDevice.findUnique({
+      where: { userId_installId: { userId, installId } },
+    });
+    // Seen before this session existed, so not a new device after all.
+    recognised = existing !== null;
+    if (!existing) {
+      try {
+        await prisma.knownDevice.create({
+          data: {
+            userId,
+            installId,
+            deviceName: deviceLabel(device),
+            deviceModel: device.deviceModel || null,
+            osVersion: device.osVersion || null,
+            firstIp: session.lastIp,
+            firstSeenAt: session.createdAt,
+            adopted: true,
+          },
+        });
+      } catch (e) {
+        if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+      }
+    }
+  }
+  if (installId) {
+    await prisma.session.deleteMany({ where: { userId, installId, id: { not: session.id } } });
+  }
+
+  // updateMany so a session signed out mid-request doesn't fail it.
+  await prisma.session.updateMany({
+    where: { id: session.id },
+    data: {
+      ...(installId ? { installId } : {}),
+      ...(device.deviceName || device.deviceModel ? { deviceName: deviceLabel(device) } : {}),
+      ...(device.deviceModel ? { deviceModel: device.deviceModel } : {}),
+      ...(device.osVersion ? { osVersion: device.osVersion } : {}),
+      ...(device.appVersion ? { appVersion: device.appVersion } : {}),
+      ...(recognised ? { newDevice: false } : {}),
+    },
   });
 }

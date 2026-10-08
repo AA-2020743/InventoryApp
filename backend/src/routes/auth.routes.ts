@@ -7,7 +7,7 @@ import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/auth";
-import { createSession, SESSION_TTL_DAYS } from "../services/sessions";
+import { checkIn, createSession, SESSION_TTL_DAYS } from "../services/sessions";
 
 export const authRouter = Router();
 
@@ -28,14 +28,17 @@ const loginLimiter = rateLimit({
 // optional: a client that sends "appVersion": null rather than leaving it
 // out must not have its sign-in refused over a detail. Capped in length
 // because they're free text from the client and get shown back.
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+const deviceSchema = z.object({
   installId: z.string().trim().max(64).nullish(),
   deviceName: z.string().trim().max(100).nullish(),
   deviceModel: z.string().trim().max(100).nullish(),
   osVersion: z.string().trim().max(50).nullish(),
   appVersion: z.string().trim().max(30).nullish(),
+});
+
+const loginSchema = deviceSchema.extend({
+  email: z.string().email(),
+  password: z.string().min(1),
 });
 
 authRouter.post(
@@ -91,6 +94,19 @@ authRouter.post(
     ]);
 
     res.json({ success: true, signedOutDevices: signedOut.count });
+  })
+);
+
+// Sent by the app on each start while signed in; see checkIn.
+authRouter.post(
+  "/device",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const device = deviceSchema.parse(req.body);
+    const session = await prisma.session.findUnique({ where: { id: req.user!.sessionId } });
+    if (!session) throw new HttpError(401, "This device has been signed out");
+    await checkIn(session, device);
+    res.json({ success: true });
   })
 );
 
@@ -151,6 +167,8 @@ authRouter.get(
       where: {
         userId,
         firstSeenAt: { gt: since, lte: serverTime },
+        // Attached to a sign-in that was already reported - see checkIn.
+        adopted: false,
         // Not the caller itself. Spelled out with an OR because SQL's
         // "installId <> x" is never true for a NULL installId, and the rows
         // without one - sign-ins from older apps - must still be reported.

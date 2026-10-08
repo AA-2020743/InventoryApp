@@ -26,6 +26,18 @@ data class UserDto(val id: String, val email: String, val name: String)
 @JsonClass(generateAdapter = true)
 data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
 
+// What the app reports about this phone each time it starts while signed in,
+// so a session from an older app version gets attached to the right device
+// and the details shown in the device list stay current.
+@JsonClass(generateAdapter = true)
+data class DeviceCheckInRequest(
+    val installId: String,
+    val deviceName: String,
+    val deviceModel: String,
+    val osVersion: String,
+    val appVersion: String? = null,
+)
+
 // One signed-in device. [current] marks the one making the request.
 @JsonClass(generateAdapter = true)
 data class SessionDto(

@@ -1,6 +1,8 @@
 package com.supermarket.inventory.data
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.provider.Settings
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -79,12 +81,31 @@ class SessionManager @Inject constructor(
         }
     }
 
-    // A random id for this install, made on first use and kept until the app
-    // is uninstalled. The server uses it to recognise this phone when it
-    // signs in again, so only a genuinely unfamiliar install raises a
-    // new-device alert. Random rather than derived from the hardware: it
-    // identifies the install to this one server and nothing else.
-    suspend fun installId(): String {
+    // Identifies this phone to the server, so it's recognised when it signs in
+    // again and listed once however many times it has. (Still called an
+    // install id on the wire; it now outlives the install.)
+    //
+    // Derived from ANDROID_ID, which Android scopes to this app's signing key
+    // on this device and keeps across reinstalls and cleared app data. The
+    // first version was a random id stored in the app's own data, so a
+    // reinstall - or clearing storage - made the same phone look new: a
+    // fresh "new device" alert, and a second entry in the list beside the
+    // first. Hashed, so the raw value never leaves the phone.
+    //
+    // The random stored id remains only as a fallback for a device that
+    // reports no ANDROID_ID.
+    suspend fun installId(): String = deviceBoundId() ?: storedRandomId()
+
+    @SuppressLint("HardwareIds")
+    private fun deviceBoundId(): String? {
+        val androidId = runCatching {
+            Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        }.getOrNull()?.trim()
+        if (androidId.isNullOrEmpty()) return null
+        return UUID.nameUUIDFromBytes("supermarket-inventory:$androidId".toByteArray()).toString()
+    }
+
+    private suspend fun storedRandomId(): String {
         context.dataStore.data.first()[Keys.INSTALL_ID]?.let { return it }
         val fresh = UUID.randomUUID().toString()
         var stored = fresh

@@ -7,6 +7,7 @@ import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.data.apiCall
 import com.supermarket.inventory.data.remote.ApiService
 import com.supermarket.inventory.data.remote.dto.ChangePasswordRequest
+import com.supermarket.inventory.data.remote.dto.DeviceCheckInRequest
 import com.supermarket.inventory.data.remote.dto.LoginRequest
 import com.supermarket.inventory.data.remote.dto.NewDevicesDto
 import com.supermarket.inventory.data.remote.dto.SessionDto
@@ -63,6 +64,24 @@ class AuthRepository @Inject constructor(
     private suspend fun startWatchingSignIns() {
         val start = apiCall { api.getNewDevices(null) }
         if (start is ApiResult.Success) sessionManager.setSignInWatermark(start.data.serverTime)
+    }
+
+    // Tells the server which phone this session belongs to and what it is
+    // now. Best effort - the device list just shows what it last knew if
+    // this doesn't get through.
+    suspend fun checkInDevice() {
+        val device = DeviceDetailsReader.read(context)
+        apiCall {
+            api.checkInDevice(
+                DeviceCheckInRequest(
+                    installId = sessionManager.installId(),
+                    deviceName = device.name,
+                    deviceModel = device.model,
+                    osVersion = device.osVersion,
+                    appVersion = device.appVersion,
+                )
+            )
+        }
     }
 
     suspend fun getSessions(): ApiResult<List<SessionDto>> = apiCall { api.getSessions() }

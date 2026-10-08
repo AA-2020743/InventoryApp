@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.supermarket.inventory.data.SessionManager
+import com.supermarket.inventory.data.repository.AuthRepository
 import com.supermarket.inventory.ui.nav.InventoryNavHost
 import com.supermarket.inventory.ui.theme.InventoryAppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,6 +34,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var sessionManager: SessionManager
+    @Inject lateinit var authRepository: AuthRepository
 
     // A screen a notification asked to open, waiting for the nav host to
     // take it. Held here rather than read from the intent inside
@@ -52,6 +54,14 @@ class MainActivity : AppCompatActivity() {
             val open by pendingOpen.collectAsState()
             InventoryAppTheme(themeMode = themeMode) {
                 NotificationPermissionRequest(signedIn = token != null)
+                // Each start while signed in - and right after signing in -
+                // the app tells the server which phone this is and what it
+                // is now. That attaches a session begun on an older app
+                // version to this phone, and keeps the device list current.
+                val signedIn = token != null
+                LaunchedEffect(signedIn) {
+                    if (signedIn) authRepository.checkInDevice()
+                }
                 InventoryNavHost(
                     sessionManager = sessionManager,
                     pendingOpen = open,
