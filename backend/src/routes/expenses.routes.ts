@@ -4,15 +4,18 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
-import { totalsByCategory } from "../utils/categoryTotals";
+import { expenseGroups, noteSuggestions, normaliseNote, SPOILAGE_EXPENSE_PREFIX } from "../utils/expenseBreakdown";
 import { applyCashDeduction } from "./cashRegister.routes";
 
 export const expensesRouter = Router();
 
-// Server-generated prefix for the write-off a spoilage creates (see the
-// spoil route in products.routes.ts). Always this English form regardless
-// of the app's display language, since it's produced server-side.
-const SPOILAGE_EXPENSE_PREFIX = "Spoiled: ";
+// The till entry an expense creates, readable on its own in the cash ledger:
+// "Expense: Other - electricity" rather than just "Expense: Other", which
+// says nothing about where the money went.
+function ledgerNote(name: string, notes: string | null | undefined): string {
+  const note = normaliseNote(notes);
+  return note ? `Expense: ${name} - ${note}` : `Expense: ${name}`;
+}
 
 const expenseInput = z.object({
   name: z.string().trim().min(1),
@@ -59,6 +62,26 @@ expensesRouter.get(
   })
 );
 
+// Notes already written under one expense name, most used first - offered
+// by the app as one-tap suggestions while logging another, so "electricity"
+// is picked rather than retyped as "Electricity " or "electrcity" and the
+// report's breakdown keeps it on one line.
+expensesRouter.get(
+  "/notes",
+  asyncHandler(async (req, res) => {
+    const name = typeof req.query.name === "string" ? req.query.name.trim() : "";
+    if (!name) {
+      res.json([]);
+      return;
+    }
+    const rows = await prisma.expense.findMany({
+      where: { name, notes: { not: null } },
+      select: { notes: true, date: true },
+    });
+    res.json(noteSuggestions(rows));
+  })
+);
+
 // GET /api/expenses/for-range?period=day|month&date= - the expense side of
 // profit for a specific calendar day or month, mirroring the dashboard
 // summary's math for an arbitrary period instead of just "today"/"this
@@ -86,8 +109,10 @@ expensesRouter.get(
       total,
       deficit,
       // Grouped by name - see the /names endpoint above for why the name
-      // is the category for an expense.
-      byCategory: totalsByCategory(items.map((e) => ({ category: e.name, amount: e.amount }))),
+      // is the category for an expense - each with its breakdown by note,
+      // and spoilage write-offs folded into one group broken down by product.
+      // See expenseGroups.
+      byCategory: await expenseGroups(prisma, items),
     });
   })
 );
@@ -97,8 +122,8 @@ expensesRouter.post(
   asyncHandler(async (req, res) => {
     const data = expenseInput.parse(req.body);
     const expense = await prisma.$transaction(async (tx) => {
-      const created = await tx.expense.create({ data });
-      await applyCashDeduction(tx, { expenseId: created.id }, created.amount, `Expense: ${created.name}`);
+      const created = await tx.expense.create({ data: { ...data, notes: normaliseNote(data.notes) } });
+      await applyCashDeduction(tx, { expenseId: created.id }, created.amount, ledgerNote(created.name, created.notes));
       return created;
     });
     res.status(201).json(expense);
@@ -112,8 +137,11 @@ expensesRouter.put(
     const expense = await prisma.$transaction(async (tx) => {
       const existing = await tx.expense.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Expense not found");
-      const updated = await tx.expense.update({ where: { id: req.params.id }, data });
-      await applyCashDeduction(tx, { expenseId: updated.id }, updated.amount, `Expense: ${updated.name}`);
+      const updated = await tx.expense.update({
+        where: { id: req.params.id },
+        data: data.notes === undefined ? data : { ...data, notes: normaliseNote(data.notes) },
+      });
+      await applyCashDeduction(tx, { expenseId: updated.id }, updated.amount, ledgerNote(updated.name, updated.notes));
       // Reached only if applyCashDeduction succeeded (fully paid), so any
       // deficit this expense carried from before this edit no longer
       // applies - clear it rather than leaving a stale value behind.

@@ -6,6 +6,7 @@ import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { applyCashDeduction } from "./cashRegister.routes";
 import { newInvoiceForRestockSchema, resolveRestockFinancing } from "./products.routes";
 import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
+import { SPOILAGE_EXPENSE_PREFIX } from "../utils/expenseBreakdown";
 
 export const inventoryTransactionsRouter = Router();
 
@@ -169,7 +170,7 @@ inventoryTransactionsRouter.post(
       // unlinked, and only when exactly one such row exists - anything
       // ambiguous is left alone and reported, so no unrelated expense can
       // be deleted by a correction.
-      const expenseName = `Spoiled: ${existing.product.name}`;
+      const expenseName = `${SPOILAGE_EXPENSE_PREFIX}${existing.product.name}`;
       const cost = (existing.unitCost ?? new Prisma.Decimal(0)).mul(restored);
       const candidates = await tx.expense.findMany({
         where: {

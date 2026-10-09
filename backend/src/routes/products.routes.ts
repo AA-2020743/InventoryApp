@@ -5,6 +5,7 @@ import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { applyCashDeduction } from "./cashRegister.routes";
 import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
+import { SPOILAGE_EXPENSE_PREFIX } from "../utils/expenseBreakdown";
 
 export const productsRouter = Router();
 
@@ -469,7 +470,7 @@ productsRouter.post(
     }
 
     const cost = product.purchaseCost.mul(quantity);
-    const expenseName = `Spoiled: ${product.name}`;
+    const expenseName = `${SPOILAGE_EXPENSE_PREFIX}${product.name}`;
 
     const result = await prisma.$transaction(async (tx) => {
       const updatedProduct = await tx.product.update({
