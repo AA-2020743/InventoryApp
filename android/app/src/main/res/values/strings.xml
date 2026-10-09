@@ -504,4 +504,11 @@
     <string name="devices_confirm_older_title">Sign out older-app sign-ins?</string>
     <string name="devices_confirm_older_body">Any phone still using an older version will need to sign in again. Devices shown by name stay signed in.</string>
     <string name="devices_signed_out_older">Older-app sign-ins signed out.</string>
+    <!-- Expense notes, and the report's breakdown by note / spoiled product -->
+    <string name="expense_note">Note (optional)</string>
+    <string name="expense_note_hint">e.g. electricity, maintenance</string>
+    <string name="stats_spoiled_group">Spoiled items</string>
+    <string name="stats_no_note">Without a note</string>
+    <string name="stats_share_of_group">%1$s%% of %2$s</string>
+    <string name="stats_spoiled_quantity">%1$s spoiled</string>
 </resources>

@@ -391,6 +391,25 @@ data class CategoryTotalDto(
     val category: String?,
     val total: String,
     val count: Int,
+    // "spoilage" for the one group every spoilage write-off is folded into -
+    // the app shows its own translated label for it - otherwise "expense".
+    val kind: String = "expense",
+    // What the group is made of: notes under an expense name, or products
+    // under spoilage. Empty when there's nothing to break down. The lines
+    // add up to [total] exactly - the server builds both from the same rows.
+    val breakdown: List<CategorySubTotalDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class CategorySubTotalDto(
+    // null for the expenses in the group that carry no note.
+    val label: String?,
+    val total: String,
+    val count: Int,
+    // Spoilage lines only: how much spoiled, and the product's unit. Null
+    // when it can't be fully traced, rather than a partial figure.
+    val quantity: String? = null,
+    val unit: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

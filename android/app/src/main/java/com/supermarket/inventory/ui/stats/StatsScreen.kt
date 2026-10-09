@@ -1,6 +1,17 @@
 package com.supermarket.inventory.ui.stats
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import com.supermarket.inventory.data.remote.dto.CategorySubTotalDto
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -441,15 +452,22 @@ private fun SectionTotalCard(
 //
 // The colour is the same one the category would get as a pie slice, so a
 // category looks like itself wherever it appears.
+//
+// A group that has a breakdown - a catch-all name like "Other" with notes on
+// its entries, or the spoilage group with its products - fills its bar in
+// segments, one per line, so what it's made of shows before it's opened; a
+// tap opens the lines themselves.
 @Composable
 private fun CategoryBreakdownCard(
     title: String,
     breakdown: List<CategoryTotalDto>,
     accent: Color,
 ) {
-    val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val maxTotal = breakdown.maxOfOrNull { it.total.toDoubleOrNull() ?: 0.0 } ?: 0.0
     val grandTotal = breakdown.sumOf { it.total.toDoubleOrNull() ?: 0.0 }
+    // Which groups are open. Keyed by kind and name so it survives the list
+    // reloading for the same period.
+    var expanded by remember(breakdown) { mutableStateOf(emptySet<String>()) }
 
     Card(
         Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -469,58 +487,209 @@ private fun CategoryBreakdownCard(
             }
             Spacer(Modifier.height(4.dp))
             breakdown.forEachIndexed { index, row ->
-                val value = row.total.toDoubleOrNull() ?: 0.0
-                val fraction = if (maxTotal > 0) (value / maxTotal).toFloat().coerceIn(0f, 1f) else 0f
-                val share = if (grandTotal > 0) (value / grandTotal) * 100 else 0.0
-                val color = categoryColor(index)
-                Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                val key = "${row.kind}|${row.category}"
+                CategoryGroupRow(
+                    row = row,
+                    color = categoryColor(index),
+                    maxTotal = maxTotal,
+                    grandTotal = grandTotal,
+                    expanded = key in expanded,
+                    onToggle = { expanded = if (key in expanded) expanded - key else expanded + key },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun groupLabel(row: CategoryTotalDto): String = when {
+    row.kind == "spoilage" -> stringResource(R.string.stats_spoiled_group)
+    row.category.isNullOrBlank() -> stringResource(R.string.stats_uncategorized)
+    else -> expenseDisplayName(row.category)
+}
+
+// The lines of a group, each with its shade of the group's colour - fully
+// strong for the largest, fading down the list - and the "no note" remainder
+// in a neutral grey, so it reads as what's left over rather than a category.
+private data class ShadedLine(val line: CategorySubTotalDto, val value: Double, val color: Color)
+
+private fun shadeLines(row: CategoryTotalDto, base: Color, neutral: Color): List<ShadedLine> {
+    var rank = 0
+    return row.breakdown.map { line ->
+        val color = if (line.label == null) {
+            neutral
+        } else {
+            base.copy(alpha = (1f - 0.18f * rank++).coerceAtLeast(0.3f))
+        }
+        ShadedLine(line, line.total.toDoubleOrNull() ?: 0.0, color)
+    }
+}
+
+@Composable
+private fun CategoryGroupRow(
+    row: CategoryTotalDto,
+    color: Color,
+    maxTotal: Double,
+    grandTotal: Double,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val value = row.total.toDoubleOrNull() ?: 0.0
+    val fraction = if (maxTotal > 0) (value / maxTotal).toFloat().coerceIn(0f, 1f) else 0f
+    val share = if (grandTotal > 0) (value / grandTotal) * 100 else 0.0
+    val hasLines = row.breakdown.isNotEmpty()
+    val lines = shadeLines(row, color, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+    val label = groupLabel(row)
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .then(if (hasLines) Modifier.clickable(onClick = onToggle) else Modifier)
+            .padding(vertical = 5.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (hasLines) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(formatAmount(row.total), style = MaterialTheme.typography.bodyMedium)
+            if (hasLines) {
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, top = 3.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                // Only lines with an amount get a segment: a weight of zero
+                // isn't allowed, and a zero-width segment would show nothing.
+                val segments = lines.filter { it.value > 0 }
+                if (segments.isEmpty()) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fraction)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(color),
+                    )
+                } else {
                     Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fraction)
+                            .clip(RoundedCornerShape(3.dp)),
+                        horizontalArrangement = Arrangement.spacedBy(1.dp),
                     ) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+                        segments.forEach { segment ->
+                            Box(
+                                Modifier
+                                    .weight(segment.value.toFloat())
+                                    .fillMaxHeight()
+                                    .background(segment.color),
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            // How many entries made this category up, and what slice of the
+            // period it is. Both were asked for; the individual entries
+            // deliberately are not here.
+            Text(
+                "${formatPercent(share.toString())}% · " +
+                    stringResource(R.string.stats_category_count, row.count),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded && hasLines,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            BreakdownLines(lines = lines, groupTotal = value, groupLabel = label, spoilage = row.kind == "spoilage")
+        }
+    }
+}
+
+// The opened group: its lines hanging off a guide in the group's colour, each
+// with its amount, its share of the group (not of the period - the question
+// here is what this group was made of), how many entries, and for spoilage
+// how much of the product was lost.
+@Composable
+private fun BreakdownLines(lines: List<ShadedLine>, groupTotal: Double, groupLabel: String, spoilage: Boolean) {
+    Row(Modifier.fillMaxWidth().padding(start = 3.dp, top = 6.dp).height(IntrinsicSize.Min)) {
+        Box(
+            Modifier
+                .width(2.dp)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(1.dp))
+                .background(lines.firstOrNull()?.color ?: MaterialTheme.colorScheme.outlineVariant),
+        )
+        Column(Modifier.padding(start = 11.dp)) {
+            lines.forEach { shaded ->
+                val line = shaded.line
+                val share = if (groupTotal > 0) (shaded.value / groupTotal) * 100 else 0.0
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(shaded.color))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            row.category?.takeIf { it.isNotBlank() }?.let { expenseDisplayName(it) }
-                                ?: uncategorizedLabel,
-                            style = MaterialTheme.typography.bodyMedium,
+                            line.label ?: stringResource(R.string.stats_no_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontStyle = if (line.label == null) FontStyle.Italic else FontStyle.Normal,
+                            color = if (line.label == null) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        Text(formatAmount(row.total), style = MaterialTheme.typography.bodyMedium)
+                        Text(formatAmount(line.total), style = MaterialTheme.typography.bodySmall)
                     }
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 16.dp, top = 3.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                        ) {
-                            Box(
-                                Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(fraction)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(color),
+                    val details = buildList {
+                        add(stringResource(R.string.stats_share_of_group, formatPercent(share.toString()), groupLabel))
+                        add(stringResource(R.string.stats_category_count, line.count))
+                        if (spoilage && line.quantity != null) {
+                            add(
+                                stringResource(
+                                    R.string.stats_spoiled_quantity,
+                                    "${formatQuantity(line.quantity)} ${line.unit.orEmpty()}".trim(),
+                                )
                             )
                         }
-                        Spacer(Modifier.width(8.dp))
-                        // How many entries made this category up, and what
-                        // slice of the period it is. Both were asked for;
-                        // the individual entries deliberately are not here.
-                        Text(
-                            "${formatPercent(share.toString())}% · " +
-                                stringResource(R.string.stats_category_count, row.count),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
                     }
+                    Text(
+                        details.joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 15.dp),
+                    )
                 }
             }
         }

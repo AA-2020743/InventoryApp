@@ -192,6 +192,9 @@ interface ApiService {
     @GET("api/expenses/names")
     suspend fun getExpenseNames(): List<String>
 
+    @GET("api/expenses/notes")
+    suspend fun getExpenseNotes(@Query("name") name: String): List<String>
+
     @GET("api/expenses/for-range")
     suspend fun getExpensesForRange(
         @Query("period") period: String,

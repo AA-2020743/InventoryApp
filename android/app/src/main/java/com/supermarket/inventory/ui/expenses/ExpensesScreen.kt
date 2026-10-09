@@ -76,6 +76,10 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 
 data class ExpensesUiState(
     val isLoading: Boolean = true,
@@ -113,11 +117,17 @@ class ExpensesViewModel @Inject constructor(private val repository: ExpenseRepos
         }
     }
 
-    suspend fun create(name: String, amount: Double, date: String?) =
-        repository.createExpense(name, amount, date, null)
+    suspend fun create(name: String, amount: Double, date: String?, notes: String) =
+        repository.createExpense(name, amount, date, notes)
 
-    suspend fun update(id: String, name: String, amount: Double, date: String?, notes: String?) =
+    suspend fun update(id: String, name: String, amount: Double, date: String?, notes: String) =
         repository.updateExpense(id, name, amount, date, notes)
+
+    suspend fun noteSuggestions(name: String): List<String> =
+        when (val result = repository.getNoteSuggestions(name)) {
+            is ApiResult.Success -> result.data
+            is ApiResult.Error -> emptyList()
+        }
 }
 
 // Expenses always pay out of the cash register immediately - there's no
@@ -289,12 +299,14 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             initialName = prefilledName,
             initialAmount = "",
             initialDateIso = null,
+            initialNotes = "",
             nameSuggestions = state.names,
+            loadNoteSuggestions = viewModel::noteSuggestions,
             error = addError,
             onDismiss = { showAddDialog = false },
-            onSave = { name, amount, date ->
+            onSave = { name, amount, date, notes ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.create(name, amount, date)) {
+                    when (val result = viewModel.create(name, amount, date, notes)) {
                         is ApiResult.Success -> { viewModel.load(); showAddDialog = false }
                         is ApiResult.Error -> addError = result.message
                     }
@@ -309,12 +321,14 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
             initialName = expense.name,
             initialAmount = expense.amount,
             initialDateIso = expense.date,
+            initialNotes = expense.notes.orEmpty(),
             nameSuggestions = state.names,
+            loadNoteSuggestions = viewModel::noteSuggestions,
             error = editError,
             onDismiss = { expenseToEdit = null; editError = null },
-            onSave = { name, amount, date ->
+            onSave = { name, amount, date, notes ->
                 viewModel.viewModelScope.launch {
-                    when (val result = viewModel.update(expense.id, name, amount, date, expense.notes)) {
+                    when (val result = viewModel.update(expense.id, name, amount, date, notes)) {
                         is ApiResult.Success -> { viewModel.load(); expenseToEdit = null; editError = null }
                         is ApiResult.Error -> editError = result.message
                     }
@@ -347,6 +361,14 @@ fun ExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(expenseDisplayName(expense.name), style = MaterialTheme.typography.titleMedium)
+                // What a catch-all like "Other" was actually for.
+                expense.notes?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Text(formatIsoDate(expense.date), style = MaterialTheme.typography.bodySmall)
                 if (deficit > 0) {
                     Text(
@@ -369,19 +391,38 @@ fun ExpenseRow(expense: ExpenseDto, onEdit: () -> Unit, onDelete: () -> Unit) {
 
 // Not private: reused by StatsScreen's per-period expenses view to edit an
 // expense inline without duplicating this dialog.
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ExpenseDialog(
     title: String,
     initialName: String,
     initialAmount: String,
     initialDateIso: String?,
+    initialNotes: String,
     nameSuggestions: List<String>,
+    loadNoteSuggestions: suspend (String) -> List<String>,
     error: String? = null,
     onDismiss: () -> Unit,
-    onSave: (String, Double, String?) -> Unit,
+    // name, amount, date, note. The note is "" rather than null when blank:
+    // nulls are left out of the request body, so a null couldn't clear a
+    // note an edit removed. The server stores "" as no note.
+    onSave: (String, Double, String?, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
+    var notes by remember { mutableStateOf(initialNotes) }
+    // Notes used before under the name being entered - "Other" brings back
+    // "electricity", "maintenance"... Re-fetched as the name changes, after
+    // a pause in typing rather than on every keystroke.
+    var noteSuggestions by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(name) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) {
+            noteSuggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(300)
+        noteSuggestions = loadNoteSuggestions(trimmed)
+    }
     var nameExpanded by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf(initialAmount) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -435,6 +476,39 @@ fun ExpenseDialog(
                     singleLine = true,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.expense_note)) },
+                    placeholder = { Text(stringResource(R.string.expense_note_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                // One tap to reuse a note, which also keeps its spelling - and
+                // so its line in the reports' breakdown - the same. Narrowed
+                // by what's typed; all of them wrap into view rather than
+                // scrolling, as the quick-add names do.
+                val typed = notes.trim()
+                val matching = noteSuggestions.filter {
+                    !it.equals(typed, ignoreCase = true) && (typed.isEmpty() || it.contains(typed, ignoreCase = true))
+                }
+                if (matching.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        matching.forEach { suggestion ->
+                            SuggestionChip(
+                                onClick = { notes = suggestion },
+                                label = { Text(suggestion) },
+                                icon = {
+                                    Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                            )
+                        }
+                    }
+                }
                 Text(
                     stringResource(R.string.expense_date),
                     style = MaterialTheme.typography.labelSmall,
@@ -450,7 +524,7 @@ fun ExpenseDialog(
             TextButton(onClick = {
                 val amountValue = amount.toDoubleOrNull()
                 if (name.isNotBlank() && amountValue != null) {
-                    onSave(name.trim(), amountValue, Instant.ofEpochMilli(dateMillis).toString())
+                    onSave(name.trim(), amountValue, Instant.ofEpochMilli(dateMillis).toString(), notes.trim())
                 }
             }) { Text(stringResource(R.string.action_save)) }
         },

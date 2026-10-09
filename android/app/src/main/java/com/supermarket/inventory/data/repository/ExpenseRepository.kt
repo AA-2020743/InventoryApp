@@ -17,6 +17,9 @@ class ExpenseRepository @Inject constructor(private val api: ApiService) {
     // category, so these drive both the name dropdown and the quick-add chips.
     suspend fun getNames(): ApiResult<List<String>> = apiCall { api.getExpenseNames() }
 
+    // Notes already used under one expense name, most used first.
+    suspend fun getNoteSuggestions(name: String): ApiResult<List<String>> = apiCall { api.getExpenseNotes(name) }
+
     suspend fun getExpensesForRange(period: String, dateIso: String? = null): ApiResult<ExpensesForRangeResponse> =
         apiCall { api.getExpensesForRange(period, dateIso) }
 

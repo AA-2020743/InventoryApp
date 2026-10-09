@@ -504,4 +504,11 @@
     <string name="devices_confirm_older_title">تسجيل خروج عمليات الدخول من الإصدارات الأقدم؟</string>
     <string name="devices_confirm_older_body">سيحتاج أي هاتف ما زال يستخدم إصدارًا أقدم إلى تسجيل الدخول مرة أخرى. الأجهزة الظاهرة بأسمائها تبقى مسجّلة الدخول.</string>
     <string name="devices_signed_out_older">تم تسجيل خروج عمليات الدخول من الإصدارات الأقدم.</string>
+    <!-- Expense notes, and the report's breakdown by note / spoiled product -->
+    <string name="expense_note">ملاحظة (اختياري)</string>
+    <string name="expense_note_hint">مثال: كهرباء، صيانة</string>
+    <string name="stats_spoiled_group">الأصناف التالفة</string>
+    <string name="stats_no_note">بدون ملاحظة</string>
+    <string name="stats_share_of_group">%1$s%% من %2$s</string>
+    <string name="stats_spoiled_quantity">تلف %1$s</string>
 </resources>
