@@ -104,6 +104,47 @@ shows as "active (running)" for the couple of seconds a status check looks at
 it. Polling the endpoint is the difference between knowing the deploy worked
 and knowing it launched.
 
+## Keeping Node.js patched
+
+The backend runs on the server's own Node, so Node's security releases
+apply to it directly. Node fixes vulnerabilities only on lines still in
+support: when a line reaches end of life it gets no further fixes at all.
+Node 20 reached end of life in April 2026 and was left out of the October
+2026 security releases, which fixed 22 and 24. `redeploy.sh` prints the
+Node version and warns if it's older than 22.
+
+Run **Node 24**, an LTS line supported until April 2028. The backend is
+tested on it: CI runs it, and the full deploy and a smoke test of the main
+API paths pass on 24.22.1.
+
+```bash
+node -v                                   # what the server runs now
+ls /etc/apt/sources.list.d/ | grep -i node   # a nodesource entry means it came from NodeSource
+```
+
+Moving to Node 24 from NodeSource (the same steps work from any earlier
+line):
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/nodesource_setup.sh
+sudo bash /tmp/nodesource_setup.sh
+sudo apt-get install -y nodejs
+node -v                                   # v24.22.1 or newer
+cd ~/InventoryApp && ./ops/redeploy.sh    # reinstalls dependencies for the new Node
+```
+
+After that, each Node security release is an ordinary package update:
+
+```bash
+sudo apt-get update && sudo apt-get install --only-upgrade nodejs
+sudo systemctl restart inventory-backend
+```
+
+Node 24 ships with npm 11, which is starting to require approval before a
+package's install scripts run. Prisma depends on its scripts, so they're
+approved in `backend/package.json` under `allowScripts`; npm 10 ignores
+the field.
+
 ## Keeping Postgres off the internet
 
 Docker publishes container ports by writing its own rules ahead of ufw, so a

@@ -26,7 +26,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # What the server should run: an LTS line that still gets security
+          # releases. 20 reached end of life in April 2026.
+          node-version: "24"
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci

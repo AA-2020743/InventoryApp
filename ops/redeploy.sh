@@ -30,6 +30,17 @@ fi
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
+# The backend runs on whatever Node the server has, and an end-of-life line
+# gets no security releases at all - Node 20 got no fix for the October 2026
+# advisories. Warned about rather than refused, so a deploy is never blocked
+# by it, but loudly enough to be seen. See "Keeping Node.js patched" in
+# ops/README.md.
+node_major="$(node -p 'process.versions.node.split(".")[0]')"
+echo "node $(node -v), npm $(npm -v)"
+if [ "$node_major" -lt 22 ]; then
+    printf '\n\033[1;33mWARNING: Node %s is past end of life and gets no security fixes.\nUpgrade the server to Node 24 - see "Keeping Node.js patched" in ops/README.md.\033[0m\n' "$node_major" >&2
+fi
+
 say "Updating to origin/$BRANCH"
 # --ff-only on purpose: if the checkout has drifted, stop and say so rather
 # than quietly building a merge nobody reviewed.

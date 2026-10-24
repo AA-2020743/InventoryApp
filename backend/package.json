@@ -13,6 +13,9 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@prisma/client": "^5.20.0",
     "adm-zip": "^0.6.0",
@@ -37,5 +40,11 @@
     "prisma": "^5.20.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
+  },
+  "allowScripts": {
+    "@prisma/client": true,
+    "@prisma/engines": true,
+    "prisma": true,
+    "esbuild": true
   }
 }
