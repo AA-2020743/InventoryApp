@@ -669,4 +669,6 @@
     <string name="sell_batch_opening">Stock from before the records</string>
     <string name="sell_batch_cleared">Sold through in %1$s days, by %2$s</string>
     <string name="sell_batch_open">%1$s %2$s left · on the shelf %3$s days</string>
+    <string name="stats_revenue_vs_day_before">revenue against the day before (%1$s)</string>
+    <string name="stats_revenue_vs_month_before">revenue against the month before (%1$s)</string>
 </resources>

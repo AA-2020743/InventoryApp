@@ -241,7 +241,33 @@ fun StatsScreen(
         StatsTab.SELL_THROUGH -> reports.sellThrough.loading && reports.sellThrough.data != null
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.stats_title)) }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.stats_title)) },
+                // Day or month rides in the top bar rather than a row of its
+                // own, so the figures start that much higher up the screen.
+                actions = {
+                    if (selectedTab.stepping == Stepping.TOGGLE) {
+                        SingleChoiceSegmentedButtonRow(Modifier.width(150.dp).padding(end = 8.dp)) {
+                            SegmentedButton(
+                                selected = state.period == StatsPeriod.DAY,
+                                onClick = { viewModel.onPeriodChange(StatsPeriod.DAY) },
+                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
+                                icon = {},
+                            ) { Text(stringResource(R.string.stats_period_day), maxLines = 1) }
+                            SegmentedButton(
+                                selected = state.period == StatsPeriod.MONTH,
+                                onClick = { viewModel.onPeriodChange(StatsPeriod.MONTH) },
+                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
+                                icon = {},
+                            ) { Text(stringResource(R.string.stats_period_month), maxLines = 1) }
+                        }
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             ScrollableTabRow(selectedTabIndex = selectedTab.ordinal, edgePadding = 8.dp) {
                 StatsTab.entries.forEach { tab ->
@@ -250,21 +276,6 @@ fun StatsScreen(
                         onClick = { selectedTab = tab },
                         text = { Text(stringResource(tab.title), maxLines = 1) },
                     )
-                }
-            }
-
-            if (selectedTab.stepping == Stepping.TOGGLE) {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp)) {
-                    SegmentedButton(
-                        selected = state.period == StatsPeriod.DAY,
-                        onClick = { viewModel.onPeriodChange(StatsPeriod.DAY) },
-                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
-                    ) { Text(stringResource(R.string.stats_period_day)) }
-                    SegmentedButton(
-                        selected = state.period == StatsPeriod.MONTH,
-                        onClick = { viewModel.onPeriodChange(StatsPeriod.MONTH) },
-                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
-                    ) { Text(stringResource(R.string.stats_period_month)) }
                 }
             }
 
@@ -281,20 +292,7 @@ fun StatsScreen(
                     onNext = { viewModel.step(forward = true, stepBy = stepBy) },
                     onPick = { if (stepBy == StatsPeriod.MONTH) showMonthPicker = true else showDatePicker = true },
                     onJumpToNow = viewModel::jumpToNow,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                )
-            }
-
-            if (selectedTab == StatsTab.OVERVIEW) {
-                PeriodStrip(
-                    period = state.period,
-                    periods = state.strip,
-                    selectedKey = state.selectedKey,
-                    onSelect = { key ->
-                        if (state.period == StatsPeriod.DAY) viewModel.onDateSelected(LocalDate.parse(key))
-                        else viewModel.onMonthSelected(YearMonth.parse(key))
-                    },
-                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                 )
             }
 
@@ -1021,6 +1019,32 @@ private fun PeriodSummaryCard(state: StatsUiState) {
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    // Revenue against the day (or month) before - what the
+                    // strip of neighbouring days used to show, in one line.
+                    // Not for today or this month: half a day measured
+                    // against a whole one only ever reads as a fall.
+                    val previous = state.previousPeriod
+                    val change = previous?.revenue?.toDoubleOrNull()?.let { percentChange(revenue, it) }
+                    if (previous != null && change != null && !state.isCurrent()) {
+                        Row(
+                            Modifier.padding(top = 4.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            ChangeChip(change)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                stringResource(
+                                    if (state.period == StatsPeriod.DAY) R.string.stats_revenue_vs_day_before
+                                    else R.string.stats_revenue_vs_month_before,
+                                    formatAmount(previous.revenue),
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 // The margin rides in the corner as a chip rather than a

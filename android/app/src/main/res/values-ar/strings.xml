@@ -669,4 +669,6 @@
     <string name="sell_batch_opening">مخزون سابق للسجلات</string>
     <string name="sell_batch_cleared">بيعت خلال %1$s يوم، بحلول %2$s</string>
     <string name="sell_batch_open">متبقٍ %1$s %2$s · على الرف منذ %3$s يوم</string>
+    <string name="stats_revenue_vs_day_before">الإيرادات مقارنةً باليوم السابق (%1$s)</string>
+    <string name="stats_revenue_vs_month_before">الإيرادات مقارنةً بالشهر السابق (%1$s)</string>
 </resources>

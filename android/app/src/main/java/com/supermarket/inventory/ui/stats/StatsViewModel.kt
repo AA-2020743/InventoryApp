@@ -39,9 +39,6 @@ private fun <T> ApiResult<T>.dataOrNull(): T? = when (this) {
 val BUSINESS_ZONE: ZoneId = ZoneId.of("Africa/Cairo")
 fun businessToday(): LocalDate = LocalDate.now(BUSINESS_ZONE)
 
-// How many neighbouring days / months the strip under the date shows.
-const val STRIP_DAYS = 7
-const val STRIP_MONTHS = 6
 enum class StatsSort { QUANTITY, PROFIT }
 
 data class StatsUiState(
@@ -58,9 +55,8 @@ data class StatsUiState(
     val periodCost: String = "0",
     val periodProfit: String = "0",
     val periodSalesCount: Int = 0,
-    // The selected day or month with its neighbours, oldest first, for the
-    // strip under the date - each with its revenue.
-    val strip: List<StatsPeriodDto> = emptyList(),
+    // The day or month before the selected one, to measure it against.
+    val previousPeriod: StatsPeriodDto? = null,
     // Something has been shown once. After that a reload keeps the figures
     // up (dimmed) instead of blanking the screen on every step.
     val hasLoaded: Boolean = false,
@@ -94,8 +90,13 @@ class StatsViewModel @Inject constructor(
 
     init { load() }
 
+    // Switching between day and month is a change of what's shown, not a
+    // step through it: the figures on screen are for the other kind of
+    // period, so they go rather than staying up, dimmed, under the new
+    // heading.
     fun onPeriodChange(period: StatsPeriod) {
-        uiState = uiState.copy(period = period)
+        if (period == uiState.period) return
+        uiState = uiState.copy(period = period, hasLoaded = false)
         load()
     }
 
@@ -119,8 +120,8 @@ class StatsViewModel @Inject constructor(
         onDateSelected(minOf(next, businessToday()))
     }
 
-    // A month picked from the list or the strip, on the same day of it as
-    // the one in view where it has one (and no later than today).
+    // A month picked from the list, on the same day of it as the one in view
+    // where it has one (and no later than today).
     fun onMonthSelected(month: YearMonth) {
         val day = minOf(uiState.selectedDate.dayOfMonth, month.lengthOfMonth())
         onDateSelected(minOf(month.atDay(day), businessToday()))
@@ -154,23 +155,10 @@ class StatsViewModel @Inject constructor(
             // still be the last day of the month before in Cairo.)
             val dateIso = request.selectedDate.atTime(12, 0).atZone(BUSINESS_ZONE).toInstant().toString()
 
-            // The headline figures and the strip come from one request: the
-            // selected period with its neighbours, cut on the server in
-            // Cairo time. (They used to come from a UTC-midnight window,
-            // which left the first hours after the shop's midnight out of
-            // every day.) The strip runs a little past the selected period,
-            // up to today, so there is context on both sides of it.
-            val today = businessToday()
-            val stripEnd: LocalDate
-            val stripCount: Int
-            if (day) {
-                stripEnd = minOf(request.selectedDate.plusDays(3), today)
-                stripCount = STRIP_DAYS
-            } else {
-                val endMonth = minOf(YearMonth.from(request.selectedDate).plusMonths(2), YearMonth.from(today))
-                stripEnd = endMonth.atDay(1)
-                stripCount = STRIP_MONTHS
-            }
+            // The headline figures come from the selected period and the one
+            // before it, cut on the server in Cairo time. (They used to come
+            // from a UTC-midnight window, which left the first hours after
+            // the shop's midnight out of every day.)
             val periodName = if (day) "day" else "month"
             // A bare "yyyy-MM-dd" carries no timezone of its own - the
             // backend resolves the actual day boundaries against the
@@ -193,16 +181,14 @@ class StatsViewModel @Inject constructor(
                 // rows rather than the period or the catalogue.
                 val topProductsCall = async { statsRepository.getTopProducts("month", dateIso, sortParam) }
                 val marginsCall = async { statsRepository.getMargins() }
-                val stripCall = async { statsRepository.getPeriods(periodName, stripEnd.toString(), stripCount) }
+                val periodsCall = async { statsRepository.getPeriods(periodName, request.selectedDate.toString(), 2) }
                 val salesCall = if (day) async { salesRepository.getSalesForRange(period = "day", date = rangeDate) } else null
                 val expensesCall = async { expenseRepository.getExpensesForRange(periodName, rangeDate) }
                 val otherSalesCall = async { otherSaleRepository.getForRange(periodName, rangeDate) }
 
-                val strip = when (val result = stripCall.await()) {
-                    is ApiResult.Success -> result.data.periods
-                    is ApiResult.Error -> emptyList()
-                }
-                val selected = strip.firstOrNull { it.key == request.selectedKey }
+                val periods = periodsCall.await().dataOrNull()?.periods ?: emptyList()
+                val selected = periods.firstOrNull { it.key == request.selectedKey }
+                val previous = periods.firstOrNull { it.key != request.selectedKey }
                 val salesForDay = salesCall?.await()?.dataOrNull()?.items ?: emptyList()
                 val expensesForRange = expensesCall.await().dataOrNull()
                 val otherSalesForRange = otherSalesCall.await().dataOrNull()
@@ -224,7 +210,7 @@ class StatsViewModel @Inject constructor(
                     periodCost = selected?.cost ?: "0",
                     periodProfit = selected?.profit ?: "0",
                     periodSalesCount = selected?.salesCount ?: 0,
-                    strip = strip,
+                    previousPeriod = previous,
                 )
             }
         }
