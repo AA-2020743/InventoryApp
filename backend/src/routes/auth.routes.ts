@@ -37,7 +37,7 @@ const deviceSchema = z.object({
 });
 
 const loginSchema = deviceSchema.extend({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 });
 

@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { MulterError } from "multer";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { MAX_IMAGE_BYTES } from "../uploadLimits";
 
 export class HttpError extends Error {
@@ -23,7 +23,7 @@ export function asyncHandler<T extends (req: Request, res: Response, next: NextF
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
-    res.status(400).json({ error: "Validation failed", details: err.flatten() });
+    res.status(400).json({ error: "Validation failed", details: z.flattenError(err) });
     return;
   }
   if (err instanceof HttpError) {

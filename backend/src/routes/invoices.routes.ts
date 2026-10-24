@@ -11,8 +11,10 @@ import { recomputeProductCost } from "../services/productCost";
 
 export const invoicesRouter = Router();
 
+// guid(): any 8-4-4-4-12 hex id - the check zod 3's uuid() made. zod 4's
+// uuid() also insists on RFC version digits, and an id is an id.
 const invoiceInput = z.object({
-  supplierId: z.string().uuid(),
+  supplierId: z.string().guid(),
   invoiceNumber: z.string().trim().optional().nullable(),
   amount: z.number().positive(),
   issueDate: z.coerce.date().optional(),

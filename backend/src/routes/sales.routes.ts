@@ -101,12 +101,14 @@ async function collectSaleAmount(
   });
 }
 
+// guid(): any 8-4-4-4-12 hex id - the check zod 3's uuid() made. zod 4's
+// uuid() also insists on RFC version digits, and an id is an id.
 const saleInput = z.object({
   // Set by the Android app's offline sales queue: a sale first created while
   // offline carries the same clientId on every retry, so a retry after a
   // dropped *response* (the first attempt actually succeeded server-side)
   // returns the original sale instead of selling the stock twice.
-  clientId: z.string().uuid().optional(),
+  clientId: z.string().guid().optional(),
   // DEFERRED = sold on credit; revenue is still recognized immediately
   // (see Sale.paymentStatus in schema.prisma) but the amount also counts
   // as an outstanding receivable on the dashboard until collected.
@@ -115,7 +117,7 @@ const saleInput = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string().uuid(),
+        productId: z.string().guid(),
         quantity: z.number().positive(),
       })
     )
@@ -426,7 +428,7 @@ const saleEditInput = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string().uuid(),
+        productId: z.string().guid(),
         quantity: z.number().positive(),
       })
     )

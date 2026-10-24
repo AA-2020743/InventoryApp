@@ -5,8 +5,9 @@
 # a specific mistake reached a build or a phone: a DTO referenced without its
 # import, a Modifier extension without its own, a stringResource given the
 # wrong number of arguments, a lazy list inside a dropdown (which crashes
-# when the menu opens), and a list capped so quietly that the figures drawn
-# from it were wrong rather than merely short.
+# when the menu opens), a list capped so quietly that the figures drawn
+# from it were wrong rather than merely short, and an update schema whose
+# defaults would overwrite fields the edit never sent.
 set -u
 cd "$(dirname "$0")/../.."
 status=0
@@ -15,7 +16,8 @@ for check in \
   scripts/checks/compose_extension_imports.py \
   scripts/checks/string_resource_arity.py \
   scripts/checks/lazy_layout_in_menu.py \
-  scripts/checks/no_silent_caps.py
+  scripts/checks/no_silent_caps.py \
+  scripts/checks/no_defaults_in_updates.py
 do
   python3 "$check" || status=1
 done

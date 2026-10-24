@@ -18,6 +18,7 @@ Each check exists because a specific mistake reached a build or a phone.
 | `string_resource_arity.py` | A `stringResource` passed arguments the string has no placeholders for — silent at runtime, so it ships. |
 | `lazy_layout_in_menu.py` | A `LazyColumn` inside a `DropdownMenu`. The menu measures its content's intrinsic width; a lazy list is a `SubcomposeLayout` and has none, so opening the menu crashes. |
 | `no_silent_caps.py` | A list arriving capped without the screen saying so. See below. |
+| `no_defaults_in_updates.py` | An update parsed with `.partial()` of a schema that has defaults. Under zod 4 those defaults fill in what the edit left out: renaming a kg product set it back to "pcs", not sold by weight, with a low-stock threshold of 0. |
 
 ## Why the cap check is the important one
 

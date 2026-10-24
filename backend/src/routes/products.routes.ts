@@ -16,8 +16,11 @@ export const productsRouter = Router();
 // lifecycle governs when cash actually leaves for it. Not provided
 // explicitly by older callers - inferred as DEFERRED when an invoice to
 // link is present, CASH otherwise, so the field stays optional.
+//
+// guid(): any 8-4-4-4-12 hex id - the check zod 3's uuid() made. zod 4's
+// uuid() also insists on RFC version digits, and an id is an id.
 export const newInvoiceForRestockSchema = z.object({
-  supplierId: z.string().uuid(),
+  supplierId: z.string().guid(),
   invoiceNumber: z.string().trim().optional().nullable(),
   dueDate: z.coerce.date(),
   notes: z.string().trim().optional().nullable(),
@@ -25,7 +28,7 @@ export const newInvoiceForRestockSchema = z.object({
 
 const financingFields = {
   financing: z.enum(["CASH", "DEFERRED"]).optional(),
-  supplierInvoiceId: z.string().uuid().optional(),
+  supplierInvoiceId: z.string().guid().optional(),
   newInvoice: newInvoiceForRestockSchema.optional(),
 };
 
@@ -124,19 +127,33 @@ export async function resolveRestockFinancing(
   );
 }
 
-const productInput = z.object({
+// A product's fields, with no defaults: what an edit may send. An edit only
+// changes what it was sent - under zod 4, .partial() fills a missing field
+// with its default, so with the defaults below in this schema, renaming a
+// product sold by the kilo would also have made it "pcs", not sold by
+// weight, and reset its package size and low-stock threshold.
+const productBase = z.object({
   barcode: z.string().trim().min(1).optional().nullable(),
   name: z.string().trim().min(1),
   imageUrl: z.string().trim().optional().nullable(),
   category: z.string().trim().optional().nullable(),
-  unit: z.string().trim().min(1).default("pcs"),
-  unitsPerPackage: z.number().positive().default(1),
-  soldByWeight: z.boolean().default(false),
+  unit: z.string().trim().min(1),
+  unitsPerPackage: z.number().positive(),
+  soldByWeight: z.boolean(),
   purchaseCost: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
-  quantity: z.number().nonnegative().default(0),
-  lowStockThreshold: z.number().nonnegative().default(0),
+  quantity: z.number().nonnegative(),
+  lowStockThreshold: z.number().nonnegative(),
   ...financingFields,
+});
+
+// A new product: what's left out takes its default.
+const productInput = productBase.extend({
+  unit: productBase.shape.unit.default("pcs"),
+  unitsPerPackage: productBase.shape.unitsPerPackage.default(1),
+  soldByWeight: productBase.shape.soldByWeight.default(false),
+  quantity: productBase.shape.quantity.default(0),
+  lowStockThreshold: productBase.shape.lowStockThreshold.default(0),
 });
 
 // GET /api/products?search=&category=&lowStockOnly=true&activeOnly=true
@@ -269,7 +286,7 @@ productsRouter.post(
 productsRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
-    const data = productInput.partial().parse(req.body);
+    const data = productBase.partial().parse(req.body);
     // financing/supplierInvoiceId/newInvoice only make sense for initial
     // stock at creation time - editing a product's own fields never
     // touches how it was paid for, so strip them here rather than passing
