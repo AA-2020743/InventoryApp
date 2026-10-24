@@ -205,13 +205,19 @@ salesRouter.get(
 // Months are cut on the business's own clock (Africa/Cairo), the same
 // boundary /for-range uses, so a sale just after midnight belongs to the
 // day - and the month - the shop would say it belongs to.
+//
+// "createdAt" is a timestamp *without* a zone holding UTC. AT TIME ZONE on
+// such a value reads it as wall-clock time in the zone named, so applying
+// 'Africa/Cairo' directly - as this once did - shifted every sale three
+// hours the wrong way and filed the early hours of each month's first day
+// under the month before. It has to be declared UTC first, then converted.
 salesRouter.get(
   "/months",
   asyncHandler(async (_req, res) => {
     const rows = await prisma.$queryRaw<
       { month: string; count: bigint; revenue: Prisma.Decimal }[]
     >`
-      SELECT to_char("createdAt" AT TIME ZONE 'Africa/Cairo', 'YYYY-MM') AS month,
+      SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Cairo', 'YYYY-MM') AS month,
              COUNT(*) AS count,
              COALESCE(SUM("totalAmount"), 0) AS revenue
       FROM "Sale"

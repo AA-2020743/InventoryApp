@@ -125,6 +125,70 @@ statsRouter.get(
   })
 );
 
+// GET /api/stats/periods?period=day|month&end=YYYY-MM-DD&count=7
+//
+// Revenue, cost of goods, profit and sale count for each of `count`
+// consecutive days (or months) ending with the one containing `end`. This is
+// where the Statistics screen's headline figures and its strip of
+// neighbouring days come from.
+//
+// The periods are cut here, on the business's clock - Cairo, summer time
+// included - rather than by the phone. The app used to ask /revenue for a
+// window from UTC midnight to UTC midnight, two or three hours away from the
+// shop's midnight: sales in the first hours after midnight counted toward no
+// day's figures at all, and a month lost the early hours of its 1st.
+statsRouter.get(
+  "/periods",
+  asyncHandler(async (req, res) => {
+    const period = req.query.period === "month" ? "month" : req.query.period === "day" ? "day" : null;
+    if (!period) throw new HttpError(400, "period must be 'day' or 'month'");
+    const endParam = typeof req.query.end === "string" ? req.query.end : undefined;
+    if (endParam !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(endParam)) throw new HttpError(400, "end must look like YYYY-MM-DD");
+    const count = req.query.count === undefined ? 1 : Number(req.query.count);
+    if (!Number.isInteger(count) || count < 1 || count > 60) throw new HttpError(400, "count must be a whole number from 1 to 60");
+
+    // A calendar date names a business day; noon UTC on it is inside that
+    // day in Cairo whatever the season.
+    const [y, m, d] = (endParam ?? dateOnlyKey().toISOString().slice(0, 10)).split("-").map(Number);
+    const noon = (dy: number) => new Date(Date.UTC(y, m - 1, d + dy, 12));
+    const keyOf = (date: Date) => {
+      const day = dateOnlyKey(date).toISOString().slice(0, 10);
+      return period === "month" ? day.slice(0, 7) : day;
+    };
+    const anchors =
+      period === "day"
+        ? Array.from({ length: count }, (_, i) => noon(i - (count - 1)))
+        : Array.from({ length: count }, (_, i) => new Date(Date.UTC(y, m - 1 + i - (count - 1), 15, 12)));
+    const from = period === "day" ? startOfDay(anchors[0]) : startOfMonth(anchors[0]);
+    const to = period === "day" ? startOfNextDay(anchors[count - 1]) : startOfNextMonth(anchors[count - 1]);
+
+    const sales = await prisma.sale.findMany({
+      where: { createdAt: { gte: from, lt: to } },
+      select: { createdAt: true, totalAmount: true, totalCost: true },
+    });
+    const buckets = new Map(
+      anchors.map((a) => [keyOf(a), { revenue: new Prisma.Decimal(0), cost: new Prisma.Decimal(0), salesCount: 0 }])
+    );
+    for (const sale of sales) {
+      const b = buckets.get(keyOf(sale.createdAt));
+      if (!b) continue;
+      b.revenue = b.revenue.add(sale.totalAmount);
+      b.cost = b.cost.add(sale.totalCost);
+      b.salesCount += 1;
+    }
+    res.json({
+      period,
+      periods: [...buckets.entries()].map(([key, b]) => ({
+        key,
+        revenue: b.revenue,
+        cost: b.cost,
+        profit: b.revenue.sub(b.cost),
+        salesCount: b.salesCount,
+      })),
+    });
+  })
+);
+
 // Revenue/cost/profit time series, bucketed by day or month, for charting.
 statsRouter.get(
   "/revenue",

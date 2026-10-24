@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
+import { startOfMonth, startOfNextMonth } from "../utils/dates";
 
 export const cashRegisterRouter = Router();
 
@@ -57,13 +58,19 @@ export async function applyCashDeduction(
 // for is how a list quietly stops being the whole list.
 const monthQuery = /^(\d{4})-(\d{2})$/;
 
+// The month's boundaries on the business's clock (Africa/Cairo), like every
+// other month in the app - not UTC midnight, which put the till's first two
+// or three hours of each month in the month before. Derived from a mid-month
+// instant, from which startOfMonth/startOfNextMonth find the real local
+// midnights, summer time or not.
 function monthRange(month: string): { gte: Date; lt: Date } | null {
   const match = monthQuery.exec(month);
   if (!match) return null;
   const year = Number(match[1]);
   const monthIndex = Number(match[2]) - 1;
   if (monthIndex < 0 || monthIndex > 11) return null;
-  return { gte: new Date(Date.UTC(year, monthIndex, 1)), lt: new Date(Date.UTC(year, monthIndex + 1, 1)) };
+  const mid = new Date(Date.UTC(year, monthIndex, 15, 12));
+  return { gte: startOfMonth(mid), lt: startOfNextMonth(mid) };
 }
 
 cashRegisterRouter.get(
@@ -93,7 +100,10 @@ cashRegisterRouter.get(
     const rows = await prisma.$queryRaw<
       { month: string; count: bigint; inflow: Prisma.Decimal; outflow: Prisma.Decimal }[]
     >`
-      SELECT to_char("createdAt", 'YYYY-MM') AS month,
+      -- "createdAt" is a zoneless timestamp holding UTC: declare it UTC,
+      -- then take the month as the shop's clock in Cairo sees it, matching
+      -- monthRange above.
+      SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Cairo', 'YYYY-MM') AS month,
              COUNT(*) AS count,
              COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS inflow,
              COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS outflow

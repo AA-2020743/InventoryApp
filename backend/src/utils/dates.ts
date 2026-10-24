@@ -51,33 +51,59 @@ export function dateOnlyKey(d: Date = new Date()): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-// The real UTC instant of local midnight in the business's timezone, for
-// the calendar day containing `d`.
+// The real UTC instant at which the business timezone's wall clock reads
+// year-month-day 00:00.
+//
+// The offset subtracted has to be the one in force *at that midnight*, not
+// at whatever instant the caller happened to ask about: across a clock
+// change the two differ by an hour. Egypt's change falls right at midnight
+// (summer time ends at the end of the last Thursday of October and starts at
+// 00:00 on the last Friday of April), so using the caller's offset put a day
+// boundary an hour off - Thursday's first hour landing in Wednesday, or a
+// whole month starting at 23:00 on the last day of the one before.
+//
+// Two passes find it: guess with the offset at the naive time, then correct
+// with the offset at the guess. On the night the clocks go forward at 00:00
+// there is no 00:00 at all - the clock jumps from 23:59 to 01:00 - and this
+// lands on the jump itself, which is exactly when that day begins.
+function businessMidnight(year: number, month: number, day: number): Date {
+  const wallAsUtc = Date.UTC(year, month - 1, day);
+  const guess = wallAsUtc - timezoneOffsetMinutes(new Date(wallAsUtc), BUSINESS_TIMEZONE) * 60000;
+  return new Date(wallAsUtc - timezoneOffsetMinutes(new Date(guess), BUSINESS_TIMEZONE) * 60000);
+}
+
+// Calendar arithmetic on a business date, normalised by Date.UTC (day 32 of
+// a month becomes the 1st of the next, month 13 January of the next year).
+function shiftedDate(year: number, month: number, day: number): { year: number; month: number; day: number } {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
+// Local midnight in the business's timezone, as a real UTC instant, for the
+// calendar day containing `d`.
 export function startOfDay(d: Date = new Date()): Date {
   const { year, month, day } = businessDateParts(d);
-  const offsetMinutes = timezoneOffsetMinutes(d, BUSINESS_TIMEZONE);
-  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0) - offsetMinutes * 60000);
+  return businessMidnight(year, month, day);
 }
 
-// The real UTC instant of local midnight on the 1st of the business
-// month containing `d`.
+// Local midnight on the 1st of the business month containing `d`.
 export function startOfMonth(d: Date = new Date()): Date {
   const { year, month } = businessDateParts(d);
-  const offsetMinutes = timezoneOffsetMinutes(d, BUSINESS_TIMEZONE);
-  return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - offsetMinutes * 60000);
+  return businessMidnight(year, month, 1);
 }
 
-// The exact start of the next calendar day after `d`, in the business
-// timezone. Deliberately re-derives from a fresh instant  ~36h ahead
-// (rather than naively adding 24h to startOfDay(d)) so it stays correct
-// across a DST transition, where a "day" can be 23 or 25 hours long.
+// The start of the calendar day after the one containing `d`. Worked out on
+// the calendar rather than by adding hours: across a clock change a day is
+// 23 or 25 hours long.
 export function startOfNextDay(d: Date = new Date()): Date {
-  return startOfDay(new Date(startOfDay(d).getTime() + 36 * 3600000));
+  const { year, month, day } = businessDateParts(d);
+  const next = shiftedDate(year, month, day + 1);
+  return businessMidnight(next.year, next.month, next.day);
 }
 
-// The exact start of the month after the one containing `d`, in the
-// business timezone - same DST-safety reasoning as startOfNextDay,
-// jumping well past the end of the longest possible month.
+// The start of the month after the one containing `d`.
 export function startOfNextMonth(d: Date = new Date()): Date {
-  return startOfMonth(new Date(startOfMonth(d).getTime() + 33 * 24 * 3600000));
+  const { year, month } = businessDateParts(d);
+  const next = shiftedDate(year, month + 1, 1);
+  return businessMidnight(next.year, next.month, 1);
 }
