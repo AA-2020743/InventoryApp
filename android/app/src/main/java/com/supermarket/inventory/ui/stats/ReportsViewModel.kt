@@ -104,13 +104,13 @@ class ReportsViewModel @Inject constructor(
     fun loadBatches(productId: String) =
         load(::batches, productId, false) { repository.getBatches(productId) }
 
-    fun setTrendWindow(months: Int, month: YearMonth) {
+    fun chooseTrendWindow(months: Int, month: YearMonth) {
         trendWindow = months
         loadCosts(month)
         loadSuppliers(month)
     }
 
-    fun setPaceDays(days: Int) {
+    fun choosePaceDays(days: Int) {
         paceDays = days
         loadSellThrough()
     }

@@ -348,20 +348,20 @@ fun StatsScreen(
                     StatsTab.COSTS -> CostTrendTab(
                         report = reports.costs,
                         window = reports.trendWindow,
-                        onWindowChange = { reports.setTrendWindow(it, month) },
+                        onWindowChange = { reports.chooseTrendWindow(it, month) },
                         onRetry = { reports.loadCosts(month, force = true) },
                     )
                     StatsTab.SUPPLIERS -> SuppliersTab(
                         report = reports.suppliers,
                         window = reports.trendWindow,
-                        onWindowChange = { reports.setTrendWindow(it, month) },
+                        onWindowChange = { reports.chooseTrendWindow(it, month) },
                         onRetry = { reports.loadSuppliers(month, force = true) },
                     )
                     StatsTab.CREDIT -> CreditTab(reports.credit, onRetry = { reports.loadCredit(force = true) })
                     StatsTab.SELL_THROUGH -> SellThroughTab(
                         report = reports.sellThrough,
                         paceDays = reports.paceDays,
-                        onPaceChange = reports::setPaceDays,
+                        onPaceChange = reports::choosePaceDays,
                         batches = reports.batches,
                         onOpenProduct = reports::loadBatches,
                         onRetry = { reports.loadSellThrough(force = true) },
