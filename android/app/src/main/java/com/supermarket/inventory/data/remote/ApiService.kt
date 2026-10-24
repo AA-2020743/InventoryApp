@@ -304,6 +304,34 @@ interface ApiService {
         @Query("to") to: String? = null,
     ): RevenueSeriesResponse
 
+    // Consecutive days or months ending with the one containing `end`
+    // (YYYY-MM-DD), cut on the server in Cairo time.
+    @GET("api/stats/periods")
+    suspend fun getStatsPeriods(
+        @Query("period") period: String,
+        @Query("end") end: String,
+        @Query("count") count: Int,
+    ): StatsPeriodsResponse
+
+    // Reports (Statistics section). month is YYYY-MM.
+    @GET("api/reports/pulse")
+    suspend fun getPulse(@Query("month") month: String): PulseDto
+
+    @GET("api/reports/cost-trend")
+    suspend fun getCostTrend(@Query("month") month: String, @Query("months") months: Int): CostTrendDto
+
+    @GET("api/reports/suppliers")
+    suspend fun getSuppliersReport(@Query("month") month: String, @Query("months") months: Int): SuppliersReportDto
+
+    @GET("api/reports/deferred-customers")
+    suspend fun getCreditReport(): CreditReportDto
+
+    @GET("api/reports/sell-through")
+    suspend fun getSellThrough(@Query("days") days: Int): SellThroughDto
+
+    @GET("api/reports/sell-through/{productId}/batches")
+    suspend fun getStockBatches(@Path("productId") productId: String): StockBatchesDto
+
     @GET("api/alerts")
     suspend fun getAlerts(@Query("days") days: Int? = null): AlertsResponse
 

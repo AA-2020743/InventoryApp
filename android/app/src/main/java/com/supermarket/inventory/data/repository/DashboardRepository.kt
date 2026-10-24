@@ -26,4 +26,17 @@ class StatsRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun getRevenueSeries(period: String, from: String? = null, to: String? = null): ApiResult<RevenueSeriesResponse> =
         apiCall { api.getRevenueSeries(period, from, to) }
+
+    suspend fun getPeriods(period: String, end: String, count: Int): ApiResult<StatsPeriodsResponse> =
+        apiCall { api.getStatsPeriods(period, end, count) }
+}
+
+@Singleton
+class ReportsRepository @Inject constructor(private val api: ApiService) {
+    suspend fun getPulse(month: String): ApiResult<PulseDto> = apiCall { api.getPulse(month) }
+    suspend fun getCostTrend(month: String, months: Int): ApiResult<CostTrendDto> = apiCall { api.getCostTrend(month, months) }
+    suspend fun getSuppliers(month: String, months: Int): ApiResult<SuppliersReportDto> = apiCall { api.getSuppliersReport(month, months) }
+    suspend fun getCredit(): ApiResult<CreditReportDto> = apiCall { api.getCreditReport() }
+    suspend fun getSellThrough(days: Int): ApiResult<SellThroughDto> = apiCall { api.getSellThrough(days) }
+    suspend fun getBatches(productId: String): ApiResult<StockBatchesDto> = apiCall { api.getStockBatches(productId) }
 }

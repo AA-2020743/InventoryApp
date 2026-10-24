@@ -35,7 +35,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -54,17 +53,19 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,7 +74,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -96,15 +101,30 @@ import com.supermarket.inventory.ui.theme.profitColor
 import com.supermarket.inventory.ui.theme.warningColor
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.YearMonth
 import java.util.Locale
 import java.time.format.DateTimeFormatter
 
+// How a tab moves through time: by the Overview's day/month toggle, a month
+// at a time (the reports that only make sense over a month), or not at all -
+// a picture of right now.
+private enum class Stepping { TOGGLE, MONTH, NONE }
+
 // Top products and margins are their own sub-tabs (kept out of the main
 // scroll) so the day/month's sales and expenses - what the owner checks
 // most often - are visible right away instead of below two long rankings.
-private enum class StatsTab { OVERVIEW, TOP_PRODUCTS, MARGINS }
+// The longer-range reports follow them, each in a tab of its own.
+private enum class StatsTab(@StringRes val title: Int, val stepping: Stepping) {
+    OVERVIEW(R.string.stats_tab_overview, Stepping.TOGGLE),
+    PULSE(R.string.stats_tab_pulse, Stepping.MONTH),
+    TOP_PRODUCTS(R.string.stats_tab_top_products, Stepping.MONTH),
+    MARGINS(R.string.stats_tab_margins, Stepping.NONE),
+    COSTS(R.string.stats_tab_costs, Stepping.MONTH),
+    SUPPLIERS(R.string.stats_tab_suppliers, Stepping.MONTH),
+    CREDIT(R.string.stats_tab_credit, Stepping.NONE),
+    SELL_THROUGH(R.string.stats_tab_sell_through, Stepping.NONE),
+}
 
 // Picking a month should be picking a month.
 //
@@ -124,7 +144,7 @@ private fun MonthPickerDialog(
     // Newest first. A month later than the current one has nothing in it
     // to look at, unless one is somehow already selected.
     val months = remember(selected) {
-        val newest = maxOf(YearMonth.now(), selected)
+        val newest = maxOf(YearMonth.from(businessToday()), selected)
         (0 until MONTHS_OFFERED).map { newest.minusMonths(it.toLong()) }
     }
     AlertDialog(
@@ -178,92 +198,174 @@ private fun MonthPickerDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltViewModel()) {
+fun StatsScreen(
+    onEditSale: (String) -> Unit,
+    viewModel: StatsViewModel = hiltViewModel(),
+    reports: ReportsViewModel = hiltViewModel(),
+) {
     val state = viewModel.uiState
     var showDatePicker by remember { mutableStateOf(false) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
-    var selectedTab by remember { mutableStateOf(StatsTab.OVERVIEW) }
+    var selectedTab by rememberSaveable { mutableStateOf(StatsTab.OVERVIEW) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
     val otherLabel = stringResource(R.string.stats_other)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    // What the arrows step by here: the toggle on the Overview, a month on
+    // the monthly reports.
+    val stepBy = if (selectedTab.stepping == Stepping.TOGGLE) state.period else StatsPeriod.MONTH
+    val month = YearMonth.from(state.selectedDate)
+
+    // A report loads when its tab is opened, and again when the month in
+    // view changes - not before: most visits are for the day's figures.
+    LaunchedEffect(selectedTab, month) {
+        when (selectedTab) {
+            StatsTab.PULSE -> reports.loadPulse(month)
+            StatsTab.COSTS -> reports.loadCosts(month)
+            StatsTab.SUPPLIERS -> reports.loadSuppliers(month)
+            StatsTab.CREDIT -> reports.loadCredit()
+            StatsTab.SELL_THROUGH -> reports.loadSellThrough()
+            else -> Unit
+        }
+    }
+
+    // Reloading keeps what's on screen, dimmed under a thin bar, rather than
+    // blanking it: stepping through days with the arrows would otherwise
+    // flash a spinner on every tap.
+    val reloading = when (selectedTab) {
+        StatsTab.OVERVIEW, StatsTab.TOP_PRODUCTS, StatsTab.MARGINS -> state.isLoading && state.hasLoaded
+        StatsTab.PULSE -> reports.pulse.loading && reports.pulse.data != null
+        StatsTab.COSTS -> reports.costs.loading && reports.costs.data != null
+        StatsTab.SUPPLIERS -> reports.suppliers.loading && reports.suppliers.data != null
+        StatsTab.CREDIT -> reports.credit.loading && reports.credit.data != null
+        StatsTab.SELL_THROUGH -> reports.sellThrough.loading && reports.sellThrough.data != null
+    }
 
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.stats_title)) }) }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(12.dp)) {
-                SegmentedButton(
-                    selected = state.period == StatsPeriod.DAY,
-                    onClick = { viewModel.onPeriodChange(StatsPeriod.DAY) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
-                ) { Text(stringResource(R.string.stats_period_day)) }
-                SegmentedButton(
-                    selected = state.period == StatsPeriod.MONTH,
-                    onClick = { viewModel.onPeriodChange(StatsPeriod.MONTH) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
-                ) { Text(stringResource(R.string.stats_period_month)) }
+            ScrollableTabRow(selectedTabIndex = selectedTab.ordinal, edgePadding = 8.dp) {
+                StatsTab.entries.forEach { tab ->
+                    Tab(
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        text = { Text(stringResource(tab.title), maxLines = 1) },
+                    )
+                }
             }
 
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
+            if (selectedTab.stepping == Stepping.TOGGLE) {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp)) {
+                    SegmentedButton(
+                        selected = state.period == StatsPeriod.DAY,
+                        onClick = { viewModel.onPeriodChange(StatsPeriod.DAY) },
+                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
+                    ) { Text(stringResource(R.string.stats_period_day)) }
+                    SegmentedButton(
+                        selected = state.period == StatsPeriod.MONTH,
+                        onClick = { viewModel.onPeriodChange(StatsPeriod.MONTH) },
+                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
+                    ) { Text(stringResource(R.string.stats_period_month)) }
+                }
+            }
+
+            if (selectedTab.stepping != Stepping.NONE) {
                 // A day view asks for a day, a month view asks for a month -
                 // picking a month by tapping a day inside it was always a
                 // detour through information nothing needed.
-                OutlinedButton(
-                    onClick = {
-                        if (state.period == StatsPeriod.MONTH) showMonthPicker = true else showDatePicker = true
+                DateNavigator(
+                    period = stepBy,
+                    date = state.selectedDate,
+                    canGoForward = state.canGoForward(stepBy),
+                    isCurrent = state.isCurrent(stepBy),
+                    onPrevious = { viewModel.step(forward = false, stepBy = stepBy) },
+                    onNext = { viewModel.step(forward = true, stepBy = stepBy) },
+                    onPick = { if (stepBy == StatsPeriod.MONTH) showMonthPicker = true else showDatePicker = true },
+                    onJumpToNow = viewModel::jumpToNow,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                )
+            }
+
+            if (selectedTab == StatsTab.OVERVIEW) {
+                PeriodStrip(
+                    period = state.period,
+                    periods = state.strip,
+                    selectedKey = state.selectedKey,
+                    onSelect = { key ->
+                        if (state.period == StatsPeriod.DAY) viewModel.onDateSelected(LocalDate.parse(key))
+                        else viewModel.onMonthSelected(YearMonth.parse(key))
                     },
-                ) {
-                    Icon(
-                        Icons.Filled.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    val pattern = if (state.period == StatsPeriod.MONTH) "MMMM yyyy" else "dd MMM yyyy"
-                    Text(state.selectedDate.format(DateTimeFormatter.ofPattern(pattern)))
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            TabRow(selectedTabIndex = selectedTab.ordinal) {
-                Tab(
-                    selected = selectedTab == StatsTab.OVERVIEW,
-                    onClick = { selectedTab = StatsTab.OVERVIEW },
-                    text = { Text(stringResource(R.string.stats_tab_overview)) },
-                )
-                Tab(
-                    selected = selectedTab == StatsTab.TOP_PRODUCTS,
-                    onClick = { selectedTab = StatsTab.TOP_PRODUCTS },
-                    text = { Text(stringResource(R.string.stats_tab_top_products)) },
-                )
-                Tab(
-                    selected = selectedTab == StatsTab.MARGINS,
-                    onClick = { selectedTab = StatsTab.MARGINS },
-                    text = { Text(stringResource(R.string.stats_tab_margins)) },
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
                 )
             }
 
-            if (state.isLoading) {
-                Column(Modifier.fillMaxSize(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    CircularProgressIndicator()
-                }
+            if (reloading) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
             } else {
+                // Same height as the bar, so the content doesn't jump when
+                // it comes and goes.
+                Spacer(Modifier.height(4.dp))
+            }
+
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .alpha(if (reloading) 0.55f else 1f)
+                    .then(
+                        if (selectedTab.stepping != Stepping.NONE) {
+                            Modifier.swipeToStep(
+                                rtl = rtl,
+                                onPrevious = { viewModel.step(forward = false, stepBy = stepBy) },
+                                onNext = { viewModel.step(forward = true, stepBy = stepBy) },
+                            )
+                        } else {
+                            Modifier
+                        }
+                    ),
+            ) {
                 when (selectedTab) {
-                    StatsTab.OVERVIEW -> OverviewTab(
-                        state = state,
-                        onEditSale = onEditSale,
-                        onDeleteSaleRequest = { saleToDelete = it },
+                    StatsTab.OVERVIEW, StatsTab.TOP_PRODUCTS, StatsTab.MARGINS ->
+                        if (state.isLoading && !state.hasLoaded) {
+                            Column(Modifier.fillMaxSize(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                CircularProgressIndicator()
+                            }
+                        } else {
+                            when (selectedTab) {
+                                StatsTab.TOP_PRODUCTS -> TopProductsTab(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    uncategorizedLabel = uncategorizedLabel,
+                                    otherLabel = otherLabel,
+                                )
+                                StatsTab.MARGINS -> MarginsTab(state)
+                                else -> OverviewTab(
+                                    state = state,
+                                    onEditSale = onEditSale,
+                                    onDeleteSaleRequest = { saleToDelete = it },
+                                )
+                            }
+                        }
+                    StatsTab.PULSE -> PulseTab(reports.pulse, onRetry = { reports.loadPulse(month, force = true) })
+                    StatsTab.COSTS -> CostTrendTab(
+                        report = reports.costs,
+                        window = reports.trendWindow,
+                        onWindowChange = { reports.setTrendWindow(it, month) },
+                        onRetry = { reports.loadCosts(month, force = true) },
                     )
-                    StatsTab.TOP_PRODUCTS -> TopProductsTab(
-                        state = state,
-                        viewModel = viewModel,
-                        uncategorizedLabel = uncategorizedLabel,
-                        otherLabel = otherLabel,
+                    StatsTab.SUPPLIERS -> SuppliersTab(
+                        report = reports.suppliers,
+                        window = reports.trendWindow,
+                        onWindowChange = { reports.setTrendWindow(it, month) },
+                        onRetry = { reports.loadSuppliers(month, force = true) },
                     )
-                    StatsTab.MARGINS -> MarginsTab(state)
+                    StatsTab.CREDIT -> CreditTab(reports.credit, onRetry = { reports.loadCredit(force = true) })
+                    StatsTab.SELL_THROUGH -> SellThroughTab(
+                        report = reports.sellThrough,
+                        paceDays = reports.paceDays,
+                        onPaceChange = reports::setPaceDays,
+                        batches = reports.batches,
+                        onOpenProduct = reports::loadBatches,
+                        onRetry = { reports.loadSellThrough(force = true) },
+                    )
                 }
             }
         }
@@ -273,25 +375,26 @@ fun StatsScreen(onEditSale: (String) -> Unit, viewModel: StatsViewModel = hiltVi
         MonthPickerDialog(
             selected = YearMonth.from(state.selectedDate),
             onDismiss = { showMonthPicker = false },
-            onSelect = { month ->
-                // The first of the month: every range the screen asks for is
-                // resolved from whichever date falls inside it.
-                viewModel.onDateSelected(month.atDay(1))
+            onSelect = { picked ->
+                viewModel.onMonthSelected(picked)
                 showMonthPicker = false
             },
         )
     }
 
     if (showDatePicker) {
-        val initialMillis = state.selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        // The picker works in UTC milliseconds: the selected day's UTC
+        // midnight is that day to it, whatever the phone's own zone. (The
+        // phone's local midnight, east of Greenwich, is the day before.)
+        val initialMillis = state.selectedDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val date = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
-                        viewModel.onDateSelected(date)
+                        val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        viewModel.onDateSelected(minOf(date, businessToday()))
                     }
                     showDatePicker = false
                 }) { Text(stringResource(R.string.action_save)) }
@@ -901,6 +1004,24 @@ private fun PeriodSummaryCard(state: StatsUiState) {
                         style = MaterialTheme.typography.headlineMedium,
                         color = netColor,
                     )
+                    // How many checkouts made the period, and what one came
+                    // to on average - a busy day of small baskets and a quiet
+                    // day of big ones can take the same money.
+                    if (state.periodSalesCount > 0) {
+                        Text(
+                            stringResource(
+                                R.string.stats_sales_count_average,
+                                state.periodSalesCount,
+                                formatAmount(
+                                    (state.periodRevenue.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO)
+                                        .divide(state.periodSalesCount.toBigDecimal(), 2, java.math.RoundingMode.HALF_UP)
+                                        .toPlainString()
+                                ),
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 // The margin rides in the corner as a chip rather than a
                 // third column, so the headline figure gets the width.
