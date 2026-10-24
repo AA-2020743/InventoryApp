@@ -25,8 +25,25 @@ data class StatsPeriodsResponse(val period: String, val periods: List<StatsPerio
 @JsonClass(generateAdapter = true)
 data class PulseTotalsDto(val revenue: String, val profit: String, val sales: Int)
 
+// The month's expected total: what's been sold, plus the average full day
+// so far for each day left. The breakdown fields are null from a server
+// older than that.
 @JsonClass(generateAdapter = true)
-data class PulseProjectionDto(val revenue: String, val profit: String, val elapsedPercent: Double)
+data class PulseProjectionDto(
+    val revenue: String,
+    val profit: String,
+    val elapsedPercent: Double,
+    // On top of what's already been sold.
+    val remainingRevenue: String? = null,
+    val remainingProfit: String? = null,
+    val averageDayRevenue: String? = null,
+    val averageDayProfit: String? = null,
+    val dayOfMonth: Int? = null,
+    val daysInMonth: Int? = null,
+    val daysCompleted: Int? = null,
+    // Today included.
+    val daysLeft: Int? = null,
+)
 
 @JsonClass(generateAdapter = true)
 data class PulseBasketDto(val averageSale: String?, val averageLines: Double?, val previousAverageSale: String?)

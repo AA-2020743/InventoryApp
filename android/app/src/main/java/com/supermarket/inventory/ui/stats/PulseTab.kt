@@ -94,34 +94,60 @@ private fun PulseContent(p: PulseDto) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                p.projection?.let { proj ->
+                val proj = p.projection
+                if (proj != null) {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        stringResource(R.string.pulse_month_elapsed, formatPercent(proj.elapsedPercent.toString())),
+                        if (proj.dayOfMonth != null && proj.daysInMonth != null && proj.daysLeft != null) {
+                            stringResource(R.string.pulse_day_of_month, proj.dayOfMonth, proj.daysInMonth, proj.daysLeft)
+                        } else {
+                            stringResource(R.string.pulse_month_elapsed, formatPercent(proj.elapsedPercent.toString()))
+                        },
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Spacer(Modifier.height(4.dp))
                     MeterBar((proj.elapsedPercent / 100).toFloat(), MaterialTheme.colorScheme.primary, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
+                    // What's still to come sits under each total, so the two
+                    // add up on screen: so far + still to come = expected.
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         KpiTile(
                             label = stringResource(R.string.pulse_heading_for_revenue),
                             value = formatAmount(proj.revenue),
                             accent = MaterialTheme.colorScheme.primary,
+                            footnote = proj.remainingRevenue?.let { stringResource(R.string.pulse_still_to_come, formatAmount(it)) },
                             modifier = Modifier.weight(1f),
                         )
                         KpiTile(
                             label = stringResource(R.string.pulse_heading_for_profit),
                             value = formatAmount(proj.profit),
                             accent = if (proj.profit.money() >= 0) profitColor() else lossColor(),
+                            footnote = proj.remainingProfit?.let { stringResource(R.string.pulse_still_to_come, formatAmount(it)) },
                             modifier = Modifier.weight(1f),
                         )
                     }
                     Text(
-                        stringResource(R.string.pulse_projection_note),
+                        if (proj.averageDayRevenue != null && proj.averageDayProfit != null && proj.daysCompleted != null) {
+                            stringResource(
+                                R.string.pulse_projection_basis,
+                                formatAmount(proj.averageDayRevenue),
+                                formatAmount(proj.averageDayProfit),
+                                proj.daysCompleted,
+                            )
+                        } else {
+                            stringResource(R.string.pulse_projection_note)
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp),
+                    )
+                } else if (p.inProgress) {
+                    // The 1st: no whole day to take an average from yet.
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.pulse_projection_after_first_day),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

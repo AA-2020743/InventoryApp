@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
-import { dateOnlyKey, startOfMonth, startOfNextMonth } from "../utils/dates";
+import { dateOnlyKey, startOfDay, startOfMonth, startOfNextMonth } from "../utils/dates";
 import { isSpoilage, normaliseNote } from "../utils/expenseBreakdown";
 
 // Longer-range reports for the Statistics section: how costs move from month
@@ -500,7 +500,8 @@ function cairoWeekdayHour(d: Date): { weekday: number; hour: number } {
 //
 // - pace: the month so far against the same stretch of last month (day of
 //   month for day of month), and - while the month is under way - where it
-//   is heading at the current rate.
+//   is heading: what's been sold, plus the average day so far for each day
+//   that's left.
 // - basket: what a sale is worth on average, and how many lines it has.
 // - rhythm: revenue by weekday and hour over the 90 days to the end of the
 //   month, on the shop's clock - when the shop is busy and when it isn't.
@@ -553,15 +554,52 @@ reportsRouter.get(
     const cur = sumOf(current);
     const prev = sumOf(previous);
 
+    // Where the month is heading, counted in days rather than hours. It used
+    // to scale the takings by the share of the month's hours gone, nights
+    // included: at 2 a.m. part of a day counted as gone with nothing sold in
+    // it, at 10 p.m. most of one with nearly all of its sales, so the figure
+    // drifted through the day; two hours into the 1st, one sale was
+    // multiplied by 370; and it never matched the sum anyone would check it
+    // with - takings over days gone, times days in the month.
+    //
+    // Now: the average of the days that are over, for each day still to
+    // come. Today counts as an average day, or as what it has already taken
+    // if that's more - so its sales aren't counted twice, and a busy day
+    // isn't marked down to average. No projection until a whole day is over.
+    const [year, monthNumber] = month.split("-").map(Number);
+    const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+    const dayOfMonth = dateOnlyKey(now).getUTCDate();
+    const daysCompleted = inProgress ? dayOfMonth - 1 : daysInMonth;
     const elapsed = (cutoff.getTime() - monthStart.getTime()) / (monthEnd.getTime() - monthStart.getTime());
-    const projection =
-      inProgress && elapsed > 0
-        ? {
-            revenue: cur.revenue.div(elapsed).toDecimalPlaces(2),
-            profit: cur.profit.div(elapsed).toDecimalPlaces(2),
-            elapsedPercent: round1(elapsed * 100),
-          }
-        : null;
+    let projection = null;
+    if (inProgress && daysCompleted > 0) {
+      const todayStart = startOfDay(now);
+      const done = sumOf(current.filter((s) => s.createdAt < todayStart));
+      const today = sumOf(current.filter((s) => s.createdAt >= todayStart));
+      const averageRevenue = done.revenue.div(daysCompleted);
+      const averageProfit = done.profit.div(daysCompleted);
+      const daysAfterToday = daysInMonth - dayOfMonth;
+      const todayCounted = today.revenue.gt(averageRevenue)
+        ? { revenue: today.revenue, profit: today.profit }
+        : { revenue: averageRevenue, profit: averageProfit };
+      const revenue = done.revenue.add(todayCounted.revenue).add(averageRevenue.mul(daysAfterToday));
+      const profit = done.profit.add(todayCounted.profit).add(averageProfit.mul(daysAfterToday));
+      projection = {
+        revenue: revenue.toDecimalPlaces(2),
+        profit: profit.toDecimalPlaces(2),
+        // Still to come on top of what's been sold.
+        remainingRevenue: revenue.sub(cur.revenue).toDecimalPlaces(2),
+        remainingProfit: profit.sub(cur.profit).toDecimalPlaces(2),
+        averageDayRevenue: averageRevenue.toDecimalPlaces(2),
+        averageDayProfit: averageProfit.toDecimalPlaces(2),
+        dayOfMonth,
+        daysInMonth,
+        daysCompleted,
+        // Today included.
+        daysLeft: daysInMonth - daysCompleted,
+        elapsedPercent: round1(elapsed * 100),
+      };
+    }
 
     const lineCount = current.reduce((a, s) => a + s._count.items, 0);
     const credit = current

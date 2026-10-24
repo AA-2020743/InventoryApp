@@ -541,8 +541,8 @@
     <string name="pulse_was">كان %1$s</string>
     <string name="pulse_sales_count">‏%1$d عملية بيع، مقابل %2$d</string>
     <string name="pulse_month_elapsed">مضى %1$s%% من الشهر</string>
-    <string name="pulse_heading_for_revenue">الإيرادات المتوقعة</string>
-    <string name="pulse_heading_for_profit">الربح المتوقع</string>
+    <string name="pulse_heading_for_revenue">إيرادات الشهر المتوقعة</string>
+    <string name="pulse_heading_for_profit">ربح الشهر المتوقع</string>
     <string name="pulse_projection_note">إذا استمر البيع بنفس الوتيرة حتى نهاية الشهر.</string>
     <string name="pulse_basket">سلة الشراء</string>
     <string name="pulse_average_sale">متوسط البيع</string>
@@ -671,4 +671,8 @@
     <string name="sell_batch_open">متبقٍ %1$s %2$s · على الرف منذ %3$s يوم</string>
     <string name="stats_revenue_vs_day_before">الإيرادات مقارنةً باليوم السابق (%1$s)</string>
     <string name="stats_revenue_vs_month_before">الإيرادات مقارنةً بالشهر السابق (%1$s)</string>
+    <string name="pulse_day_of_month">اليوم %1$d من %2$d · متبقٍ %3$d يوم</string>
+    <string name="pulse_still_to_come">+%1$s متوقعة في الأيام المتبقية</string>
+    <string name="pulse_projection_basis">على أساس متوسط اليوم الكامل حتى الآن - إيرادات %1$s وربح %2$s على مدى %3$d يوم - لكل يوم متبقٍ. يُحسب اليوم الحالي كيوم متوسط، أو بما حققه إن كان أكثر.</string>
+    <string name="pulse_projection_after_first_day">يبدأ توقع الشهر بعد انتهاء أول يوم كامل.</string>
 </resources>
