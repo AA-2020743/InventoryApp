@@ -5,6 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { env } from "./env";
 import { authRouter } from "./routes/auth.routes";
+import { reportsRouter } from "./routes/reports.routes";
 import { productsRouter } from "./routes/products.routes";
 import { inventoryTransactionsRouter } from "./routes/inventoryTransactions.routes";
 import { suppliersRouter } from "./routes/suppliers.routes";
@@ -64,6 +65,7 @@ app.use("/api/stats", requireAuth, statsRouter);
 app.use("/api/alerts", requireAuth, alertsRouter);
 app.use("/api/settings", requireAuth, settingsRouter);
 app.use("/api/backup", requireAuth, backupRouter);
+app.use("/api/reports", requireAuth, reportsRouter);
 
 app.use(errorHandler);
 
