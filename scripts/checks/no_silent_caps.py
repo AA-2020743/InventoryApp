@@ -48,6 +48,9 @@ ALLOWED: dict[tuple[str, str], str] = {
         "the products that make up 80% of revenue, under a headline that "
         "says how many they are out of how many were sold - the cut is the "
         "finding, and its size is printed above it",
+    ("ui/stats/ProductsTab.kt", ".take(3)"):
+        "the first three drawn as a podium, with fourth place onward listed "
+        "right under it (ranked.drop(3)) - every product is shown",
     ("data/DeviceDetails.kt", ".take(MAX_NAME)"):
         "truncates a device-name string to the server's length limit - "
         "characters of one label, not records from a list",

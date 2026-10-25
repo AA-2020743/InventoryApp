@@ -1,5 +1,11 @@
 package com.supermarket.inventory.ui.stats
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -199,22 +205,19 @@ private fun CostTrendContent(r: CostTrendDto, window: Int, onWindowChange: (Int)
                         icon = Icons.Filled.SwapVert,
                         accent = MaterialTheme.colorScheme.secondary,
                     ) {
-                        movers.forEach { (n, delta) ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(nameLabel(n), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    formatAmountChange(n.series[n.series.size - 2], n.series.last()),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    formatSignedAmount(delta.toPlainString()),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (delta.signum() > 0) lossColor() else profitColor(),
-                                )
-                            }
+                        // Rises and falls apart, each with its total, so "costs
+                        // went up by 2,000 overall" doesn't have to be added up
+                        // from a mixed list. Bars are sized against the largest
+                        // change of either kind.
+                        val largest = movers.maxOf { it.second.abs() }.toDouble().takeIf { it > 0 } ?: 1.0
+                        val rises = movers.filter { it.second.signum() > 0 }
+                        val falls = movers.filter { it.second.signum() < 0 }
+                        if (rises.isNotEmpty()) {
+                            MoverGroup(stringResource(R.string.costs_went_up), rises, lossColor(), largest)
+                        }
+                        if (falls.isNotEmpty()) {
+                            if (rises.isNotEmpty()) Spacer(Modifier.height(10.dp))
+                            MoverGroup(stringResource(R.string.costs_went_down), falls, profitColor(), largest)
                         }
                     }
                 }
@@ -325,4 +328,70 @@ private fun BreakEvenCard(r: CostTrendDto) {
             color = if (covered) profitColor() else warningColor(),
         )
     }
+}
+
+// One side of "Biggest changes": a heading with what that side comes to in
+// all, then a row per expense - the change, its percentage, the two months'
+// figures and a bar.
+@Composable
+private fun MoverGroup(title: String, rows: List<Pair<CostNameDto, java.math.BigDecimal>>, color: Color, largest: Double) {
+    val total = rows.fold(java.math.BigDecimal.ZERO) { acc, (_, d) -> acc.add(d) }
+    Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = color, modifier = Modifier.weight(1f))
+        Text(formatSignedAmount(total.toPlainString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = color)
+    }
+    rows.forEach { (n, delta) -> MoverRow(n, delta, color, (delta.abs().toDouble() / largest).toFloat()) }
+}
+
+@Composable
+private fun MoverRow(n: CostNameDto, delta: java.math.BigDecimal, color: Color, fraction: Float) {
+    val before = n.series[n.series.size - 2]
+    val after = n.series.last()
+    val beforeValue = before.money()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(nameLabel(n), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(formatSignedAmount(delta.toPlainString()), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = color)
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                formatAmountChange(before, after),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
+            when {
+                // Nothing the month before: a percentage of zero means nothing.
+                beforeValue == 0.0 -> Tag(stringResource(R.string.costs_new_this_month), color)
+                after.money() == 0.0 -> Tag(stringResource(R.string.costs_not_paid_this_month), color)
+                else -> ChangeChip(delta.toDouble() / beforeValue * 100, higherIsGood = false)
+            }
+        }
+        MeterBar(fraction, color.copy(alpha = 0.7f), Modifier.fillMaxWidth().padding(top = 7.dp))
+    }
+}
+
+@Composable
+private fun Tag(text: String, color: Color) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = color,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    )
 }

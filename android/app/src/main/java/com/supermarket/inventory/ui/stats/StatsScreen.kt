@@ -84,10 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.CategoryTotalDto
-import com.supermarket.inventory.data.remote.dto.MarginItemDto
 import com.supermarket.inventory.data.remote.dto.SaleDto
-import com.supermarket.inventory.data.remote.dto.TopProductItemDto
-import com.supermarket.inventory.ui.common.PieChart
 import com.supermarket.inventory.ui.common.expenseDisplayName
 import com.supermarket.inventory.ui.common.categoryColor
 import com.supermarket.inventory.ui.common.formatAmount
@@ -95,12 +92,12 @@ import com.supermarket.inventory.ui.common.formatMonth
 import com.supermarket.inventory.ui.common.formatIsoDateTime
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
-import com.supermarket.inventory.ui.common.topSlicesWithOther
 import com.supermarket.inventory.ui.theme.lossColor
 import com.supermarket.inventory.ui.theme.profitColor
 import com.supermarket.inventory.ui.theme.warningColor
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.YearMonth
 import java.util.Locale
@@ -118,8 +115,8 @@ private enum class Stepping { TOGGLE, MONTH, NONE }
 private enum class StatsTab(@StringRes val title: Int, val stepping: Stepping) {
     OVERVIEW(R.string.stats_tab_overview, Stepping.TOGGLE),
     PULSE(R.string.stats_tab_pulse, Stepping.MONTH),
-    TOP_PRODUCTS(R.string.stats_tab_top_products, Stepping.MONTH),
-    MARGINS(R.string.stats_tab_margins, Stepping.NONE),
+    // Best sellers and margins - once two tabs of their own - as one report.
+    PRODUCTS(R.string.stats_tab_products, Stepping.MONTH),
     COSTS(R.string.stats_tab_costs, Stepping.MONTH),
     SUPPLIERS(R.string.stats_tab_suppliers, Stepping.MONTH),
     CREDIT(R.string.stats_tab_credit, Stepping.NONE),
@@ -209,7 +206,6 @@ fun StatsScreen(
     var saleToDelete by remember { mutableStateOf<SaleDto?>(null) }
     var selectedTab by rememberSaveable { mutableStateOf(StatsTab.OVERVIEW) }
     val uncategorizedLabel = stringResource(R.string.stats_uncategorized)
-    val otherLabel = stringResource(R.string.stats_other)
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     // What the arrows step by here: the toggle on the Overview, a month on
     // the monthly reports.
@@ -233,7 +229,7 @@ fun StatsScreen(
     // blanking it: stepping through days with the arrows would otherwise
     // flash a spinner on every tap.
     val reloading = when (selectedTab) {
-        StatsTab.OVERVIEW, StatsTab.TOP_PRODUCTS, StatsTab.MARGINS -> state.isLoading && state.hasLoaded
+        StatsTab.OVERVIEW, StatsTab.PRODUCTS -> state.isLoading && state.hasLoaded
         StatsTab.PULSE -> reports.pulse.loading && reports.pulse.data != null
         StatsTab.COSTS -> reports.costs.loading && reports.costs.data != null
         StatsTab.SUPPLIERS -> reports.suppliers.loading && reports.suppliers.data != null
@@ -321,26 +317,24 @@ fun StatsScreen(
                     ),
             ) {
                 when (selectedTab) {
-                    StatsTab.OVERVIEW, StatsTab.TOP_PRODUCTS, StatsTab.MARGINS ->
+                    StatsTab.OVERVIEW, StatsTab.PRODUCTS ->
                         if (state.isLoading && !state.hasLoaded) {
                             Column(Modifier.fillMaxSize(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                 CircularProgressIndicator()
                             }
+                        } else if (selectedTab == StatsTab.PRODUCTS) {
+                            ProductsTab(
+                                month = month,
+                                topProducts = state.topProducts,
+                                margins = state.margins,
+                                uncategorizedLabel = uncategorizedLabel,
+                            )
                         } else {
-                            when (selectedTab) {
-                                StatsTab.TOP_PRODUCTS -> TopProductsTab(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    uncategorizedLabel = uncategorizedLabel,
-                                    otherLabel = otherLabel,
-                                )
-                                StatsTab.MARGINS -> MarginsTab(state)
-                                else -> OverviewTab(
-                                    state = state,
-                                    onEditSale = onEditSale,
-                                    onDeleteSaleRequest = { saleToDelete = it },
-                                )
-                            }
+                            OverviewTab(
+                                state = state,
+                                onEditSale = onEditSale,
+                                onDeleteSaleRequest = { saleToDelete = it },
+                            )
                         }
                     StatsTab.PULSE -> PulseTab(reports.pulse, onRetry = { reports.loadPulse(month, force = true) })
                     StatsTab.COSTS -> CostTrendTab(
@@ -424,7 +418,7 @@ fun StatsScreen(
 // which is what the owner needs from this screen; the individual records
 // (and editing them) live on their own Expenses / Other Sales tabs.
 @Composable
-private fun OverviewTab(
+internal fun OverviewTab(
     state: StatsUiState,
     onEditSale: (String) -> Unit,
     onDeleteSaleRequest: (SaleDto) -> Unit,
@@ -798,165 +792,6 @@ private fun BreakdownLines(lines: List<ShadedLine>, groupTotal: Double, groupLab
 }
 
 @Composable
-private fun TopProductsTab(
-    state: StatsUiState,
-    viewModel: StatsViewModel,
-    uncategorizedLabel: String,
-    otherLabel: String,
-) {
-    // The ranking is by whichever measure is selected, so the bar beside
-    // each product has to be measured against that same one - a bar sized
-    // by revenue under a list sorted by quantity would contradict the order
-    // it sits in.
-    val metricOf: (TopProductItemDto) -> Double = when (state.sortBy) {
-        StatsSort.QUANTITY -> { item -> item.quantitySold }
-        StatsSort.PROFIT -> { item -> item.profit.toDoubleOrNull() ?: 0.0 }
-    }
-    val topMetric = state.topProducts.maxOfOrNull(metricOf) ?: 0.0
-
-    LazyColumn(contentPadding = PaddingValues(12.dp)) {
-        item {
-            val monthLabel = state.selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
-            Text(
-                stringResource(R.string.stats_top_products_month_label, monthLabel),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
-        }
-        if (state.topProducts.isNotEmpty()) {
-            // Each chart gets a card of its own so the two stop reading as
-            // one long strip of circles.
-            item {
-                val categoryData = state.topProducts
-                    .groupBy { it.category?.takeIf { c -> c.isNotBlank() } ?: uncategorizedLabel }
-                    .map { (category, items) -> category to items.sumOf { it.revenue.toDoubleOrNull() ?: 0.0 } }
-                ChartCard(title = stringResource(R.string.stats_by_category)) {
-                    PieChart(topSlicesWithOther(categoryData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
-                }
-            }
-            item { Spacer(Modifier.height(8.dp)) }
-            item {
-                val itemData = state.topProducts.map { it.name to (it.revenue.toDoubleOrNull() ?: 0.0) }
-                ChartCard(title = stringResource(R.string.stats_by_item)) {
-                    PieChart(topSlicesWithOther(itemData, 6, otherLabel), modifier = Modifier.fillMaxWidth())
-                }
-            }
-            item { Spacer(Modifier.height(16.dp)) }
-        }
-        item { SortRow(state, viewModel) }
-        item {
-            Text(
-                stringResource(R.string.stats_top_products),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-        }
-        itemsIndexed(state.topProducts) { index, item ->
-            TopProductRow(
-                rank = index + 1,
-                item = item,
-                fraction = if (topMetric > 0) (metricOf(item) / topMetric).toFloat().coerceIn(0f, 1f) else 0f,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChartCard(title: String, content: @Composable () -> Unit) {
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
-            content()
-        }
-    }
-}
-
-// A place in the ranking, as a numbered disc. The top three carry the
-// accent; the rest are numbered but quiet, so the eye lands on the podium
-// without the list turning into a wall of colour.
-@Composable
-private fun RankBadge(rank: Int) {
-    val onPodium = rank <= 3
-    Box(
-        Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(
-                if (onPodium) profitColor().copy(alpha = 0.18f)
-                else MaterialTheme.colorScheme.surfaceVariant
-            ),
-        contentAlignment = androidx.compose.ui.Alignment.Center,
-    ) {
-        Text(
-            rank.toString(),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (onPodium) profitColor() else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun MarginsTab(state: StatsUiState) {
-    val percents = state.margins.mapNotNull { it.marginPercent.toDoubleOrNull() }
-    LazyColumn(contentPadding = PaddingValues(12.dp)) {
-        if (percents.isNotEmpty()) {
-            // The spread across the catalogue, before the per-product list:
-            // one thin-margin line matters more when everything else sits
-            // at forty percent than when the whole shop runs at eight.
-            item {
-                Card(
-                    Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatFigure(
-                            label = stringResource(R.string.stats_margin_highest),
-                            value = "${formatPercent((percents.maxOrNull() ?: 0.0).toString())}%",
-                            color = profitColor(),
-                            modifier = Modifier.weight(1f),
-                        )
-                        StatFigure(
-                            label = stringResource(R.string.stats_average_margin),
-                            value = "${formatPercent(percents.average().toString())}%",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        StatFigure(
-                            label = stringResource(R.string.stats_margin_lowest),
-                            value = "${formatPercent((percents.minOrNull() ?: 0.0).toString())}%",
-                            color = marginColor(percents.minOrNull() ?: 0.0),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
-        }
-        item {
-            Text(
-                stringResource(R.string.stats_top_margins),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-        }
-        items(state.margins) { MarginRow(it) }
-    }
-}
-
-// Thin margins are the ones worth spotting, so the colour is a judgement
-// rather than decoration: under a tenth is a warning, under a quarter is
-// worth a look, above that reads as healthy.
-@Composable
-private fun marginColor(percent: Double): Color = when {
-    percent < 10 -> lossColor()
-    percent < 25 -> warningColor()
-    else -> profitColor()
-}
-
-@Composable
 private fun PeriodSummaryCard(state: StatsUiState) {
     val revenue = state.periodRevenue.toDoubleOrNull() ?: 0.0
     val cost = state.periodCost.toDoubleOrNull() ?: 0.0
@@ -1188,160 +1023,95 @@ private fun FlowLegend(entries: List<Triple<Color, String, Double>>) {
     }
 }
 
-@Composable
-private fun SortRow(state: StatsUiState, viewModel: StatsViewModel) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = state.sortBy == StatsSort.QUANTITY,
-            onClick = { viewModel.onSortChange(StatsSort.QUANTITY) },
-            label = { Text(stringResource(R.string.stats_sort_quantity)) },
-        )
-        FilterChip(
-            selected = state.sortBy == StatsSort.PROFIT,
-            onClick = { viewModel.onSortChange(StatsSort.PROFIT) },
-            label = { Text(stringResource(R.string.stats_sort_profit)) },
-        )
-    }
-}
-
-@Composable
-private fun TopProductRow(rank: Int, item: TopProductItemDto, fraction: Float) {
-    Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        ) {
-            RankBadge(rank)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        item.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(formatAmount(item.profit), style = MaterialTheme.typography.bodyLarge, color = profitColor())
-                }
-                // Units shifted and what they brought in - the revenue is
-                // new here, and it is the figure that says whether a big
-                // profit came from volume or from price.
-                Text(
-                    stringResource(R.string.stats_quantity_sold, formatQuantity(item.quantitySold.toString())) +
-                        " · " + stringResource(R.string.stats_product_revenue, formatAmount(item.revenue)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Box(
-                    Modifier
-                        .padding(top = 6.dp)
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(fraction)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(profitColor()),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MarginRow(item: MarginItemDto) {
-    val percent = item.marginPercent.toDoubleOrNull() ?: 0.0
-    val color = marginColor(percent)
-    Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    item.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    stringResource(R.string.stats_margin_percent, formatPercent(item.marginPercent)),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = color,
-                )
-            }
-            // The percentage on its own never said whether a thin margin is
-            // thin money: what it cost, what it sells for, and what that
-            // leaves per unit are all already fetched, so they may as well
-            // be here.
-            Text(
-                stringResource(
-                    R.string.stats_margin_detail,
-                    formatAmount(item.purchaseCost),
-                    formatAmount(item.sellingPrice),
-                    formatAmount(item.marginAmount),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-            Box(
-                Modifier
-                    .padding(top = 6.dp)
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth((percent / 100.0).toFloat().coerceIn(0f, 1f))
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(color),
-                )
-            }
-        }
-    }
-}
-
+// One sale of the day: when it was rung up, what it came to and how many
+// items, whether it went on credit (and to whom), then each line with its
+// quantity, unit price and amount. Edit and delete stay one tap away.
 @Composable
 private fun SaleRow(sale: SaleDto, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Column {
-                    Text(formatIsoDateTime(sale.createdAt), style = MaterialTheme.typography.bodyMedium)
-                    if (sale.paymentStatus == "DEFERRED") {
+    val deferred = sale.paymentStatus == "DEFERRED"
+    val time = runCatching {
+        Instant.parse(sale.createdAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
+    }.getOrDefault(formatIsoDateTime(sale.createdAt))
+    Card(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 10.dp, end = 4.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(
+                    time,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(formatAmount(sale.totalAmount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Text(
-                            stringResource(R.string.deferred_sales_title),
+                            stringResource(R.string.stats_sale_items, sale.items.size),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (deferred) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                listOfNotNull(stringResource(R.string.deferred_sales_title), sale.customerName?.trim()?.takeIf { it.isNotEmpty() })
+                                    .joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = warningColor(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(warningColor().copy(alpha = 0.14f))
+                                    .padding(horizontal = 7.dp, vertical = 1.dp),
+                            )
+                        }
                     }
                 }
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text(formatAmount(sale.totalAmount), style = MaterialTheme.typography.bodyMedium)
-                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
-                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete)) }
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Divider(Modifier.padding(vertical = 4.dp))
-            sale.items.forEach { item ->
-                Text(
-                    "${item.product?.name ?: item.productId} x${formatQuantity(item.quantity)}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            if (sale.items.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(end = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    sale.items.forEach { item ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text(
+                                item.product?.name ?: item.productId,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                stringResource(R.string.stats_sale_line_qty, formatQuantity(item.quantity), formatAmount(item.unitPrice)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(formatAmount(item.subtotal), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
             }
         }
     }

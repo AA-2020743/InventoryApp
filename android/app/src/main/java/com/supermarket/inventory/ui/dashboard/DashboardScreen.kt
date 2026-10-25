@@ -1,6 +1,17 @@
 package com.supermarket.inventory.ui.dashboard
 
 import androidx.compose.foundation.clickable
+import java.math.BigDecimal
+import com.supermarket.inventory.ui.stats.ReportCard
+import com.supermarket.inventory.ui.common.categoryColor
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -120,7 +131,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun DashboardContent(
+internal fun DashboardContent(
     summary: DashboardSummaryDto,
     modifier: Modifier = Modifier,
     onViewInventory: () -> Unit,
@@ -240,41 +251,37 @@ private fun MonthCard(month: DashboardPeriodDto) {
     val color = if (profit < 0) lossColor() else profitColor()
     val deficit = month.deficit.toDoubleOrNull() ?: 0.0
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.dashboard_this_month), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(12.dp))
-            StatLine(stringResource(R.string.dashboard_revenue), formatAmount(month.revenue))
-            Spacer(Modifier.height(8.dp))
-            // Already counted inside revenue above - shown separately so the
-            // owner can see how much of the month came from miscellaneous
-            // income rather than checkout sales.
-            StatLine(stringResource(R.string.dashboard_other_sales), formatAmount(month.otherSales))
-            Spacer(Modifier.height(8.dp))
-            StatLine(stringResource(R.string.dashboard_expenses), formatAmount(month.expenses))
-            Spacer(Modifier.height(8.dp))
-            // Deficit (expenses the cash register couldn't fully cover) and
-            // profit aren't opposites of the same figure - a month can be
-            // profitable and still have a deficit, or vice versa - but
-            // showing both at once reads as redundant/contradictory, so the
-            // deficit takes priority as the more urgent number whenever
-            // there is one, and profit only shows when there isn't.
-            if (deficit > 0) {
-                StatLine(
-                    stringResource(R.string.dashboard_deficit),
-                    formatAmount(month.deficit),
-                    valueColor = lossColor(),
-                    valueStyle = MaterialTheme.typography.titleMedium,
-                )
-            } else {
-                StatLine(
-                    stringResource(R.string.dashboard_profit),
-                    formatAmount(month.profit),
-                    valueColor = color,
-                    valueStyle = MaterialTheme.typography.titleMedium,
-                )
-            }
-        }
+    ReportCard(
+        title = stringResource(R.string.dashboard_this_month),
+        icon = Icons.Filled.CalendarMonth,
+        modifier = Modifier.padding(top = 0.dp),
+    ) {
+        // Deficit (expenses the cash register couldn't fully cover) and
+        // profit aren't opposites of the same figure - a month can be
+        // profitable and still have a deficit, or vice versa - but showing
+        // both at once reads as redundant/contradictory, so the deficit takes
+        // priority as the more urgent number whenever there is one, and
+        // profit only shows when there isn't.
+        Text(
+            stringResource(if (deficit > 0) R.string.dashboard_deficit else R.string.dashboard_profit),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            formatAmount(if (deficit > 0) month.deficit else month.profit),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (deficit > 0) lossColor() else color,
+        )
+        Spacer(Modifier.height(12.dp))
+        StatLine(stringResource(R.string.dashboard_revenue), formatAmount(month.revenue))
+        Spacer(Modifier.height(8.dp))
+        // Already counted inside revenue above - shown separately so the
+        // owner can see how much of the month came from miscellaneous
+        // income rather than checkout sales.
+        StatLine(stringResource(R.string.dashboard_other_sales), formatAmount(month.otherSales))
+        Spacer(Modifier.height(8.dp))
+        StatLine(stringResource(R.string.dashboard_expenses), formatAmount(month.expenses))
     }
 }
 
@@ -285,78 +292,116 @@ private fun MonthCard(month: DashboardPeriodDto) {
 // unlike the Today/Month cards, this isn't scoped to the current month,
 // since valuation is what the business is worth right now, not just this
 // month's activity).
+//
+// Laid out as the sum it is - what the business holds, what it owes, and
+// the difference - rather than seven lines in a row, with the holdings as
+// one bar so what the worth is made of shows at a glance.
 @Composable
 private fun ValuationCard(summary: DashboardSummaryDto) {
     val deficit = summary.allTimeDeficitTotal.toDoubleOrNull() ?: 0.0
+    val net = summary.netValuation.toDoubleOrNull() ?: 0.0
+    val holdings = listOf(
+        Triple(stringResource(R.string.dashboard_inventory_value), summary.inventoryValue, categoryColor(0)),
+        Triple(stringResource(R.string.dashboard_assets_value), summary.assetsValue, categoryColor(1)),
+        Triple(stringResource(R.string.dashboard_cash_register), summary.cashRegisterBalance, categoryColor(2)),
+        Triple(stringResource(R.string.dashboard_deferred_receivables), summary.deferredReceivablesTotal, categoryColor(3)),
+        // Its own accent (the theme's tertiary) since it's a different kind
+        // of receivable - cash lent to a worker, not a customer sale - even
+        // though both add to net valuation the same way.
+        Triple(stringResource(R.string.dashboard_debt_receivables), summary.debtReceivableTotal, MaterialTheme.colorScheme.tertiary),
+    )
+    val held = holdings.fold(BigDecimal.ZERO) { acc, (_, v, _) -> acc.add(v.toBigDecimalOrNull() ?: BigDecimal.ZERO) }
+    val owed = (summary.pendingInvoicesTotal.toBigDecimalOrNull() ?: BigDecimal.ZERO)
+        .add(summary.allTimeDeficitTotal.toBigDecimalOrNull() ?: BigDecimal.ZERO)
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.dashboard_net_valuation), style = MaterialTheme.typography.labelLarge)
+    ReportCard(title = stringResource(R.string.dashboard_net_valuation), icon = Icons.Filled.AccountBalanceWallet, modifier = Modifier.padding(top = 0.dp)) {
+        Text(
+            formatAmount(summary.netValuation),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (net < 0) lossColor() else MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            stringResource(R.string.dashboard_held_minus_owed, formatAmount(held.toPlainString()), formatAmount(owed.toPlainString())),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(14.dp))
+        SectionHeader(stringResource(R.string.dashboard_holds), formatAmount(held.toPlainString()))
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+            holdings.forEach { (_, value, c) ->
+                val v = value.toDoubleOrNull() ?: 0.0
+                // Only what adds up: a till counted below zero has no share.
+                if (v > 0) Box(Modifier.weight(v.toFloat()).fillMaxHeight().background(c))
             }
-            Text(formatAmount(summary.netValuation), style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(12.dp))
-            StatLine(stringResource(R.string.dashboard_inventory_value), formatAmount(summary.inventoryValue))
-            Spacer(Modifier.height(8.dp))
-            StatLine(stringResource(R.string.dashboard_assets_value), formatAmount(summary.assetsValue))
-            Spacer(Modifier.height(8.dp))
-            StatLine(stringResource(R.string.dashboard_cash_register), formatAmount(summary.cashRegisterBalance))
-            Spacer(Modifier.height(8.dp))
-            StatLine(stringResource(R.string.dashboard_deferred_receivables), formatAmount(summary.deferredReceivablesTotal))
-            Spacer(Modifier.height(8.dp))
-            // Called out in its own accent color (distinct from the plain
-            // deferred-receivables line above) since it's a different kind
-            // of receivable - cash lent to a worker, not a customer sale -
-            // even though both add to net valuation the same way.
-            StatLine(
-                stringResource(R.string.dashboard_debt_receivables),
-                formatAmount(summary.debtReceivableTotal),
-                valueColor = MaterialTheme.colorScheme.tertiary,
-            )
-            Spacer(Modifier.height(8.dp))
-            StatLine(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal))
-            Spacer(Modifier.height(8.dp))
-            StatLine(
-                stringResource(R.string.dashboard_overall_deficit),
-                formatAmount(summary.allTimeDeficitTotal),
-                valueColor = if (deficit > 0) lossColor() else MaterialTheme.colorScheme.onSurface,
-            )
         }
+        Spacer(Modifier.height(6.dp))
+        holdings.forEach { (label, value, c) -> DotLine(label, formatAmount(value), c) }
+
+        Spacer(Modifier.height(12.dp))
+        SectionHeader(stringResource(R.string.dashboard_owes), formatAmount(owed.toPlainString()))
+        Spacer(Modifier.height(4.dp))
+        DotLine(stringResource(R.string.dashboard_pending_invoices), formatAmount(summary.pendingInvoicesTotal), warningColor())
+        DotLine(
+            stringResource(R.string.dashboard_overall_deficit),
+            formatAmount(summary.allTimeDeficitTotal),
+            lossColor(),
+            valueColor = if (deficit > 0) lossColor() else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, total: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text(total, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun DotLine(label: String, value: String, dot: Color, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(9.dp).clip(CircleShape).background(dot))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = valueColor)
     }
 }
 
 @Composable
 private fun AlertsCard(summary: DashboardSummaryDto, onViewInventory: () -> Unit, onViewInvoices: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.dashboard_needs_attention), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(8.dp))
-            if (summary.alerts.lowStockCount > 0) {
-                AlertRow(
-                    icon = Icons.Filled.Inventory2,
-                    text = stringResource(R.string.dashboard_low_stock_alert, summary.alerts.lowStockCount),
-                    color = warningColor(),
-                    onClick = onViewInventory,
-                )
-            }
-            if (summary.alerts.overdueInvoicesCount > 0) {
-                AlertRow(
-                    icon = Icons.Filled.Receipt,
-                    text = stringResource(R.string.dashboard_invoices_overdue_alert, summary.alerts.overdueInvoicesCount),
-                    color = lossColor(),
-                    onClick = onViewInvoices,
-                )
-            }
-            if (summary.alerts.dueSoonInvoicesCount > 0) {
-                AlertRow(
-                    icon = Icons.Filled.Receipt,
-                    text = stringResource(R.string.dashboard_invoices_due_alert, summary.alerts.dueSoonInvoicesCount),
-                    color = warningColor(),
-                    onClick = onViewInvoices,
-                )
-            }
+    ReportCard(
+        title = stringResource(R.string.dashboard_needs_attention),
+        icon = Icons.Filled.Warning,
+        accent = warningColor(),
+        modifier = Modifier.padding(top = 0.dp),
+    ) {
+        if (summary.alerts.lowStockCount > 0) {
+            AlertRow(
+                icon = Icons.Filled.Inventory2,
+                text = stringResource(R.string.dashboard_low_stock_alert, summary.alerts.lowStockCount),
+                color = warningColor(),
+                onClick = onViewInventory,
+            )
+        }
+        if (summary.alerts.overdueInvoicesCount > 0) {
+            AlertRow(
+                icon = Icons.Filled.Receipt,
+                text = stringResource(R.string.dashboard_invoices_overdue_alert, summary.alerts.overdueInvoicesCount),
+                color = lossColor(),
+                onClick = onViewInvoices,
+            )
+        }
+        if (summary.alerts.dueSoonInvoicesCount > 0) {
+            AlertRow(
+                icon = Icons.Filled.Receipt,
+                text = stringResource(R.string.dashboard_invoices_due_alert, summary.alerts.dueSoonInvoicesCount),
+                color = warningColor(),
+                onClick = onViewInvoices,
+            )
         }
     }
 }
@@ -368,17 +413,22 @@ private fun AlertsCard(summary: DashboardSummaryDto, onViewInventory: () -> Unit
 @Composable
 private fun AlertRow(icon: ImageVector, text: String, color: Color, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.10f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Warning, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
             text,
             color = color,
             style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
