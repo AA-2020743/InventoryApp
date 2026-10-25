@@ -29,8 +29,14 @@ private fun ltrIsolate(text: String) = "$LRI$text$PDI"
 // Half up, like every amount the server rounds and stores: NumberFormat's own
 // default is half-even, which shows an exact 1.005 as 1.00 where the stored
 // figure would be 1.01.
+//
+// Always Western digits (0-9, "," and "."), whatever the language: they're
+// what the app has shown in Arabic so far, and they keep a figure one
+// left-to-right run. Arabic-Indic digits count as right-to-left text, so
+// next to an arrow or "LE" they reorder - "5,500 → 0" drew as "0 → 5,500",
+// and "LE" jumped to the front of an amount inside a sentence.
 private fun numberFormat(locale: Locale, minFraction: Int, maxFraction: Int): NumberFormat =
-    NumberFormat.getNumberInstance(locale).apply {
+    NumberFormat.getNumberInstance(Locale.Builder().setLocale(locale).setUnicodeLocaleKeyword("nu", "latn").build()).apply {
         minimumFractionDigits = minFraction
         maximumFractionDigits = maxFraction
         roundingMode = RoundingMode.HALF_UP

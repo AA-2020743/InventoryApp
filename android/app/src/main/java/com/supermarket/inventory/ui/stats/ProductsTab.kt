@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -141,8 +142,9 @@ fun ProductsTab(
                 Podium(ranked.take(3), metric)
             }
         }
-        itemsIndexed(ranked.drop(3), key = { _, p -> p.productId }) { i, p ->
-            RankedProductRow(rank = i + 4, p = p, metric = metric, fraction = (p.metric(metric) / top).toFloat())
+        val rest = ranked.drop(3)
+        itemsIndexed(rest, key = { _, p -> p.productId }) { i, p ->
+            RankedProductRow(rank = i + 4, p = p, metric = metric, fraction = (p.metric(metric) / top).toFloat(), shape = groupedRowShape(i, rest.size), first = i == 0)
         }
 
         // ---- by category ----
@@ -154,7 +156,7 @@ fun ProductsTab(
         if (margins.isNotEmpty()) {
             item { MarginSummaryCard(margins, marginOrder, onOrder = { marginOrder = it }) }
             val ordered = margins.sortedBy { it.marginPercent.money() }.let { if (marginOrder == MarginOrder.HIGHEST) it.reversed() else it }
-            itemsIndexed(ordered, key = { _, m -> "m-" + m.productId }) { _, m -> MarginRow(m) }
+            itemsIndexed(ordered, key = { _, m -> "m-" + m.productId }) { i, m -> MarginRow(m, shape = groupedRowShape(i, ordered.size), first = i == 0) }
         }
     }
 }
@@ -217,16 +219,16 @@ private fun Podium(top: List<TopProductItemDto>, metric: ProductMetric) {
 // Fourth place down: the bar is sized against first place on the measure
 // the list is ranked by, so the bar and the order always agree.
 @Composable
-private fun RankedProductRow(rank: Int, p: TopProductItemDto, metric: ProductMetric, fraction: Float) {
+private fun RankedProductRow(rank: Int, p: TopProductItemDto, metric: ProductMetric, fraction: Float, shape: Shape, first: Boolean) {
     val revenue = p.revenue.money()
     val margin = if (revenue > 0) p.profit.money() / revenue * 100 else null
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .padding(top = if (first) 10.dp else 2.dp)
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$rank", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(26.dp))
@@ -251,7 +253,7 @@ private fun RankedProductRow(rank: Int, p: TopProductItemDto, metric: ProductMet
                 color = if (metric == ProductMetric.PROFIT) profitColor() else MaterialTheme.colorScheme.onSurface,
             )
         }
-        MeterBar(fraction, MaterialTheme.colorScheme.primary.copy(alpha = 0.75f), Modifier.fillMaxWidth().padding(top = 8.dp, start = 26.dp))
+        MeterBar(fraction, MaterialTheme.colorScheme.primary.copy(alpha = 0.75f), Modifier.fillMaxWidth().padding(top = 6.dp, start = 26.dp))
     }
 }
 
@@ -352,16 +354,16 @@ private fun MarginSummaryCard(margins: List<MarginItemDto>, order: MarginOrder, 
 }
 
 @Composable
-private fun MarginRow(m: MarginItemDto) {
+private fun MarginRow(m: MarginItemDto, shape: Shape, first: Boolean) {
     val percent = m.marginPercent.money()
     val color = marginColor(percent)
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .padding(top = if (first) 10.dp else 2.dp)
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -388,6 +390,6 @@ private fun MarginRow(m: MarginItemDto) {
                     .padding(horizontal = 10.dp, vertical = 3.dp),
             )
         }
-        MeterBar((percent / 100.0).toFloat(), color.copy(alpha = 0.8f), Modifier.fillMaxWidth().padding(top = 8.dp))
+        MeterBar((percent / 100.0).toFloat(), color.copy(alpha = 0.8f), Modifier.fillMaxWidth().padding(top = 6.dp))
     }
 }

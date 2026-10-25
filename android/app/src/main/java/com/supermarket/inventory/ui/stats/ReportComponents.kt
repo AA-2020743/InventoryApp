@@ -273,6 +273,22 @@ fun <T> ChoiceChips(options: List<Pair<T, String>>, selected: T, onSelect: (T) -
     }
 }
 
+// The rows of one long list drawn as a single block: rounded at its two ends
+// and nearly square where neighbours meet, so twenty products read as one
+// list rather than a stack of twenty cards, and take less height doing it.
+fun groupedRowShape(index: Int, count: Int): RoundedCornerShape {
+    val end = 14.dp
+    val joint = 4.dp
+    val first = index == 0
+    val last = index == count - 1
+    return RoundedCornerShape(
+        topStart = if (first) end else joint,
+        topEnd = if (first) end else joint,
+        bottomStart = if (last) end else joint,
+        bottomEnd = if (last) end else joint,
+    )
+}
+
 // A thin horizontal bar: `fraction` of the track filled.
 @Composable
 fun MeterBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {

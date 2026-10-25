@@ -597,7 +597,7 @@
     <string name="credit_aging">عمر المديونية</string>
     <string name="credit_aging_subtitle">المبالغ غير المسددة حسب الأيام منذ البيع</string>
     <string name="credit_aging_bucket">%1$s يوم</string>
-    <string name="credit_aging_row">%1$s · %2$d عملية</string>
+    <string name="credit_aging_count">%1$d عملية</string>
     <string name="credit_sort_volume">الأكثر شراءً</string>
     <string name="credit_sort_owed">الأعلى مديونية</string>
     <string name="credit_sort_slowest">الأبطأ سدادًا</string>
@@ -623,7 +623,8 @@
     <string name="suppliers_unassigned_note">إعادة تخزين مسجلة بدون فاتورة، بتكلفة الوحدة</string>
     <string name="suppliers_dependence">مدى الاعتماد على مورد واحد</string>
     <string name="suppliers_top_share">%1$s يورّد %2$s%% من مشترياتك</string>
-    <string name="suppliers_card_detail">%1$s%% من المشتريات · %2$d فاتورة · %3$s شهريًا عند التعامل</string>
+    <string name="suppliers_card_share">%1$s%% من المشتريات · %2$d فاتورة</string>
+    <string name="suppliers_card_monthly">%1$s شهريًا عند التعامل</string>
     <string name="suppliers_trend_needs_history">يحتاج الاتجاه إلى ثلاثة أشهر مكتملة</string>
     <string name="suppliers_owed_amount">مستحق %1$s</string>
     <string name="suppliers_no_lines">لا توجد أصناف مسجلة في هذه الفواتير</string>
@@ -673,7 +674,7 @@
     <string name="stats_revenue_vs_month_before">الإيرادات مقارنةً بالشهر السابق (%1$s)</string>
     <string name="pulse_day_of_month">اليوم %1$d من %2$d · متبقٍ %3$d يوم</string>
     <string name="pulse_still_to_come">%1$s متوقعة في الأيام المتبقية</string>
-    <string name="pulse_projection_basis">على أساس متوسط اليوم الكامل حتى الآن - إيرادات %1$s وربح %2$s على مدى %3$d يوم - لكل يوم متبقٍ. يُحسب اليوم الحالي كيوم متوسط، أو بما حققه إن كان أكثر.</string>
+    <string name="pulse_projection_basis">كل يوم متبقٍ بمتوسط اليوم الكامل حتى الآن: إيرادات %1$s وربح %2$s على مدى %3$d يوم. يُحسب اليوم الحالي كيوم متوسط على الأقل.</string>
     <string name="pulse_projection_after_first_day">يبدأ توقع الشهر بعد انتهاء أول يوم كامل.</string>
     <string name="stats_tab_products">المنتجات</string>
     <string name="products_best_sellers">الأكثر مبيعًا</string>
@@ -702,4 +703,6 @@
     <string name="dashboard_holds">ما يملكه المحل</string>
     <string name="dashboard_owes">ما عليه</string>
     <string name="dashboard_held_minus_owed">%1$s مملوك − %2$s مستحق</string>
+    <string name="pulse_quiet">هادئ</string>
+    <string name="pulse_busy">مزدحم</string>
 </resources>

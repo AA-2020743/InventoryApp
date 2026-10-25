@@ -597,7 +597,7 @@
     <string name="credit_aging">How old the debt is</string>
     <string name="credit_aging_subtitle">Unpaid amounts by days since the sale</string>
     <string name="credit_aging_bucket">%1$s days</string>
-    <string name="credit_aging_row">%1$s · %2$d sales</string>
+    <string name="credit_aging_count">%1$d sales</string>
     <string name="credit_sort_volume">Most bought</string>
     <string name="credit_sort_owed">Owes most</string>
     <string name="credit_sort_slowest">Slowest to pay</string>
@@ -623,7 +623,8 @@
     <string name="suppliers_unassigned_note">Restocks recorded without an invoice, at their unit cost</string>
     <string name="suppliers_dependence">How much rests on one supplier</string>
     <string name="suppliers_top_share">%1$s supplies %2$s%% of what you buy</string>
-    <string name="suppliers_card_detail">%1$s%% of buying · %2$d invoices · %3$s a month when active</string>
+    <string name="suppliers_card_share">%1$s%% of buying · %2$d invoices</string>
+    <string name="suppliers_card_monthly">%1$s a month when active</string>
     <string name="suppliers_trend_needs_history">A trend needs three finished months</string>
     <string name="suppliers_owed_amount">Owed %1$s</string>
     <string name="suppliers_no_lines">No product lines recorded on these invoices</string>
@@ -673,7 +674,7 @@
     <string name="stats_revenue_vs_month_before">revenue against the month before (%1$s)</string>
     <string name="pulse_day_of_month">Day %1$d of %2$d · %3$d days left</string>
     <string name="pulse_still_to_come">%1$s still to come</string>
-    <string name="pulse_projection_basis">At the average full day so far - %1$s revenue, %2$s profit, over %3$d days - for each day left. Today counts as an average day, or as what it has taken if that is more.</string>
+    <string name="pulse_projection_basis">Each day left at the average full day so far: %1$s revenue, %2$s profit over %3$d days. Today counts as at least an average day.</string>
     <string name="pulse_projection_after_first_day">The month forecast starts once the first full day is over.</string>
     <string name="stats_tab_products">Products</string>
     <string name="products_best_sellers">Best sellers</string>
@@ -702,4 +703,6 @@
     <string name="dashboard_holds">What the business holds</string>
     <string name="dashboard_owes">What it owes</string>
     <string name="dashboard_held_minus_owed">%1$s held − %2$s owed</string>
+    <string name="pulse_quiet">Quiet</string>
+    <string name="pulse_busy">Busy</string>
 </resources>

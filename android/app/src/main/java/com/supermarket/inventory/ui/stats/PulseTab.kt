@@ -1,6 +1,10 @@
 package com.supermarket.inventory.ui.stats
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -311,8 +315,8 @@ private fun RhythmCard(p: PulseDto) {
                 stringResource(
                     R.string.pulse_busiest,
                     dayOfWeek(d).getDisplayName(TextStyle.FULL, locale),
-                    String.format(locale, "%02d:00", h),
-                    String.format(locale, "%02d:00", (h + 1) % 24),
+                    String.format(Locale.US, "%02d:00", h),
+                    String.format(Locale.US, "%02d:00", (h + 1) % 24),
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -328,7 +332,7 @@ private fun RhythmCard(p: PulseDto) {
                     modifier = Modifier.width(40.dp),
                     maxLines = 1,
                 )
-                Canvas(Modifier.weight(1f).height(16.dp)) {
+                Canvas(Modifier.weight(1f).height(18.dp)) {
                     val n = hours.size
                     val gap = 2.dp.toPx()
                     val w = (size.width - gap * (n - 1)) / n
@@ -341,10 +345,27 @@ private fun RhythmCard(p: PulseDto) {
                 }
             }
         }
+        // An hour under every third column, laid out like the columns
+        // themselves (a Row follows the reading direction, as the grid does),
+        // so a busy cell can be read off without counting.
         Row(Modifier.fillMaxWidth().padding(start = 40.dp, top = 4.dp)) {
-            Text(String.format(locale, "%02d", firstHour), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Box(Modifier.weight(1f))
-            Text(String.format(locale, "%02d", lastHour), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            hours.forEach { h ->
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    if (h % 3 == 0) {
+                        Text(String.format(Locale.US, "%02d", h), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.pulse_quiet), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(6.dp))
+            listOf(0.15f, 0.36f, 0.57f, 0.78f, 1f).forEach { a ->
+                Box(Modifier.padding(horizontal = 1.dp).size(width = 14.dp, height = 10.dp).clip(RoundedCornerShape(3.dp)).background(base.copy(alpha = a)))
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.pulse_busy), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

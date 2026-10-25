@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.CreditCustomerDto
@@ -138,8 +140,18 @@ private fun CreditContent(r: CreditReportDto) {
                     r.aging.forEachIndexed { i, a ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                             LegendDot(agingColors[i], stringResource(R.string.credit_aging_bucket, a.bucket), Modifier.weight(1f))
+                            // The count and the amount as two pieces: joined in one
+                            // string, the Arabic word for "sales" drifted away from
+                            // its number to the far side of the amount.
                             Text(
-                                stringResource(R.string.credit_aging_row, formatAmount(a.outstanding), a.count),
+                                stringResource(R.string.credit_aging_count, a.count),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                formatAmount(a.outstanding),
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.widthIn(min = 104.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = if (i == r.aging.lastIndex && a.count > 0) FontWeight.SemiBold else FontWeight.Normal,
                                 color = if (i == r.aging.lastIndex && a.count > 0) lossColor() else MaterialTheme.colorScheme.onSurface,

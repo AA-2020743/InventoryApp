@@ -439,6 +439,7 @@ internal fun OverviewTab(
                     } else {
                         null
                     },
+                    hint = if (expenses.items.isEmpty()) stringResource(R.string.stats_no_expenses_this_period) else null,
                 )
             }
             if (expenses.byCategory.isNotEmpty()) {
@@ -450,9 +451,6 @@ internal fun OverviewTab(
                     )
                 }
             }
-            if (expenses.items.isEmpty()) {
-                item { Text(stringResource(R.string.stats_no_expenses_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
-            }
         }
         state.otherSalesForRange?.let { otherSales ->
             item { Spacer(Modifier.height(16.dp)) }
@@ -462,6 +460,7 @@ internal fun OverviewTab(
                     label = stringResource(R.string.stats_other_sales_title),
                     total = otherSales.total,
                     accent = profitColor(),
+                    hint = if (otherSales.items.isEmpty()) stringResource(R.string.stats_no_other_sales_this_period) else null,
                 )
             }
             if (otherSales.byCategory.isNotEmpty()) {
@@ -473,9 +472,6 @@ internal fun OverviewTab(
                     )
                 }
             }
-            if (otherSales.items.isEmpty()) {
-                item { Text(stringResource(R.string.stats_no_other_sales_this_period), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
-            }
         }
         if (state.period == StatsPeriod.DAY) {
             item { Spacer(Modifier.height(16.dp)) }
@@ -485,12 +481,10 @@ internal fun OverviewTab(
                     label = stringResource(R.string.sales_title),
                     total = state.periodRevenue,
                     accent = MaterialTheme.colorScheme.primary,
+                    hint = if (state.salesForDay.isEmpty()) stringResource(R.string.stats_no_sales_this_day) else null,
                 )
             }
             item { Spacer(Modifier.height(4.dp)) }
-            if (state.salesForDay.isEmpty()) {
-                item { Text(stringResource(R.string.stats_no_sales_this_day), style = MaterialTheme.typography.bodyMedium) }
-            }
             items(state.salesForDay, key = { it.id }) { sale ->
                 SaleRow(sale, onEdit = { onEditSale(sale.id) }, onDelete = { onDeleteSaleRequest(sale) })
             }
@@ -501,6 +495,8 @@ internal fun OverviewTab(
 // A section's headline: an icon in a tinted disc, what the section is, and
 // its total for the period. The same shape for expenses and for other
 // income, so the two read as a pair rather than as two unrelated blocks.
+// `hint` says the section is empty inside the card, rather than as loose
+// text under it.
 @Composable
 private fun SectionTotalCard(
     icon: ImageVector,
@@ -508,6 +504,7 @@ private fun SectionTotalCard(
     total: String,
     accent: Color,
     note: String? = null,
+    hint: String? = null,
 ) {
     Card(
         Modifier.fillMaxWidth(),
@@ -532,6 +529,9 @@ private fun SectionTotalCard(
                 )
                 if (note != null) {
                     Text(note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
+                if (hint != null) {
+                    Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Text(formatAmount(total), style = MaterialTheme.typography.titleMedium, color = accent)

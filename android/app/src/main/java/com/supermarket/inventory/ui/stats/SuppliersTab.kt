@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -158,7 +159,7 @@ private fun SuppliersContent(r: SuppliersReportDto, window: Int, onWindowChange:
         // ---- how much depends on one supplier ----
         if (r.suppliers.size > 1) {
             item {
-                ReportCard(title = stringResource(R.string.suppliers_dependence), accent = MaterialTheme.colorScheme.tertiary) {
+                ReportCard(title = stringResource(R.string.suppliers_dependence), icon = Icons.Filled.PieChart, accent = MaterialTheme.colorScheme.tertiary) {
                     Row(Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(7.dp))) {
                         r.suppliers.forEachIndexed { s, sup ->
                             if (sup.sharePercent > 0) {
@@ -209,13 +210,19 @@ private fun SupplierCard(sup: SupplierReportDto, color: Color, expanded: Boolean
             }
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Share and invoices on one line, the monthly figure on the
+                // next: as one sentence it wrapped and left a word on its own.
                 Column(Modifier.weight(1f)) {
                     Text(
-                        stringResource(R.string.suppliers_card_detail, formatPercent(sup.sharePercent.toString()), sup.invoices, formatAmount(sup.averagePerActiveMonth)),
+                        stringResource(R.string.suppliers_card_share, formatPercent(sup.sharePercent.toString()), sup.invoices),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(
+                        stringResource(R.string.suppliers_card_monthly, formatAmount(sup.averagePerActiveMonth)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                         if (sup.trendPercent != null) {
                             ChangeChip(sup.trendPercent, neutral = true, suffix = stringResource(R.string.reports_per_month_suffix))
                         } else {
@@ -232,7 +239,8 @@ private fun SupplierCard(sup: SupplierReportDto, color: Color, expanded: Boolean
                         }
                     }
                 }
-                Sparkline(sup.series.map { it.money() }, color, Modifier.width(110.dp))
+                Spacer(Modifier.width(12.dp))
+                Sparkline(sup.series.map { it.money() }, color, Modifier.width(96.dp))
             }
             AnimatedVisibility(visible = expanded) {
                 Column(Modifier.padding(top = 10.dp)) {
