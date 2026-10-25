@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Insights
@@ -32,6 +33,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -249,19 +251,26 @@ private fun PulseContent(p: PulseDto) {
                     Spacer(Modifier.height(8.dp))
                     val maxProfit = pareto.products.maxOfOrNull { it.profit.money() }?.takeIf { it > 0 } ?: 1.0
                     pareto.products.take(pareto.productsForShare).forEachIndexed { i, prod ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${i + 1}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(22.dp))
                             Column(Modifier.weight(1f)) {
                                 Row {
                                     Text(prod.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                     Text(formatAmount(prod.profit), style = MaterialTheme.typography.bodySmall, color = profitColor())
                                 }
-                                MeterBar((prod.profit.money() / maxProfit).toFloat(), profitColor(), Modifier.fillMaxWidth().padding(top = 3.dp))
-                                Text(
-                                    stringResource(R.string.pulse_running_share, formatPercent(prod.cumulativeSharePercent.toString())),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                // The running share beside the bar rather than on
+                                // a line of its own: same facts, a third less height.
+                                Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    MeterBar((prod.profit.money() / maxProfit).toFloat(), profitColor(), Modifier.weight(1f))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        stringResource(R.string.pulse_running_share, formatPercent(prod.cumulativeSharePercent.toString())),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.widthIn(min = 76.dp),
+                                    )
+                                }
                             }
                         }
                     }

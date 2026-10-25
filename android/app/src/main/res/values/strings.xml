@@ -551,8 +551,8 @@
     <string name="pulse_best_day">Best day</string>
     <string name="pulse_quietest_day">Quietest day</string>
     <string name="pulse_concentration">Where the money comes from</string>
-    <string name="pulse_concentration_subtitle">The few products that bring in most of it</string>
-    <string name="pulse_concentration_headline">of the %1$d products sold bring in %2$s%% of revenue</string>
+    <string name="pulse_concentration_subtitle">The few products that make most of the profit</string>
+    <string name="pulse_concentration_headline">of the %1$d products sold make %2$s%% of the profit</string>
     <string name="pulse_running_share">%1$s%% together</string>
     <string name="pulse_sold_at_loss">Sold below cost</string>
     <string name="pulse_no_sales_yet">No sales yet this month</string>
@@ -652,7 +652,6 @@
     <string name="sell_slow_value">Over two months to sell through</string>
     <string name="sell_slow_note">%1$d products, at the current pace</string>
     <string name="sell_where_money_sits">Where the money on the shelf sits</string>
-    <string name="sell_share_row">%1$s · %2$s%%</string>
     <string name="sell_out_note">%1$d products out of stock</string>
     <string name="sell_days_left">days left</string>
     <string name="sell_pace_line">Sells %1$s %2$s a day</string>

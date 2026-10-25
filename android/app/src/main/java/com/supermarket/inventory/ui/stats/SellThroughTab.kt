@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -53,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.supermarket.inventory.R
@@ -67,6 +69,7 @@ import com.supermarket.inventory.ui.theme.lossColor
 import com.supermarket.inventory.ui.theme.profitColor
 import com.supermarket.inventory.ui.theme.warningColor
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -336,13 +339,19 @@ private fun ShelfCard(r: SellThroughDto, onFilter: (String) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         LegendDot(statusColor(st), stringResource(R.string.sell_filter_count, statusLabel(st), count), Modifier.weight(1f))
+                        // Share and amount as two pieces, the share in a fixed
+                        // column: in one string the Arabic layout shuffled
+                        // the "%" and the dot between them.
                         Text(
-                            stringResource(
-                                R.string.sell_share_row,
-                                formatAmount(v.toPlainString()),
-                                formatPercent((v.toDouble() / total * 100).toString()),
-                            ),
+                            "${formatPercent((v.toDouble() / total * 100).toString())}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            formatAmount(v.toPlainString()),
                             style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.widthIn(min = 112.dp),
                         )
                     }
                 }
@@ -362,6 +371,11 @@ private fun ShelfCard(r: SellThroughDto, onFilter: (String) -> Unit) {
         }
     }
 }
+
+// A daily rate to one decimal (two below one a day): "3.867 a day" claimed a
+// precision a month of sales doesn't have, and made the line wrap.
+private fun perDayShown(perDay: String): String =
+    perDay.toBigDecimalOrNull()?.let { it.setScale(if (it >= BigDecimal.ONE) 1 else 2, RoundingMode.HALF_UP).toPlainString() } ?: perDay
 
 // One product: how long what's on the shelf will last at the current pace,
 // and - from its history - how long a delivery of it usually takes to go.
@@ -440,7 +454,7 @@ private fun ProductPaceCard(
             Spacer(Modifier.height(8.dp))
             val details = buildList {
                 if (p.unitsSold.money() > 0) {
-                    add(stringResource(R.string.sell_pace_line, formatQuantity(p.perDay), p.unit))
+                    add(stringResource(R.string.sell_pace_line, formatQuantity(perDayShown(p.perDay)), p.unit))
                 } else {
                     add(stringResource(R.string.sell_no_sales_in, paceDays))
                 }
