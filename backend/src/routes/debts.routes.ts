@@ -109,7 +109,9 @@ debtsRouter.post(
     const debt = await prisma.$transaction(async (tx) => {
       const existing = await tx.debt.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Debt not found");
-      return repayDebtAmount(tx, existing, new Prisma.Decimal(amount));
+      // To the piastre: a repayment split across several debts on the phone
+      // can arrive as 50.199999999999996, which never reached the 50.20 owed.
+      return repayDebtAmount(tx, existing, new Prisma.Decimal(amount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP));
     });
     res.json(debt);
   })

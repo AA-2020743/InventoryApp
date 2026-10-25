@@ -57,9 +57,13 @@ export async function applyRestockToProduct(
 
   let blended: Prisma.Decimal | undefined;
   if (unitCost !== undefined) {
-    const totalQuantity = product.quantity.add(newQuantity);
+    // Stock below empty counts as empty, as it does when the cost is rebuilt
+    // from the log (recomputeProductCost): a negative count would otherwise
+    // invert the weighting and push the new cost past either price.
+    const onHand = Prisma.Decimal.max(product.quantity, 0);
+    const totalQuantity = onHand.add(newQuantity);
     blended = totalQuantity.gt(0)
-      ? product.quantity
+      ? onHand
           .mul(product.purchaseCost)
           .add(newQuantity.mul(effectiveUnitCost))
           .div(totalQuantity)
@@ -361,15 +365,17 @@ productsRouter.post(
     const data = restockSchema.parse(req.body);
     const { quantity, unitCost, note } = data;
 
-    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
-    if (!product) throw new HttpError(404, "Product not found");
-
-    // The cash/invoice side always reflects what was actually paid for
-    // *this* restock (quantity at the price entered now) - never the
-    // blended valuation figure the helper leaves on the product.
-    const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
-
     const updated = await prisma.$transaction(async (tx) => {
+      // Read inside the transaction the cost is blended in, so a sale landing
+      // in between can't leave the blend weighted by a stock count that has
+      // already changed.
+      const product = await tx.product.findUnique({ where: { id: req.params.id } });
+      if (!product) throw new HttpError(404, "Product not found");
+
+      // The cash/invoice side always reflects what was actually paid for
+      // *this* restock (quantity at the price entered now) - never the
+      // blended valuation figure the helper leaves on the product.
+      const effectiveUnitCost = new Prisma.Decimal(unitCost ?? product.purchaseCost);
       const cost = effectiveUnitCost.mul(quantity);
       const resolved = await resolveRestockFinancing(tx, data, cost);
 

@@ -2,6 +2,7 @@ package com.supermarket.inventory.di
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.KotlinJsonAdapterFactory
+import com.supermarket.inventory.BuildConfig
 import com.supermarket.inventory.data.SessionManager
 import com.supermarket.inventory.data.remote.ApiService
 import dagger.Module
@@ -88,12 +89,19 @@ object NetworkModule {
         @Named("auth") authInterceptor: Interceptor,
         @Named("unauthorized") unauthorizedInterceptor: Interceptor,
     ): OkHttpClient {
-        val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         return OkHttpClient.Builder()
             .addInterceptor(baseUrlInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(unauthorizedInterceptor)
-            .addInterceptor(logging)
+            .apply {
+                // Request lines in the log are for development. A release
+                // build has no reason to write every address it calls -
+                // record ids included - where anything reading the device
+                // log can see them.
+                if (BuildConfig.DEBUG) {
+                    addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+                }
+            }
             .build()
     }
 

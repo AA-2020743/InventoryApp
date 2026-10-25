@@ -2,6 +2,7 @@ package com.supermarket.inventory.data
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapter
+import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
 import java.net.ConnectException
@@ -38,15 +39,31 @@ sealed class ApiResult<out T> {
         val message: String,
         val isNetworkError: Boolean = false,
         val networkKind: NetworkErrorKind? = null,
-    ) : ApiResult<Nothing>()
+        // The HTTP status when the server answered with an error, so a caller
+        // can tell "the server refused this" (400, 404) from "try again
+        // later" (502 while it restarts, 401 once signed in again).
+        val httpCode: Int? = null,
+    ) : ApiResult<Nothing>() {
+        // Worth trying again later rather than giving up on: no answer at all,
+        // a server error (nginx answers 502 while the backend restarts), a
+        // sign-in that has to be renewed, or being told to slow down.
+        val isTemporary: Boolean
+            get() = isNetworkError || httpCode == 401 || httpCode == 403 || httpCode == 408 || httpCode == 429 ||
+                (httpCode != null && httpCode >= 500)
+    }
 }
 
 // Most specific first: each of these is an IOException, so the generic catch
 // below has to come after all of them or it swallows them.
 suspend fun <T> apiCall(block: suspend () -> T): ApiResult<T> = try {
     ApiResult.Success(block())
+} catch (e: CancellationException) {
+    // A cancelled coroutine has to stay cancelled. Caught by the catch-all
+    // below it read as an ordinary failure - and the offline sync, stopped
+    // part-way by WorkManager, deleted the sale it was sending as "refused".
+    throw e
 } catch (e: HttpException) {
-    ApiResult.Error(extractErrorMessage(e))
+    ApiResult.Error(extractErrorMessage(e), httpCode = e.code())
 } catch (e: UnknownHostException) {
     networkError(NetworkErrorKind.UNKNOWN_HOST, "Server address not found. Check it for typos.")
 } catch (e: ConnectException) {

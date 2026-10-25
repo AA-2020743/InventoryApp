@@ -23,13 +23,15 @@ export interface BackupPayload {
   cashRegisterEntries: any[];
   businessSettings: any | null;
   otherSales: any[];
+  // Missing from archives made before debts were backed up.
+  debts?: any[];
 }
 
 // The owner's login (User) is deliberately excluded: it isn't "business
 // data" the way the rest of this is, and restoring an old password hash
 // over the current one could lock the owner out of their own backend.
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries, businessSettings, otherSales] =
+  const [suppliers, products, supplierInvoices, sales, saleItems, expenses, inventoryTransactions, assets, cashRegisterEntries, businessSettings, otherSales, debts] =
     await Promise.all([
       prisma.supplier.findMany(),
       prisma.product.findMany(),
@@ -42,6 +44,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
       prisma.cashRegisterEntry.findMany(),
       prisma.businessSettings.findFirst(),
       prisma.otherSale.findMany(),
+      prisma.debt.findMany(),
     ]);
 
   return {
@@ -58,6 +61,11 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     cashRegisterEntries,
     businessSettings,
     otherSales,
+    // Money lent to workers. Backups used to leave these out while keeping
+    // the till entries that paid them out, so a restore lost every debt -
+    // or, restored over a live database, kept today's debts against an
+    // older till.
+    debts,
   };
 }
 
@@ -83,6 +91,10 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       await tx.cashRegisterEntry.deleteMany();
       await tx.businessSettings.deleteMany();
       await tx.otherSale.deleteMany();
+      // Only when the archive has them: one made before debts were backed up
+      // says nothing about them, so the debts already here are left alone -
+      // what restoring such an archive always did.
+      if (Array.isArray(payload.debts)) await tx.debt.deleteMany();
 
       // Parents before children, mirroring the delete order above.
       if (payload.suppliers.length) {
@@ -155,6 +167,15 @@ export async function restoreFromPayload(payload: BackupPayload): Promise<void> 
       if (payload.businessSettings) {
         await tx.businessSettings.create({
           data: { ...payload.businessSettings, updatedAt: toDate(payload.businessSettings.updatedAt) ?? new Date() },
+        });
+      }
+      if (Array.isArray(payload.debts) && payload.debts.length) {
+        await tx.debt.createMany({
+          data: payload.debts.map((r) => ({
+            ...r,
+            repaidAt: toDate(r.repaidAt),
+            createdAt: toDate(r.createdAt),
+          })),
         });
       }
       if (payload.otherSales?.length) {

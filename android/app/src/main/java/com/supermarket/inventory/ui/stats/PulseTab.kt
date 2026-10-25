@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.supermarket.inventory.R
 import com.supermarket.inventory.data.remote.dto.PulseDto
 import com.supermarket.inventory.ui.common.formatAmount
+import com.supermarket.inventory.ui.common.formatSignedAmount
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.common.formatQuantity
 import com.supermarket.inventory.ui.theme.lossColor
@@ -106,7 +107,17 @@ private fun PulseContent(p: PulseDto) {
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Spacer(Modifier.height(4.dp))
-                    MeterBar((proj.elapsedPercent / 100).toFloat(), MaterialTheme.colorScheme.primary, Modifier.fillMaxWidth())
+                    // Whole days done, matching the label above it and the
+                    // forecast below; the share of hours gone where an older
+                    // server doesn't say.
+                    val daysDone = proj.daysCompleted
+                    val daysInMonth = proj.daysInMonth
+                    MeterBar(
+                        if (daysDone != null && daysInMonth != null && daysInMonth > 0) daysDone.toFloat() / daysInMonth
+                        else (proj.elapsedPercent / 100).toFloat(),
+                        MaterialTheme.colorScheme.primary,
+                        Modifier.fillMaxWidth(),
+                    )
                     Spacer(Modifier.height(10.dp))
                     // What's still to come sits under each total, so the two
                     // add up on screen: so far + still to come = expected.
@@ -115,14 +126,14 @@ private fun PulseContent(p: PulseDto) {
                             label = stringResource(R.string.pulse_heading_for_revenue),
                             value = formatAmount(proj.revenue),
                             accent = MaterialTheme.colorScheme.primary,
-                            footnote = proj.remainingRevenue?.let { stringResource(R.string.pulse_still_to_come, formatAmount(it)) },
+                            footnote = proj.remainingRevenue?.let { stringResource(R.string.pulse_still_to_come, formatSignedAmount(it)) },
                             modifier = Modifier.weight(1f),
                         )
                         KpiTile(
                             label = stringResource(R.string.pulse_heading_for_profit),
                             value = formatAmount(proj.profit),
                             accent = if (proj.profit.money() >= 0) profitColor() else lossColor(),
-                            footnote = proj.remainingProfit?.let { stringResource(R.string.pulse_still_to_come, formatAmount(it)) },
+                            footnote = proj.remainingProfit?.let { stringResource(R.string.pulse_still_to_come, formatSignedAmount(it)) },
                             modifier = Modifier.weight(1f),
                         )
                     }

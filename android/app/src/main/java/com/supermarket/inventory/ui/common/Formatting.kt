@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.supermarket.inventory.R
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -25,33 +26,56 @@ private const val LRI = "⁦" // Left-to-Right Isolate
 private const val PDI = "⁩" // Pop Directional Isolate
 private fun ltrIsolate(text: String) = "$LRI$text$PDI"
 
-fun formatAmount(value: String, locale: Locale = Locale.getDefault()): String = try {
-    val format = NumberFormat.getNumberInstance(locale).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
+// Half up, like every amount the server rounds and stores: NumberFormat's own
+// default is half-even, which shows an exact 1.005 as 1.00 where the stored
+// figure would be 1.01.
+private fun numberFormat(locale: Locale, minFraction: Int, maxFraction: Int): NumberFormat =
+    NumberFormat.getNumberInstance(locale).apply {
+        minimumFractionDigits = minFraction
+        maximumFractionDigits = maxFraction
+        roundingMode = RoundingMode.HALF_UP
     }
-    ltrIsolate("${format.format(BigDecimal(value))} $CURRENCY_SUFFIX")
+
+fun formatAmount(value: String, locale: Locale = Locale.getDefault()): String = try {
+    ltrIsolate("${numberFormat(locale, 2, 2).format(BigDecimal(value))} $CURRENCY_SUFFIX")
 } catch (_: Exception) {
     value
 }
 
-fun formatPercent(value: String, locale: Locale = Locale.getDefault()): String = try {
-    val format = NumberFormat.getNumberInstance(locale).apply {
-        minimumFractionDigits = 0
-        maximumFractionDigits = 1
+// An amount that is a change: "+170.00 LE" or "−1,800.00 LE", the sign kept
+// inside the same left-to-right run as the figure. Put in front of an
+// isolated amount from outside, the sign belongs to the surrounding Arabic
+// text and lands on the far side of it - "1,800.00 LE-".
+fun formatSignedAmount(value: String, locale: Locale = Locale.getDefault()): String = try {
+    val decimal = BigDecimal(value)
+    val sign = when (decimal.signum()) {
+        1 -> "+"
+        -1 -> "−"
+        else -> ""
     }
-    ltrIsolate(format.format(BigDecimal(value)))
+    ltrIsolate("$sign${numberFormat(locale, 2, 2).format(decimal.abs())} $CURRENCY_SUFFIX")
+} catch (_: Exception) {
+    value
+}
+
+// "6,000.00 LE → 7,800.00 LE" as one left-to-right run, whatever the
+// language around it. Left to the surrounding Arabic, the two amounts swap
+// sides while the arrow doesn't turn, so a rise from 0 to 50 read "50 → 0".
+fun formatAmountChange(from: String, to: String, locale: Locale = Locale.getDefault()): String = try {
+    val format = numberFormat(locale, 2, 2)
+    ltrIsolate("${format.format(BigDecimal(from))} → ${format.format(BigDecimal(to))} $CURRENCY_SUFFIX")
+} catch (_: Exception) {
+    "$from → $to"
+}
+
+fun formatPercent(value: String, locale: Locale = Locale.getDefault()): String = try {
+    ltrIsolate(numberFormat(locale, 0, 1).format(BigDecimal(value)))
 } catch (_: Exception) {
     value
 }
 
 fun formatQuantity(value: String, locale: Locale = Locale.getDefault()): String = try {
-    val decimal = BigDecimal(value)
-    val format = NumberFormat.getNumberInstance(locale).apply {
-        minimumFractionDigits = 0
-        maximumFractionDigits = 3
-    }
-    ltrIsolate(format.format(decimal))
+    ltrIsolate(numberFormat(locale, 0, 3).format(BigDecimal(value)))
 } catch (_: Exception) {
     value
 }

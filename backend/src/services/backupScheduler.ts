@@ -11,7 +11,9 @@ async function runBackup(): Promise<void> {
 
   const { buffer, exportedAt } = await buildBackupArchive();
   const filename = `inventory-backup-${exportedAt.slice(0, 10)}.zip`;
-  fs.writeFileSync(path.join(dir, filename), buffer);
+  // Owner-only: an archive is the whole business - every sale, cost and
+  // debt - and nothing else on the machine needs to read it.
+  fs.writeFileSync(path.join(dir, filename), buffer, { mode: 0o600 });
 
   const cutoff = Date.now() - env.backupRetentionDays * DAY_MS;
   for (const entry of fs.readdirSync(dir)) {

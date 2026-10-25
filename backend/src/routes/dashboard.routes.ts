@@ -154,7 +154,8 @@ dashboardRouter.get(
     const monthProfit = monthRevenue.sub(monthCost).sub(monthExpensesTotal);
 
     const lowStockCount = products.filter((p) => p.quantity.lte(p.lowStockThreshold)).length;
-    const overdueInvoicesCount = upcoming.filter((i) => i.dueDate < now).length;
+    // Overdue once the due day is over - see /api/invoices/upcoming.
+    const overdueInvoicesCount = upcoming.filter((i) => i.dueDate < todayStart).length;
     const dueSoonInvoicesCount = upcoming.length - overdueInvoicesCount;
 
     res.json({

@@ -6,17 +6,27 @@
 // lands under the new day even if the server thinks it's still evening.
 const BUSINESS_TIMEZONE = "Africa/Cairo";
 
+// One formatter per zone, kept: building an Intl.DateTimeFormat costs far
+// more than formatting with one, and reports turn every sale in a month - or
+// ninety days - into a business date.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
 function formatParts(d: Date, timeZone: string): Record<string, string> {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(d);
+  let format = formatters.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    formatters.set(timeZone, format);
+  }
+  const parts = format.formatToParts(d);
   const map: Record<string, string> = {};
   for (const p of parts) if (p.type !== "literal") map[p.type] = p.value;
   return map;

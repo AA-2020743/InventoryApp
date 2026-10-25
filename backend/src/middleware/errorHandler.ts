@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { MulterError } from "multer";
 import { ZodError, z } from "zod";
 import { MAX_IMAGE_BYTES } from "../uploadLimits";
@@ -41,6 +42,27 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
       return;
     }
     res.status(400).json({ error: err.message });
+    return;
+  }
+  // The body parser's own rejections - a body that isn't valid JSON, or one
+  // over the size limit - are the client's mistake, and it marks them so
+  // (status 4xx, expose). They used to reach the 500 below, so a malformed
+  // request read as the server breaking.
+  const parserError = err as { status?: unknown; expose?: unknown; type?: unknown };
+  if (typeof parserError.status === "number" && parserError.status >= 400 && parserError.status < 500 && parserError.expose === true) {
+    const message =
+      parserError.type === "entity.parse.failed"
+        ? "The request body isn't valid JSON"
+        : parserError.type === "entity.too.large"
+          ? "The request body is too large"
+          : "Bad request";
+    res.status(parserError.status).json({ error: message });
+    return;
+  }
+  // A record that was deleted between being looked up and being written -
+  // say, from another phone - is a 404, not a server fault.
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+    res.status(404).json({ error: "That record no longer exists" });
     return;
   }
   console.error(err);

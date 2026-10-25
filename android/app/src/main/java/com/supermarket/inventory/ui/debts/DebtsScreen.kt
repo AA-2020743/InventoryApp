@@ -1,5 +1,7 @@
 package com.supermarket.inventory.ui.debts
 
+import java.math.RoundingMode
+import java.math.BigDecimal
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -136,16 +138,19 @@ class DebtsViewModel @Inject constructor(
     // Applies one entered amount across a worker's merged tab, oldest debt
     // first, spilling into the next debt once the current one is fully
     // covered - mirrors collectPartialGroup in DeferredSalesViewModel.
+    //
+    // Split in exact money, for the same reason as collectPartialGroup: in
+    // Double a split could send 50.199999999999996 against 50.20 owed.
     suspend fun repayPartialGroup(debts: List<DebtDto>, amount: Double): ApiResult<Unit> {
-        var remaining = amount
+        var remaining = BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP)
         for (debt in debts.sortedBy { it.createdAt }) {
-            if (remaining <= 0) break
-            val owed = (debt.amount.toDoubleOrNull() ?: 0.0) - (debt.amountRepaid.toDoubleOrNull() ?: 0.0)
-            if (owed <= 0) continue
-            val toApply = minOf(remaining, owed)
-            val result = repository.repayDebtPartial(debt.id, toApply)
+            if (remaining.signum() <= 0) break
+            val owed = debt.amount.asMoney().subtract(debt.amountRepaid.asMoney())
+            if (owed.signum() <= 0) continue
+            val toApply = remaining.min(owed)
+            val result = repository.repayDebtPartial(debt.id, toApply.toDouble())
             if (result is ApiResult.Error) return result
-            remaining -= toApply
+            remaining = remaining.subtract(toApply)
         }
         load()
         return ApiResult.Success(Unit)
@@ -503,3 +508,5 @@ private fun AddDebtDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
+
+private fun String.asMoney(): BigDecimal = (toBigDecimalOrNull() ?: BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)

@@ -31,6 +31,8 @@ import com.supermarket.inventory.data.remote.dto.CostNameDto
 import com.supermarket.inventory.data.remote.dto.CostTrendDto
 import com.supermarket.inventory.ui.common.expenseDisplayName
 import com.supermarket.inventory.ui.common.formatAmount
+import com.supermarket.inventory.ui.common.formatSignedAmount
+import com.supermarket.inventory.ui.common.formatAmountChange
 import com.supermarket.inventory.ui.common.formatPercent
 import com.supermarket.inventory.ui.theme.lossColor
 import com.supermarket.inventory.ui.theme.profitColor
@@ -183,10 +185,12 @@ private fun CostTrendContent(r: CostTrendDto, window: Int, onWindowChange: (Int)
 
         // ---- biggest movers since last month ----
         if (prev != null) {
+            // In exact money, so a change is never shown as a figure that's
+            // a hair off what the two amounts beside it subtract to.
             val movers = r.names
-                .map { n -> n to (n.series.last().money() - n.series[n.series.size - 2].money()) }
-                .filter { it.second != 0.0 }
-                .sortedByDescending { kotlin.math.abs(it.second) }
+                .map { n -> n to n.series.last().toBigDecimal().subtract(n.series[n.series.size - 2].toBigDecimal()) }
+                .filter { it.second.signum() != 0 }
+                .sortedByDescending { it.second.abs() }
             if (movers.isNotEmpty()) {
                 item {
                     ReportCard(
@@ -199,16 +203,16 @@ private fun CostTrendContent(r: CostTrendDto, window: Int, onWindowChange: (Int)
                             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(nameLabel(n), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    "${formatAmount(n.series[n.series.size - 2])} → ${formatAmount(n.series.last())}",
+                                    formatAmountChange(n.series[n.series.size - 2], n.series.last()),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    (if (delta > 0) "+" else "−") + formatAmount(kotlin.math.abs(delta).toString()),
+                                    formatSignedAmount(delta.toPlainString()),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (delta > 0) lossColor() else profitColor(),
+                                    color = if (delta.signum() > 0) lossColor() else profitColor(),
                                 )
                             }
                         }

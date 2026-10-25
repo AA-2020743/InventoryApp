@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. The settings file holds the sign-in token and this
+     install's id: restored onto another phone, it would be signed in as this
+     one - without the new-device alert, since it would claim to be a device
+     already seen. Left out, so a restored phone signs in like any other. -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/inventory_settings.preferences_pb" />
+</full-backup-content>

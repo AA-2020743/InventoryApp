@@ -36,6 +36,10 @@
 
 set -euo pipefail
 
+# Owner-only for everything this creates: an archive is the whole business -
+# every sale, cost and debt - and nobody else on this machine needs to read it.
+umask 077
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ENV_FILE:-"$SCRIPT_DIR/.env"}"
 
@@ -74,9 +78,12 @@ LOGIN_BODY="$(API_EMAIL="$API_EMAIL" API_PASSWORD="$API_PASSWORD" DEVICE_ID="$DE
   }))')"
 
 echo "[$(date -Iseconds)] Logging in to $API_BASE_URL as \"$DEVICE_NAME\" ..."
-LOGIN_RESPONSE="$(curl -fsS -X POST "$API_BASE_URL/api/auth/login" \
+# The body goes in on stdin, not as an argument: curl's arguments are visible
+# to every user on this machine (ps, /proc) for as long as it runs, and this
+# one carries the password.
+LOGIN_RESPONSE="$(printf '%s' "$LOGIN_BODY" | curl -fsS -X POST "$API_BASE_URL/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d "$LOGIN_BODY")"
+  --data-binary @-)"
 
 TOKEN="$(python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" <<< "$LOGIN_RESPONSE")"
 if [[ -z "$TOKEN" ]]; then
@@ -131,6 +138,8 @@ echo "[$(date -Iseconds)] Done. $(ls -1 "$BACKUP_DIR"/inventory-backup-*.zip 2>/
 #   0 19 * * * /opt/inventory-offsite/fetch-offsite-backup.sh >> /opt/inventory-offsite/fetch-offsite-backup.log 2>&1
 #
 # (Older cron implementations ignore a TZ= line inside the crontab; if yours
-# does, either set the server's system timezone to Africa/Cairo instead
-# (`sudo timedatectl set-timezone Africa/Cairo`), or convert to UTC: Egypt
-# is currently UTC+2 with no DST, so use `0 22 * * *` and `0 17 * * *` UTC.)
+# does, set the server's system timezone to Africa/Cairo instead
+# (`sudo timedatectl set-timezone Africa/Cairo`). Avoid converting to fixed
+# UTC times: Egypt observes summer time again (UTC+3 from the last Friday of
+# April to the last Thursday of October, UTC+2 otherwise), so a fixed UTC
+# hour drifts by an hour twice a year.)

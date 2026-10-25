@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { optionalDate } from "../utils/params";
 import { totalsByCategory } from "../utils/categoryTotals";
 
 export const otherSalesRouter = Router();
@@ -66,7 +67,7 @@ otherSalesRouter.get(
   "/for-range",
   asyncHandler(async (req, res) => {
     const period = req.query.period === "month" ? "month" : "day";
-    const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
+    const dateParam = optionalDate(req.query.date, "date") ?? new Date();
     const from = period === "month" ? startOfMonth(dateParam) : startOfDay(dateParam);
     const to = period === "month" ? startOfNextMonth(dateParam) : startOfNextDay(dateParam);
 

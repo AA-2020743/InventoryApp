@@ -60,8 +60,10 @@ class EditSaleViewModel @Inject constructor(
         }
     }
 
+    // Each line at the price it was sold at - the server keeps that price for
+    // a product already on the sale - not today's price from the catalogue.
     private fun SaleDto.toCartItems(): List<CartItem> = items.map { item ->
-        val product = item.product ?: ProductDto(
+        val product = item.product?.copy(sellingPrice = item.unitPrice, purchaseCost = item.unitCost) ?: ProductDto(
             id = item.productId,
             barcode = null,
             name = item.productId,

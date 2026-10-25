@@ -18,13 +18,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.UUID
 import javax.inject.Inject
 
 
 
 data class CartItem(val product: ProductDto, val quantity: Double) {
-    val subtotal: BigDecimal get() = BigDecimal(product.sellingPrice).multiply(BigDecimal(quantity))
+    // Rounded to the piastre (half up) per line, as the server rounds each
+    // line it stores, so the total shown at checkout is the total recorded.
+    // valueOf, not BigDecimal(Double): 0.3 kg is then exactly 0.3 rather than
+    // the binary 0.29999999999999998889...
+    val subtotal: BigDecimal
+        get() = BigDecimal(product.sellingPrice).multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP)
 }
 
 data class SalesUiState(
@@ -195,7 +201,11 @@ class SalesViewModel @Inject constructor(
             when (val result = salesRepository.createSale(items, clientId, isDeferred, customerName)) {
                 is ApiResult.Success -> uiState = SalesUiState(pendingSyncCount = uiState.pendingSyncCount, successMessage = "SALE_COMPLETED")
                 is ApiResult.Error -> {
-                    if (result.isNetworkError) {
+                    // Queued on any failure that may pass - including the
+                    // 502 nginx gives while the backend restarts - rather
+                    // than only with no connection at all. The clientId makes
+                    // a sale that did get through count once.
+                    if (result.isTemporary) {
                         pendingSaleRepository.queue(clientId, items, isDeferred, customerName)
                         SalesSyncWorker.enqueue(context)
                         uiState = SalesUiState(pendingSyncCount = uiState.pendingSyncCount, successMessage = "OFFLINE_QUEUED")

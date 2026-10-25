@@ -425,11 +425,14 @@ reportsRouter.get(
       }
     }
 
-    const unassignedSeries = months.map(() => ZERO);
+    // Summed exactly and rounded once per month - rounding the running
+    // total after every line let the cents drift.
+    const unassignedExact = months.map(() => ZERO);
     for (const m of unassigned) {
       const i = index.get(monthKey(m.createdAt));
-      if (i !== undefined) unassignedSeries[i] = unassignedSeries[i].add(m.quantityChange.mul(m.unitCost!)).toDecimalPlaces(2);
+      if (i !== undefined) unassignedExact[i] = unassignedExact[i].add(m.quantityChange.mul(m.unitCost!));
     }
+    const unassignedSeries = unassignedExact.map((v) => v.toDecimalPlaces(2));
 
     const monthTotals = months.map((month, i) => ({
       month,
@@ -481,13 +484,17 @@ const PARETO_SHARE = 0.8;
 
 // Weekday (0 = Sunday ... 6 = Saturday) and hour of an instant on the
 // shop's clock.
+// Built once: constructing a formatter is far slower than using one, and the
+// heatmap reads ninety days of sales.
+const weekdayHourFormat = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Africa/Cairo",
+  weekday: "short",
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
 function cairoWeekdayHour(d: Date): { weekday: number; hour: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Cairo",
-    weekday: "short",
-    hour: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(d);
+  const parts = weekdayHourFormat.formatToParts(d);
   const wd = parts.find((p) => p.type === "weekday")!.value;
   const hour = Number(parts.find((p) => p.type === "hour")!.value);
   return { weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd), hour };
@@ -565,40 +572,42 @@ reportsRouter.get(
     // Now: the average of the days that are over, for each day still to
     // come. Today counts as an average day, or as what it has already taken
     // if that's more - so its sales aren't counted twice, and a busy day
-    // isn't marked down to average. No projection until a whole day is over.
-    const [year, monthNumber] = month.split("-").map(Number);
-    const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-    const dayOfMonth = dateOnlyKey(now).getUTCDate();
-    const daysCompleted = inProgress ? dayOfMonth - 1 : daysInMonth;
+    // isn't marked down to average. Revenue and profit are each judged that
+    // way on their own: deciding both by revenue counted a day of
+    // high-margin sales at the average profit, below what it had already
+    // made. No projection until a whole day is over.
     const elapsed = (cutoff.getTime() - monthStart.getTime()) / (monthEnd.getTime() - monthStart.getTime());
     let projection = null;
-    if (inProgress && daysCompleted > 0) {
-      const todayStart = startOfDay(now);
-      const done = sumOf(current.filter((s) => s.createdAt < todayStart));
-      const today = sumOf(current.filter((s) => s.createdAt >= todayStart));
-      const averageRevenue = done.revenue.div(daysCompleted);
-      const averageProfit = done.profit.div(daysCompleted);
-      const daysAfterToday = daysInMonth - dayOfMonth;
-      const todayCounted = today.revenue.gt(averageRevenue)
-        ? { revenue: today.revenue, profit: today.profit }
-        : { revenue: averageRevenue, profit: averageProfit };
-      const revenue = done.revenue.add(todayCounted.revenue).add(averageRevenue.mul(daysAfterToday));
-      const profit = done.profit.add(todayCounted.profit).add(averageProfit.mul(daysAfterToday));
-      projection = {
-        revenue: revenue.toDecimalPlaces(2),
-        profit: profit.toDecimalPlaces(2),
-        // Still to come on top of what's been sold.
-        remainingRevenue: revenue.sub(cur.revenue).toDecimalPlaces(2),
-        remainingProfit: profit.sub(cur.profit).toDecimalPlaces(2),
-        averageDayRevenue: averageRevenue.toDecimalPlaces(2),
-        averageDayProfit: averageProfit.toDecimalPlaces(2),
-        dayOfMonth,
-        daysInMonth,
-        daysCompleted,
-        // Today included.
-        daysLeft: daysInMonth - daysCompleted,
-        elapsedPercent: round1(elapsed * 100),
-      };
+    if (inProgress) {
+      // The month's last day, and today, on the shop's calendar.
+      const daysInMonth = dateOnlyKey(new Date(monthEnd.getTime() - 1)).getUTCDate();
+      const dayOfMonth = dateOnlyKey(now).getUTCDate();
+      const daysCompleted = dayOfMonth - 1;
+      if (daysCompleted > 0) {
+        const todayStart = startOfDay(now);
+        const today = sumOf(current.filter((s) => s.createdAt >= todayStart));
+        const done = { revenue: cur.revenue.sub(today.revenue), profit: cur.profit.sub(today.profit) };
+        const averageRevenue = done.revenue.div(daysCompleted);
+        const averageProfit = done.profit.div(daysCompleted);
+        const daysAfterToday = daysInMonth - dayOfMonth;
+        const revenue = done.revenue.add(Prisma.Decimal.max(today.revenue, averageRevenue)).add(averageRevenue.mul(daysAfterToday));
+        const profit = done.profit.add(Prisma.Decimal.max(today.profit, averageProfit)).add(averageProfit.mul(daysAfterToday));
+        projection = {
+          revenue: revenue.toDecimalPlaces(2),
+          profit: profit.toDecimalPlaces(2),
+          // Still to come on top of what's been sold.
+          remainingRevenue: revenue.sub(cur.revenue).toDecimalPlaces(2),
+          remainingProfit: profit.sub(cur.profit).toDecimalPlaces(2),
+          averageDayRevenue: averageRevenue.toDecimalPlaces(2),
+          averageDayProfit: averageProfit.toDecimalPlaces(2),
+          dayOfMonth,
+          daysInMonth,
+          daysCompleted,
+          // Today included.
+          daysLeft: daysInMonth - daysCompleted,
+          elapsedPercent: round1(elapsed * 100),
+        };
+      }
     }
 
     const lineCount = current.reduce((a, s) => a + s._count.items, 0);

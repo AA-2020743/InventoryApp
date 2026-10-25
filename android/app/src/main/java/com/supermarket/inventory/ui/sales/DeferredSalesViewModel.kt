@@ -10,6 +10,8 @@ import com.supermarket.inventory.data.remote.dto.SaleDto
 import com.supermarket.inventory.data.repository.SalesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.inject.Inject
 
 data class DeferredSalesUiState(
@@ -95,16 +97,19 @@ class DeferredSalesViewModel @Inject constructor(
     // Applies one entered amount across a customer's merged tab, oldest
     // sale first (paying down what's been owed longest before newer debt),
     // spilling into the next sale once the current one is fully covered.
+    //
+    // Split in exact money: done in Double, 100.30 across tabs of 50.10 and
+    // 50.20 sent the second one 50.199999999999996, which never settled it.
     suspend fun collectPartialGroup(sales: List<SaleDto>, amount: Double): ApiResult<Unit> {
-        var remaining = amount
+        var remaining = BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP)
         for (sale in sales.sortedBy { it.createdAt }) {
-            if (remaining <= 0) break
-            val owed = (sale.totalAmount.toDoubleOrNull() ?: 0.0) - (sale.amountCollected.toDoubleOrNull() ?: 0.0)
-            if (owed <= 0) continue
-            val toApply = minOf(remaining, owed)
-            val result = salesRepository.collectSalePartial(sale.id, toApply)
+            if (remaining.signum() <= 0) break
+            val owed = sale.totalAmount.toMoney().subtract(sale.amountCollected.toMoney())
+            if (owed.signum() <= 0) continue
+            val toApply = remaining.min(owed)
+            val result = salesRepository.collectSalePartial(sale.id, toApply.toDouble())
             if (result is ApiResult.Error) return result
-            remaining -= toApply
+            remaining = remaining.subtract(toApply)
         }
         load()
         return ApiResult.Success(Unit)
@@ -113,3 +118,5 @@ class DeferredSalesViewModel @Inject constructor(
     suspend fun addManualDeferredSale(amount: Double, customerName: String?) =
         salesRepository.createManualDeferredSale(amount, customerName)
 }
+
+private fun String.toMoney(): BigDecimal = (toBigDecimalOrNull() ?: BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)

@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
+import { startOfDay } from "../utils/dates";
+import { optionalPositiveInt } from "../utils/params";
 import { applyCashDeduction } from "./cashRegister.routes";
 import { applyRestockToProduct } from "./products.routes";
 import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
@@ -32,7 +34,7 @@ invoicesRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    const upcomingDays = req.query.upcomingDays ? Number(req.query.upcomingDays) : undefined;
+    const upcomingDays = optionalPositiveInt(req.query.upcomingDays, "upcomingDays");
 
     const where: Record<string, unknown> = {};
     if (status === "PENDING" || status === "PAID") where.status = status;
@@ -55,7 +57,7 @@ invoicesRouter.get(
 invoicesRouter.get(
   "/upcoming",
   asyncHandler(async (req, res) => {
-    const days = req.query.days ? Number(req.query.days) : env.invoiceReminderDays;
+    const days = optionalPositiveInt(req.query.days, "days") ?? env.invoiceReminderDays;
     const now = new Date();
     const until = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
@@ -65,8 +67,13 @@ invoicesRouter.get(
       orderBy: { dueDate: "asc" },
     });
 
-    const overdue = invoices.filter((i) => i.dueDate < now);
-    const dueSoon = invoices.filter((i) => i.dueDate >= now);
+    // Overdue once the due day is over, not from the first minute of it. A
+    // due date is a calendar day, stored as that day's UTC midnight - 2 or 3
+    // a.m. in Cairo - so comparing it with the current instant marked every
+    // invoice overdue on the very day it fell due.
+    const today = startOfDay(now);
+    const overdue = invoices.filter((i) => i.dueDate < today);
+    const dueSoon = invoices.filter((i) => i.dueDate >= today);
 
     res.json({ overdue, dueSoon });
   })
@@ -277,7 +284,10 @@ invoicesRouter.post(
       });
 
       for (const line of lines ?? []) {
-        const product = products.find((p) => p.id === line.productId)!;
+        // Read afresh for every line: the same product can be on two lines,
+        // and blending the second against the stock and cost from before the
+        // first made 10 @ 5 + 10 @ 7 cost 7 instead of 6.
+        const product = await tx.product.findUniqueOrThrow({ where: { id: line.productId } });
         const effectiveUnitCost = await applyRestockToProduct(tx, product, line.quantity, line.unitCost);
         await tx.inventoryTransaction.create({
           data: {

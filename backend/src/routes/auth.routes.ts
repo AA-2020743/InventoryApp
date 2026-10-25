@@ -36,6 +36,10 @@ const deviceSchema = z.object({
   appVersion: z.string().trim().max(30).nullish(),
 });
 
+// A real bcrypt hash of nothing anyone knows, compared against when the email
+// isn't found - see /login.
+const UNKNOWN_USER_HASH = bcrypt.hashSync("no such user " + Math.random(), 10);
+
 const loginSchema = deviceSchema.extend({
   email: z.email(),
   password: z.string().min(1),
@@ -48,12 +52,11 @@ authRouter.post(
     const { email, password, ...device } = loginSchema.parse(req.body);
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new HttpError(401, "Invalid email or password");
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
+    // The same bcrypt work whether or not the email exists: answering an
+    // unknown email instantly and a known one after a hash comparison tells
+    // anyone timing the replies which email is the owner's.
+    const valid = await bcrypt.compare(password, user?.passwordHash ?? UNKNOWN_USER_HASH);
+    if (!user || !valid) {
       throw new HttpError(401, "Invalid email or password");
     }
 

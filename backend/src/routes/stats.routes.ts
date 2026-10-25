@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { optionalDate, optionalPositiveInt } from "../utils/params";
 
 export const statsRouter = Router();
 
@@ -10,7 +11,7 @@ export const statsRouter = Router();
 // than the server process's own local time, so "day"/"month" here always
 // matches what the owner actually experiences as today/this month.
 function rangeFor(period: string, dateStr?: string): { from: Date; to: Date } {
-  const date = dateStr ? new Date(dateStr) : new Date();
+  const date = optionalDate(dateStr, "date") ?? new Date();
   if (period === "day") {
     return { from: startOfDay(date), to: startOfNextDay(date) };
   }
@@ -32,7 +33,7 @@ statsRouter.get(
     // its by-category and by-item charts from what this returns, and a
     // capped list makes those charts describe the top few products rather
     // than the period.
-    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const limit = optionalPositiveInt(req.query.limit, "limit");
     const sortBy = req.query.sortBy === "profit" ? "profit" : "quantity";
     const { from, to } = rangeFor(period, date);
 
@@ -101,7 +102,7 @@ statsRouter.get(
 statsRouter.get(
   "/margins",
   asyncHandler(async (req, res) => {
-    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const limit = optionalPositiveInt(req.query.limit, "limit");
 
     const products = await prisma.product.findMany({ where: { active: true } });
 
@@ -194,8 +195,8 @@ statsRouter.get(
   "/revenue",
   asyncHandler(async (req, res) => {
     const period = typeof req.query.period === "string" ? req.query.period : "day";
-    const from = typeof req.query.from === "string" ? new Date(req.query.from) : new Date(Date.now() - 30 * 86400000);
-    const to = typeof req.query.to === "string" ? new Date(req.query.to) : new Date();
+    const from = optionalDate(req.query.from, "from") ?? new Date(Date.now() - 30 * 86400000);
+    const to = optionalDate(req.query.to, "to") ?? new Date();
 
     const sales = await prisma.sale.findMany({
       where: { createdAt: { gte: from, lte: to } },

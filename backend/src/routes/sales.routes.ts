@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
+import { optionalDate, optionalPositiveInt } from "../utils/params";
 
 export const salesRouter = Router();
 
@@ -30,6 +31,53 @@ function saleNote(customerName: string | null | undefined): string {
 function saleCollectionNote(customerName: string | null | undefined): string {
   const name = customerName?.trim();
   return name ? `Payment received from ${name}` : "Payment received";
+}
+
+const ZERO = new Prisma.Decimal(0);
+
+// What one line of a sale comes to: price times quantity, rounded to the
+// piastre (half up), once. The sale's total is the sum of its rounded lines,
+// so a receipt's lines always add up to its total. Before, each line was
+// rounded only when stored while the total was rounded once from the
+// unrounded lines: three weighed lines of 4.16625 were stored as 4.17 each -
+// 12.51 - under a total of 12.50.
+function lineAmount(price: Prisma.Decimal, quantity: Prisma.Decimal): Prisma.Decimal {
+  return price.mul(quantity).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+}
+
+// Money arriving from the app as a JSON number, to the piastre. A payment
+// split across several tabs on the phone can arrive as 50.199999999999996;
+// taken as it came, that never reached the 50.20 owed, and the tab stayed
+// open owing nothing.
+function toMoney(amount: number): Prisma.Decimal {
+  return new Prisma.Decimal(amount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+}
+
+// Quantities per product across a list of lines - the same product can be on
+// more than one line.
+function quantitiesByProduct(lines: { productId: string; quantity: Prisma.Decimal.Value }[]): Map<string, Prisma.Decimal> {
+  const totals = new Map<string, Prisma.Decimal>();
+  for (const line of lines) {
+    totals.set(line.productId, (totals.get(line.productId) ?? ZERO).add(line.quantity));
+  }
+  return totals;
+}
+
+// Takes `quantity` of a product off the shelf only if it's still there.
+// Checking the stock first and decrementing after leaves a gap two sales of
+// the last few units can both get through - the check passes for each, and
+// the shelf goes negative. The condition on the update closes it: the
+// database applies it to the row as it is at that moment.
+async function takeStock(
+  tx: Prisma.TransactionClient,
+  product: { id: string; name: string },
+  quantity: Prisma.Decimal
+): Promise<void> {
+  const { count } = await tx.product.updateMany({
+    where: { id: product.id, quantity: { gte: quantity } },
+    data: { quantity: { decrement: quantity } },
+  });
+  if (count === 0) throw new HttpError(400, `Insufficient stock for "${product.name}"`);
 }
 
 // already covered - so a sale that's been partially collected and then
@@ -133,13 +181,13 @@ const saleInput = z.object({
 salesRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
-    const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
+    const from = optionalDate(req.query.from, "from");
+    const to = optionalDate(req.query.to, "to");
     // Uncapped when no limit is asked for. Its callers are the deferred-tab
     // lists, which fold their own results by month and so need all of them;
     // a default cap there silently hid tabs, and hid them after the
     // filtering rather than before it.
-    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const limit = optionalPositiveInt(req.query.limit, "limit");
     const paymentStatus =
       req.query.paymentStatus === "PAID" || req.query.paymentStatus === "DEFERRED"
         ? req.query.paymentStatus
@@ -180,13 +228,13 @@ salesRouter.get(
   "/for-range",
   asyncHandler(async (req, res) => {
     const period = req.query.period === "month" ? "month" : "day";
-    const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
+    const dateParam = optionalDate(req.query.date, "date") ?? new Date();
     const from = period === "month" ? startOfMonth(dateParam) : startOfDay(dateParam);
     const to = period === "month" ? startOfNextMonth(dateParam) : startOfNextDay(dateParam);
     // Uncapped when no limit is asked for: this returns one day or one
     // month, which is bounded by the calendar rather than by a number
     // somebody picked, and its callers show every row they get.
-    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const limit = optionalPositiveInt(req.query.limit, "limit");
 
     const sales = await prisma.sale.findMany({
       where: { createdAt: { gte: from, lt: to } },
@@ -293,7 +341,7 @@ salesRouter.post(
             clientId,
             paymentStatus,
             customerName: customerName ?? null,
-            totalAmount: manualAmount!,
+            totalAmount: toMoney(manualAmount!),
             totalCost: 0,
           },
           include: { items: { include: { product: true } } },
@@ -312,35 +360,32 @@ salesRouter.post(
       const products = await tx.product.findMany({ where: { id: { in: productIds } } });
       const productMap = new Map(products.map((p) => [p.id, p]));
 
-      let totalAmount = new Prisma.Decimal(0);
-      let totalCost = new Prisma.Decimal(0);
-      const itemsData: {
-        productId: string;
-        quantity: number;
-        unitPrice: Prisma.Decimal;
-        unitCost: Prisma.Decimal;
-        subtotal: Prisma.Decimal;
-      }[] = [];
-
-      for (const item of items) {
-        const product = productMap.get(item.productId);
-        if (!product) throw new HttpError(404, `Product ${item.productId} not found`);
-        if (product.quantity.lt(item.quantity)) {
+      // Checked per product, not per line: two lines of 4 against 5 on the
+      // shelf each passed on their own, and the sale took the stock to -3.
+      const wanted = quantitiesByProduct(items);
+      for (const [productId, quantity] of wanted) {
+        const product = productMap.get(productId);
+        if (!product) throw new HttpError(404, `Product ${productId} not found`);
+        if (product.quantity.lt(quantity)) {
           throw new HttpError(400, `Insufficient stock for "${product.name}"`);
         }
+      }
 
-        const subtotal = product.sellingPrice.mul(item.quantity);
+      let totalAmount = ZERO;
+      let totalCost = ZERO;
+      const itemsData = items.map((item) => {
+        const product = productMap.get(item.productId)!;
+        const subtotal = lineAmount(product.sellingPrice, new Prisma.Decimal(item.quantity));
         totalAmount = totalAmount.add(subtotal);
         totalCost = totalCost.add(product.purchaseCost.mul(item.quantity));
-
-        itemsData.push({
+        return {
           productId: product.id,
           quantity: item.quantity,
           unitPrice: product.sellingPrice,
           unitCost: product.purchaseCost,
           subtotal,
-        });
-      }
+        };
+      });
 
       const created = await tx.sale.create({
         data: {
@@ -354,11 +399,10 @@ salesRouter.post(
         include: { items: { include: { product: true } } },
       });
 
+      for (const [productId, quantity] of wanted) {
+        await takeStock(tx, productMap.get(productId)!, quantity);
+      }
       for (const item of itemsData) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { quantity: { decrement: item.quantity } },
-        });
         await tx.inventoryTransaction.create({
           data: {
             productId: item.productId,
@@ -418,7 +462,7 @@ salesRouter.post(
       const existing = await tx.sale.findUnique({ where: { id: req.params.id } });
       if (!existing) throw new HttpError(404, "Sale not found");
       if (existing.paymentStatus !== "DEFERRED") throw new HttpError(400, "Sale is not deferred");
-      return collectSaleAmount(tx, existing, new Prisma.Decimal(amount));
+      return collectSaleAmount(tx, existing, toMoney(amount));
     });
     res.json(sale);
   })
@@ -453,15 +497,14 @@ salesRouter.put(
         const existing = await tx.sale.findUnique({ where: { id: req.params.id }, include: { items: true } });
         if (!existing) throw new HttpError(404, "Sale not found");
 
-        const oldQtyByProduct = new Map<string, number>();
-        for (const item of existing.items) {
-          oldQtyByProduct.set(item.productId, (oldQtyByProduct.get(item.productId) ?? 0) + item.quantity.toNumber());
-        }
-        const newQtyByProduct = new Map<string, number>();
-        for (const item of items) {
-          newQtyByProduct.set(item.productId, (newQtyByProduct.get(item.productId) ?? 0) + item.quantity);
-        }
+        // In Decimal, as stored: summing quantities as floating point made
+        // 0.1 + 0.2 differ from 0.3, so an unchanged line could still be
+        // booked as a correction.
+        const oldQtyByProduct = quantitiesByProduct(existing.items);
+        const newQtyByProduct = quantitiesByProduct(items);
         const allProductIds = Array.from(new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]));
+        const deltaOf = (productId: string) =>
+          (newQtyByProduct.get(productId) ?? ZERO).sub(oldQtyByProduct.get(productId) ?? ZERO);
 
         const products = await tx.product.findMany({ where: { id: { in: allProductIds } } });
         const productMap = new Map(products.map((p) => [p.id, p]));
@@ -471,27 +514,50 @@ salesRouter.put(
         for (const productId of allProductIds) {
           const product = productMap.get(productId);
           if (!product) throw new HttpError(404, `Product ${productId} not found`);
-          const delta = (newQtyByProduct.get(productId) ?? 0) - (oldQtyByProduct.get(productId) ?? 0);
-          if (delta > 0 && product.quantity.lt(delta)) {
+          const delta = deltaOf(productId);
+          if (delta.gt(0) && product.quantity.lt(delta)) {
             throw new HttpError(400, `Insufficient stock for "${product.name}" to apply this edit`);
           }
         }
 
-        let totalAmount = new Prisma.Decimal(0);
-        let totalCost = new Prisma.Decimal(0);
+        // A product already on the sale keeps the price and cost it was sold
+        // at. The edit used to re-price every line at today's prices, so
+        // correcting one quantity on last month's sale quietly rewrote that
+        // month's revenue and profit. Only a product added by the edit is
+        // priced as of now - that's when it's being sold.
+        const soldAt = new Map<string, { unitPrice: Prisma.Decimal; unitCost: Prisma.Decimal }>();
+        for (const item of existing.items) {
+          if (!soldAt.has(item.productId)) soldAt.set(item.productId, { unitPrice: item.unitPrice, unitCost: item.unitCost });
+        }
+
+        let totalAmount = ZERO;
+        let totalCost = ZERO;
         const itemsData = items.map((item) => {
           const product = productMap.get(item.productId)!;
-          const subtotal = product.sellingPrice.mul(item.quantity);
+          const price = soldAt.get(item.productId) ?? { unitPrice: product.sellingPrice, unitCost: product.purchaseCost };
+          const subtotal = lineAmount(price.unitPrice, new Prisma.Decimal(item.quantity));
           totalAmount = totalAmount.add(subtotal);
-          totalCost = totalCost.add(product.purchaseCost.mul(item.quantity));
+          totalCost = totalCost.add(price.unitCost.mul(item.quantity));
           return {
             productId: product.id,
             quantity: item.quantity,
-            unitPrice: product.sellingPrice,
-            unitCost: product.purchaseCost,
+            unitPrice: price.unitPrice,
+            unitCost: price.unitCost,
             subtotal,
           };
         });
+
+        // Money already received toward this sale stays received. A total
+        // below it would leave the customer owing a negative amount; one
+        // that equals it means the tab is settled.
+        if (totalAmount.lt(existing.amountCollected)) {
+          throw new HttpError(
+            400,
+            `${existing.amountCollected.toFixed(2)} has already been paid toward this sale, so its total can't go below that`
+          );
+        }
+        const nextStatus = paymentStatus ?? existing.paymentStatus;
+        const settledByEdit = nextStatus === "DEFERRED" && existing.amountCollected.gt(0) && totalAmount.lte(existing.amountCollected);
 
         await tx.saleItem.deleteMany({ where: { saleId: existing.id } });
         const sale = await tx.sale.update({
@@ -501,23 +567,25 @@ salesRouter.put(
             totalCost,
             ...(customerName !== undefined ? { customerName } : {}),
             ...(paymentStatus !== undefined ? { paymentStatus } : {}),
+            ...(settledByEdit ? { paymentStatus: "PAID" as const, collectedAt: new Date() } : {}),
             items: { create: itemsData },
           },
           include: { items: { include: { product: true } } },
         });
 
         for (const productId of allProductIds) {
-          const delta = (newQtyByProduct.get(productId) ?? 0) - (oldQtyByProduct.get(productId) ?? 0);
-          if (delta === 0) continue;
-          await tx.product.update({
-            where: { id: productId },
-            data: { quantity: { decrement: delta } },
-          });
+          const delta = deltaOf(productId);
+          if (delta.isZero()) continue;
+          if (delta.gt(0)) {
+            await takeStock(tx, productMap.get(productId)!, delta);
+          } else {
+            await tx.product.update({ where: { id: productId }, data: { quantity: { increment: delta.neg() } } });
+          }
           await tx.inventoryTransaction.create({
             data: {
               productId,
               type: "SALE_CORRECTION",
-              quantityChange: new Prisma.Decimal(-delta),
+              quantityChange: delta.neg(),
               note: `Correction to sale ${existing.id}`,
             },
           });

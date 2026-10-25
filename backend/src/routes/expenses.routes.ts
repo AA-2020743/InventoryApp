@@ -4,7 +4,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { dateOnlyKey, startOfDay, startOfMonth, startOfNextDay, startOfNextMonth } from "../utils/dates";
-import { expenseGroups, noteSuggestions, normaliseNote, SPOILAGE_EXPENSE_PREFIX } from "../utils/expenseBreakdown";
+import { optionalDate } from "../utils/params";
+import { expenseGroups, isSpoilage, noteSuggestions, normaliseNote, SPOILAGE_EXPENSE_PREFIX } from "../utils/expenseBreakdown";
 import { applyCashDeduction } from "./cashRegister.routes";
 
 export const expensesRouter = Router();
@@ -91,7 +92,7 @@ expensesRouter.get(
   "/for-range",
   asyncHandler(async (req, res) => {
     const period = req.query.period === "month" ? "month" : "day";
-    const dateParam = typeof req.query.date === "string" ? new Date(req.query.date) : new Date();
+    const dateParam = optionalDate(req.query.date, "date") ?? new Date();
     const from = period === "month" ? startOfMonth(dateParam) : startOfDay(dateParam);
     const to = period === "month" ? startOfNextMonth(dateParam) : startOfNextDay(dateParam);
 
@@ -141,6 +142,11 @@ expensesRouter.put(
         where: { id: req.params.id },
         data: data.notes === undefined ? data : { ...data, notes: normaliseNote(data.notes) },
       });
+      // A spoilage write-off is a loss on goods, not money paid out: the
+      // spoilage that made it never touched the till, and editing it mustn't
+      // either. It used to go through the same deduction as any expense, so
+      // correcting the note on a write-off took its value out of the till.
+      if (isSpoilage(existing)) return updated;
       await applyCashDeduction(tx, { expenseId: updated.id }, updated.amount, ledgerNote(updated.name, updated.notes));
       // Reached only if applyCashDeduction succeeded (fully paid), so any
       // deficit this expense carried from before this edit no longer

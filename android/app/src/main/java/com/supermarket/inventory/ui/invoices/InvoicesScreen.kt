@@ -1,5 +1,8 @@
 package com.supermarket.inventory.ui.invoices
 
+import com.supermarket.inventory.ui.stats.businessToday
+import com.supermarket.inventory.ui.stats.BUSINESS_ZONE
+import java.math.BigDecimal
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -103,7 +106,9 @@ private data class PurchaseLine(
     val quantity: Double,
     val unitCost: Double,
 ) {
-    val total: Double get() = quantity * unitCost
+    // Exact, as the server totals the lines: quantity x cost in Double could
+    // show 3 x 0.335 as 1.00 where the invoice records 1.01.
+    val total: BigDecimal get() = BigDecimal.valueOf(quantity).multiply(BigDecimal.valueOf(unitCost))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,14 +129,17 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     // you act on day to day, and a growing pile of paid paperwork buried it.
     var showSettled by remember { mutableStateOf(false) }
 
-    val now = remember { Instant.now() }
+    // Overdue once the due day is over on the shop's calendar - not from the
+    // UTC midnight a due date is stored as, which is 2 or 3 a.m. in Cairo on
+    // the day itself.
+    val startOfToday = remember { businessToday().atStartOfDay(BUSINESS_ZONE).toInstant() }
     val openInvoices = state.invoices.filter { it.status != "PAID" }.sortedBy { it.dueDate }
     val settledInvoices = state.invoices.filter { it.status == "PAID" }
         .sortedByDescending { it.paidAt ?: it.dueDate }
     val outstanding = openInvoices.sumOf { it.amount.toDoubleOrNull() ?: 0.0 }
     val settledTotal = settledInvoices.sumOf { it.amount.toDoubleOrNull() ?: 0.0 }
     val overdueCount = openInvoices.count { invoice ->
-        runCatching { Instant.parse(invoice.dueDate).isBefore(now) }.getOrDefault(false)
+        runCatching { Instant.parse(invoice.dueDate).isBefore(startOfToday) }.getOrDefault(false)
     }
     val shown = if (showSettled) settledInvoices else openInvoices
 
@@ -653,9 +661,9 @@ private fun InvoiceRow(
     onViewImage: () -> Unit,
     onViewLinkedStock: () -> Unit,
 ) {
-    val now = Instant.now()
-    val dueInstant = try { Instant.parse(invoice.dueDate) } catch (_: Exception) { now }
-    val isOverdue = invoice.status == "PENDING" && dueInstant.isBefore(now)
+    val startOfToday = businessToday().atStartOfDay(BUSINESS_ZONE).toInstant()
+    val dueInstant = try { Instant.parse(invoice.dueDate) } catch (_: Exception) { startOfToday }
+    val isOverdue = invoice.status == "PENDING" && dueInstant.isBefore(startOfToday)
     val statusColor = when {
         invoice.status == "PAID" -> profitColor()
         isOverdue -> lossColor()
@@ -794,7 +802,7 @@ private fun PurchaseInvoiceDialog(
     val linesOrAmountMessage = stringResource(R.string.invoice_needs_lines_or_amount)
     val dueDateMessage = stringResource(R.string.invoice_needs_due_date)
 
-    val linesTotal = lines.sumOf { it.total }
+    val linesTotal = lines.fold(BigDecimal.ZERO) { acc, line -> acc.add(line.total) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -905,7 +913,7 @@ private fun PurchaseInvoiceDialog(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(formatAmount(line.total.toString()), style = MaterialTheme.typography.bodyMedium)
+                                Text(formatAmount(line.total.toPlainString()), style = MaterialTheme.typography.bodyMedium)
                                 IconButton(onClick = { lines = lines.filterIndexed { i, _ -> i != index } }) {
                                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_delete))
                                 }
@@ -913,7 +921,7 @@ private fun PurchaseInvoiceDialog(
                         }
                     }
                     Text(
-                        stringResource(R.string.invoice_total_from_lines, formatAmount(linesTotal.toString())),
+                        stringResource(R.string.invoice_total_from_lines, formatAmount(linesTotal.toPlainString())),
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(top = 4.dp),
                     )

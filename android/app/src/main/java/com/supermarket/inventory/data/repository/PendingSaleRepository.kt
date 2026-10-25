@@ -57,13 +57,17 @@ class PendingSaleRepository @Inject constructor(
         }
     }
 
-    // Attempts every queued sale in creation order. A network error stops
-    // the batch immediately (nothing after it is attempted either, since
-    // the same outage almost certainly affects them too) so it can all be
-    // retried as a whole next time. Any other error means the server itself
-    // rejected that specific sale (e.g. the item no longer exists) -
-    // retrying it forever would block every sale queued after it, so it's
-    // dropped and surfaced to the owner instead.
+    // Attempts every queued sale in creation order. A temporary failure stops
+    // the batch immediately (nothing after it is attempted either, since the
+    // same outage almost certainly affects them too) so it can all be retried
+    // as a whole next time. That covers more than having no connection: nginx
+    // answers 502 while the backend restarts for a deploy, and a sign-in that
+    // has run out answers 401 until the owner signs in again - both used to
+    // count as the server refusing the sale, and the sale was deleted.
+    //
+    // Only a definite refusal of that one sale (it asks for more stock than
+    // there is, the item no longer exists) drops it - retrying it forever
+    // would block every sale queued after it - and the owner is told.
     suspend fun drainAndSync(salesRepository: SalesRepository): SyncOutcome {
         var synced = 0
         var dropped = 0
@@ -82,7 +86,7 @@ class PendingSaleRepository @Inject constructor(
                     synced++
                 }
                 is ApiResult.Error -> {
-                    if (result.isNetworkError) {
+                    if (result.isTemporary) {
                         return SyncOutcome(synced, dropped, stillPendingNetworkError = true)
                     }
                     dao.delete(entry.clientId)
