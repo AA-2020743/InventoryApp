@@ -67,6 +67,14 @@ android {
         jvmTarget = "17"
     }
 
+    testOptions {
+        unitTests {
+            // Screenshot tests render real composables with the app's own
+            // strings and theme (see src/test/.../screenshots).
+            isIncludeAndroidResources = true
+            all { it.systemProperty("roborazzi.test.record", "true") }
+        }
+    }
     buildFeatures {
         compose = true
         // For BuildConfig.DEBUG, which keeps request logging out of release builds.
@@ -140,6 +148,17 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     testImplementation("junit:junit:4.13.2")
+    // Screenshots on the JVM - no emulator: Robolectric draws the screens with
+    // real Android graphics and Roborazzi saves them as images. CI renders
+    // them (.github/workflows/screenshots.yml) so a change to how a screen
+    // looks can be seen before it reaches a phone.
+    testImplementation("org.robolectric:robolectric:4.12.2")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.15.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.15.0")
+    testImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))

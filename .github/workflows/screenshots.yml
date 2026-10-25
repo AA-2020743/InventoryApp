@@ -1,0 +1,35 @@
+name: screenshots
+
+# Draws the app's report screens with real data and uploads the images, so a
+# change to how a screen looks can be seen without an emulator or a phone.
+# Robolectric renders them on the JVM; see
+# android/app/src/test/java/com/supermarket/inventory/screenshots.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "android/app/src/**"
+      - "android/app/build.gradle.kts"
+      - ".github/workflows/screenshots.yml"
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Render
+        working-directory: android
+        run: ./gradlew --no-daemon :app:testDebugUnitTest --tests "com.supermarket.inventory.screenshots.*"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: |
+            android/app/build/outputs/roborazzi/
+            android/app/build/reports/tests/
+          retention-days: 7
