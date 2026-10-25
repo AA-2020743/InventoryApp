@@ -16,6 +16,9 @@ on:
 jobs:
   render:
     runs-on: ubuntu-latest
+    # To publish the images to a git ref (below).
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,6 +28,21 @@ jobs:
       - name: Render
         working-directory: android
         run: ./gradlew --no-daemon :app:testDebugUnitTest --tests "com.supermarket.inventory.screenshots.*"
+      # Also published as a single commit under refs/ci/screenshots - a ref,
+      # not a branch, so it doesn't appear among the branches - replaced on
+      # every run. Artifacts are downloaded from a storage host that some
+      # development environments can't reach; a git ref can be fetched
+      # wherever the repository can.
+      - name: Publish to refs/ci/screenshots
+        if: success()
+        working-directory: android/app/build/outputs/roborazzi
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q .
+          git add -A
+          git -c user.name="screenshots" -c user.email="screenshots@users.noreply.github.com" commit -qm "Screenshots of ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/ci/screenshots
       - uses: actions/upload-artifact@v4
         if: always()
         with:
