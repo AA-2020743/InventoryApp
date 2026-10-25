@@ -153,8 +153,10 @@ internal fun DashboardContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
+        // Every card brings 10dp of its own above it; with this, cards sit
+        // 14dp apart instead of 22.
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(sections) { section ->
             when (section) {
@@ -200,31 +202,42 @@ private fun TodayCard(today: DashboardPeriodDto) {
     val deficit = today.deficit.toDoubleOrNull() ?: 0.0
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f)),
+        shape = RoundedCornerShape(18.dp),
     ) {
-        Column(Modifier.padding(20.dp)) {
+        // The same header and label-over-figure layout as the month card
+        // under it, so the two read as a pair; the tint is what marks this
+        // one as the headline.
+        Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (isLoss) Icons.Filled.TrendingDown else Icons.Filled.TrendingUp,
-                    contentDescription = null,
-                    tint = color,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.dashboard_today), style = MaterialTheme.typography.labelLarge)
+                Box(
+                    Modifier.size(30.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (isLoss) Icons.Filled.TrendingDown else Icons.Filled.TrendingUp,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.dashboard_today), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                formatAmount(today.profit),
-                style = MaterialTheme.typography.headlineLarge,
-                color = color,
-            )
+            Spacer(Modifier.height(10.dp))
             Text(
                 stringResource(if (isLoss) R.string.dashboard_loss else R.string.dashboard_profit),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                formatAmount(today.profit),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
                 color = color,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             StatLine(stringResource(R.string.dashboard_revenue), formatAmount(today.revenue))
             Spacer(Modifier.height(8.dp))
             StatLine(stringResource(R.string.dashboard_cost), formatAmount(today.cost))
