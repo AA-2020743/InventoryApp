@@ -300,7 +300,14 @@ private fun SideRow(side: PaymentSide, amount: BigDecimal?) {
         if (before != null) {
             val after = if (amount == null) before else before.add(amount.multiply(BigDecimal(side.sign)))
             Column(horizontalAlignment = Alignment.End) {
-                Text(formatAmount(after.toPlainString()), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    formatAmount(after.toPlainString()),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    // Below zero only when the till can't cover it - which the
+                    // sheet refuses, and this shows why at a glance.
+                    color = if (after.signum() < 0) lossColor() else MaterialTheme.colorScheme.onSurface,
+                )
                 if (amount != null) {
                     Text(
                         stringResource(R.string.pay_confirm_was, formatAmount(before.toPlainString())),
