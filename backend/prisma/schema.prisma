@@ -197,6 +197,13 @@ model SupplierInvoice {
   // created before that flow (and any created without lines) keep their
   // typed amount and are left alone by the recalculation.
   amountFromLines Boolean     @default(false)
+  // What has been paid toward the invoice in parts while it was still
+  // pending - the sum of its isPartialInvoicePayment till entries, the way
+  // Sale.amountCollected is for a customer's tab. Paying the rest settles it:
+  // that last payment goes out as the invoice's one settling entry, so a PAID
+  // invoice has paid its full amount whatever this says, and an invoice
+  // never paid in parts keeps 0 here.
+  amountPaid    Decimal       @default(0) @db.Decimal(12, 2)
   notes         String?
   // A photo of the physical invoice/receipt, uploaded via the generic
   // /api/uploads/image endpoint (see uploads.routes.ts) - stores the
@@ -392,6 +399,11 @@ model CashRegisterEntry {
   // via applyCashDeduction) or repaid (positive, via repayDebtAmount),
   // mirroring saleId/expenseId.
   debtId String?
+  // True only for a part payment toward a supplier invoice. An invoice can
+  // have many of these, unlike the single settling entry applyCashDeduction
+  // keeps against its invoiceId - that lookup skips these, the way
+  // syncSaleCashEntry skips isPartialSaleCollection.
+  isPartialInvoicePayment Boolean @default(false)
   // True only for a debt-repayment entry (mirrors isPartialSaleCollection)
   // - a debt can have many of these over time (one per repayment), unlike
   // the single disbursement entry, so lookups for "the disbursement entry"

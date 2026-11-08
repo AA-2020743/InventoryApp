@@ -49,7 +49,9 @@ class AlertsWorker @AssistedInject constructor(
                         applicationContext.getString(
                             com.supermarket.inventory.R.string.notif_invoice_overdue_body,
                             invoice.supplier?.name ?: invoice.supplierId,
-                            formatAmount(invoice.amount),
+                            // What's still owed - an invoice paid in parts
+                            // only owes the rest.
+                            formatAmount(invoice.owed.toPlainString()),
                         ),
                         notificationId = 2001,
                     )
@@ -61,7 +63,7 @@ class AlertsWorker @AssistedInject constructor(
                         applicationContext.getString(
                             com.supermarket.inventory.R.string.notif_invoice_due_body,
                             invoice.supplier?.name ?: invoice.supplierId,
-                            formatAmount(invoice.amount),
+                            formatAmount(invoice.owed.toPlainString()),
                             formatIsoDate(invoice.dueDate),
                         ),
                         notificationId = 2002,

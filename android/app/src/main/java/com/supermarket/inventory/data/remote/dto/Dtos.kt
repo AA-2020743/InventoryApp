@@ -2,6 +2,7 @@ package com.supermarket.inventory.data.remote.dto
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
+import java.math.BigDecimal
 
 @JsonClass(generateAdapter = true)
 data class LoginRequest(
@@ -222,7 +223,19 @@ data class SupplierInvoiceDto(
     // True when the amount is the sum of the stock lines booked against
     // this invoice, rather than a figure typed on an older invoice.
     val amountFromLines: Boolean = false,
-)
+    // Paid toward it in parts while pending. A PAID invoice is settled in
+    // full whatever this says - see `owed`.
+    val amountPaid: String = "0",
+) {
+    // What's still to pay: nothing once it's settled, otherwise the amount
+    // less what's been paid in parts. Exact money, as the server keeps it.
+    val owed: BigDecimal
+        get() = if (status == "PAID") BigDecimal.ZERO
+        else (amount.toBigDecimalOrNull() ?: BigDecimal.ZERO).subtract(amountPaid.toBigDecimalOrNull() ?: BigDecimal.ZERO).max(BigDecimal.ZERO)
+
+    val isPartlyPaid: Boolean
+        get() = status != "PAID" && (amountPaid.toBigDecimalOrNull()?.signum() ?: 0) > 0
+}
 
 @JsonClass(generateAdapter = true)
 data class InvoiceInput(
@@ -362,6 +375,9 @@ data class SalesForRangeResponse(
 
 @JsonClass(generateAdapter = true)
 data class CollectPartialRequest(val amount: Double)
+
+@JsonClass(generateAdapter = true)
+data class CashBalanceResponse(val balance: String)
 
 @JsonClass(generateAdapter = true)
 data class ExpenseDto(

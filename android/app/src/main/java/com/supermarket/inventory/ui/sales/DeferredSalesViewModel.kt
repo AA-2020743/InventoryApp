@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.supermarket.inventory.data.ApiResult
 import com.supermarket.inventory.data.remote.dto.SaleDto
+import com.supermarket.inventory.data.repository.CashRegisterRepository
 import com.supermarket.inventory.data.repository.SalesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -27,6 +28,7 @@ data class DeferredSalesUiState(
 @HiltViewModel
 class DeferredSalesViewModel @Inject constructor(
     private val salesRepository: SalesRepository,
+    private val cashRegisterRepository: CashRegisterRepository,
 ) : ViewModel() {
 
     var uiState by mutableStateOf(DeferredSalesUiState())
@@ -66,19 +68,20 @@ class DeferredSalesViewModel @Inject constructor(
         }
     }
 
-    fun collect(id: String) {
-        viewModelScope.launch {
-            when (salesRepository.collectSale(id)) {
-                is ApiResult.Success -> load()
-                is ApiResult.Error -> Unit
-            }
-        }
-    }
+    // What the till holds now, for the confirmation to say what it will
+    // hold once the money comes in. Null when it can't be read.
+    suspend fun tillBalance(): BigDecimal? =
+        (cashRegisterRepository.getBalance() as? ApiResult.Success)?.data?.toBigDecimalOrNull()
 
-    suspend fun collectPartial(id: String, amount: Double): ApiResult<SaleDto> {
-        val result = salesRepository.collectSalePartial(id, amount)
-        if (result is ApiResult.Success) load()
-        return result
+    // Collects from one customer's tab - `part` of it, oldest sale first, or
+    // without one everything still owed. Returns why it was refused, or null.
+    //
+    // The list is reloaded either way: a tab spread over several sales can
+    // fail part-way, after the first ones were already collected.
+    suspend fun collect(sales: List<SaleDto>, part: BigDecimal?): String? {
+        val result = if (part == null) collectGroup(sales.map { it.id }) else collectPartialGroup(sales, part.toDouble())
+        if (result is ApiResult.Error) load()
+        return (result as? ApiResult.Error)?.message
     }
 
     // Same customer can have several separate deferred sales (each its own

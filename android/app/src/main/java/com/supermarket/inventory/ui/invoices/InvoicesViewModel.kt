@@ -13,12 +13,14 @@ import com.supermarket.inventory.data.remote.dto.ProductDto
 import com.supermarket.inventory.data.remote.dto.ProductInput
 import com.supermarket.inventory.data.remote.dto.SupplierInvoiceDto
 import com.supermarket.inventory.data.remote.dto.UploadImageResponse
+import com.supermarket.inventory.data.repository.CashRegisterRepository
 import com.supermarket.inventory.data.repository.InvoiceRepository
 import com.supermarket.inventory.data.repository.ProductRepository
 import com.supermarket.inventory.data.repository.SupplierRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.io.File
+import java.math.BigDecimal
 import javax.inject.Inject
 
 data class InvoicesUiState(
@@ -38,6 +40,7 @@ class InvoicesViewModel @Inject constructor(
     private val invoiceRepository: InvoiceRepository,
     private val supplierRepository: SupplierRepository,
     private val productRepository: ProductRepository,
+    private val cashRegisterRepository: CashRegisterRepository,
     private val sessionManager: SessionManager,
 ) : ViewModel() {
 
@@ -67,20 +70,27 @@ class InvoicesViewModel @Inject constructor(
         }
     }
 
-    // Reverses a payment recorded by mistake - the till gets its money back
-    // and the invoice returns to pending.
-    fun markUnpaid(id: String) {
-        viewModelScope.launch {
-            when (val result = invoiceRepository.markUnpaid(id)) {
-                is ApiResult.Success -> load()
-                is ApiResult.Error -> uiState = uiState.copy(error = result.message)
-            }
+    // What the till holds now, for the payment confirmation to say what it
+    // will hold after. Null when it can't be read; the server still refuses
+    // a payment the till can't cover.
+    suspend fun tillBalance(): BigDecimal? =
+        (cashRegisterRepository.getBalance() as? ApiResult.Success)?.data?.toBigDecimalOrNull()
+
+    // Pays the invoice from the till: `part` of it, or - without one -
+    // whatever is left, settling it. Returns why it was refused, or null.
+    suspend fun pay(id: String, part: BigDecimal?): String? {
+        val result = if (part == null) invoiceRepository.markPaid(id) else invoiceRepository.payPartial(id, part.toDouble())
+        return when (result) {
+            is ApiResult.Success -> { load(); null }
+            is ApiResult.Error -> result.message
         }
     }
 
-    fun markPaid(id: String) {
+    // Reverses every payment recorded on the invoice - the till gets its
+    // money back and the invoice returns to pending, owed in full.
+    fun markUnpaid(id: String) {
         viewModelScope.launch {
-            when (val result = invoiceRepository.markPaid(id)) {
+            when (val result = invoiceRepository.markUnpaid(id)) {
                 is ApiResult.Success -> load()
                 is ApiResult.Error -> uiState = uiState.copy(error = result.message)
             }

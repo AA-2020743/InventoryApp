@@ -134,6 +134,9 @@ interface ApiService {
     @POST("api/invoices/{id}/pay")
     suspend fun markInvoicePaid(@Path("id") id: String): SupplierInvoiceDto
 
+    @POST("api/invoices/{id}/pay-partial")
+    suspend fun payInvoicePartial(@Path("id") id: String, @Body request: CollectPartialRequest): SupplierInvoiceDto
+
     @POST("api/invoices/{id}/unpay")
     suspend fun markInvoiceUnpaid(@Path("id") id: String): SupplierInvoiceDto
 
@@ -269,6 +272,9 @@ interface ApiService {
     // ("YYYY-MM"): that month in full, for the history view.
     @GET("api/cash-register")
     suspend fun getCashRegister(@Query("month") month: String? = null): CashRegisterResponse
+
+    @GET("api/cash-register/balance")
+    suspend fun getCashRegisterBalance(): CashBalanceResponse
 
     @GET("api/cash-register/months")
     suspend fun getCashRegisterMonths(): List<CashMonthDto>

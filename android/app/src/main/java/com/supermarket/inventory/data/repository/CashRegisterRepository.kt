@@ -18,6 +18,8 @@ class CashRegisterRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun getMonths(): ApiResult<List<CashMonthDto>> = apiCall { api.getCashRegisterMonths() }
 
+    suspend fun getBalance(): ApiResult<String> = apiCall { api.getCashRegisterBalance().balance }
+
     suspend fun setBalance(value: Double, note: String?): ApiResult<CashRegisterEntryResponse> =
         apiCall { api.setCashRegister(SetCashRegisterRequest(value, note)) }
 

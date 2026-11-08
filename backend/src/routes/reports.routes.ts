@@ -380,7 +380,7 @@ reportsRouter.get(
           },
         },
       }),
-      prisma.supplierInvoice.groupBy({ by: ["supplierId"], where: { status: "PENDING" }, _sum: { amount: true } }),
+      prisma.supplierInvoice.groupBy({ by: ["supplierId"], where: { status: "PENDING" }, _sum: { amount: true, amountPaid: true } }),
       prisma.inventoryTransaction.findMany({
         where: {
           type: "RESTOCK",
@@ -392,7 +392,8 @@ reportsRouter.get(
         select: { quantityChange: true, unitCost: true, createdAt: true },
       }),
     ]);
-    const owed = new Map(pending.map((p) => [p.supplierId, p._sum.amount ?? ZERO]));
+    // Less whatever has been paid on them in parts.
+    const owed = new Map(pending.map((p) => [p.supplierId, (p._sum.amount ?? ZERO).sub(p._sum.amountPaid ?? ZERO)]));
     const currentMonth = monthKey(new Date());
     const countsForTrend = (series: Prisma.Decimal[]) => series.map((v, i) => v.gt(0) && months[i] !== currentMonth);
 

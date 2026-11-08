@@ -6,9 +6,10 @@ import { env } from "../env";
 import { asyncHandler, HttpError } from "../middleware/errorHandler";
 import { startOfDay } from "../utils/dates";
 import { optionalPositiveInt } from "../utils/params";
-import { applyCashDeduction } from "./cashRegister.routes";
+import { applyCashDeduction, getCashRegisterBalance } from "./cashRegister.routes";
 import { applyRestockToProduct } from "./products.routes";
 import { syncInvoiceTotalFromLines } from "../services/invoiceTotals";
+import { invoicePaymentNote, settleInvoiceCash, syncInvoicePayments } from "../services/invoicePayments";
 import { recomputeProductCost } from "../services/productCost";
 
 export const invoicesRouter = Router();
@@ -25,8 +26,9 @@ const invoiceInput = z.object({
   imageUrl: z.string().trim().optional().nullable(),
 });
 
-function paymentNote(invoiceNumber: string | null, supplierName: string): string {
-  return `Paid invoice${invoiceNumber ? ` #${invoiceNumber}` : ""} — ${supplierName}`;
+// To the piastre, the way every amount is stored.
+function toMoney(value: number): Prisma.Decimal {
+  return new Prisma.Decimal(value).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
 
 // GET /api/invoices?status=PENDING&upcomingDays=7
@@ -308,7 +310,7 @@ invoicesRouter.post(
           tx,
           { invoiceId: created.id },
           created.amount,
-          paymentNote(created.invoiceNumber, supplier.name)
+          invoicePaymentNote("full", created.invoiceNumber, supplier.name)
         );
       }
 
@@ -320,8 +322,9 @@ invoicesRouter.post(
 );
 
 // Editing an already-paid invoice's amount recomputes its cash deduction
-// and deficit the same way an expense edit does - a pending invoice hasn't
-// touched the register yet, so no deduction runs for it here.
+// and deficit the same way an expense edit does. A pending invoice has only
+// touched the register through its part payments, if any, and its total
+// can't go below those (see syncInvoicePayments).
 invoicesRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -340,56 +343,111 @@ invoicesRouter.put(
       ) {
         throw new HttpError(400, "This invoice's total comes from the stock booked to it - change the stock instead");
       }
-      const updated = await tx.supplierInvoice.update({ where: { id: req.params.id }, data });
-      if (updated.status !== "PAID") return updated;
-
-      await applyCashDeduction(
-        tx,
-        { invoiceId: updated.id },
-        updated.amount,
-        paymentNote(updated.invoiceNumber, existing.supplier.name)
-      );
-      // Reached only if applyCashDeduction succeeded (fully paid), so any
-      // deficit this invoice carried from before this edit no longer
-      // applies - clear it rather than leaving a stale value behind.
-      if (updated.deficitAmount.gt(0)) {
-        return tx.supplierInvoice.update({ where: { id: updated.id }, data: { deficitAmount: 0 } });
+      const updated = await tx.supplierInvoice.update({ where: { id: req.params.id }, data, include: { supplier: true } });
+      await syncInvoicePayments(tx, updated);
+      // Reached only if the payment sync succeeded, so a paid invoice is
+      // now fully paid and any deficit it carried from before this edit no
+      // longer applies - clear it rather than leaving a stale value behind.
+      if (updated.status === "PAID" && updated.deficitAmount.gt(0)) {
+        await tx.supplierInvoice.update({ where: { id: updated.id }, data: { deficitAmount: 0 } });
       }
-      return updated;
+      return tx.supplierInvoice.findUniqueOrThrow({ where: { id: updated.id } });
     });
     res.json(invoice);
   })
 );
 
-// Pays the invoice out of the till in full - there's no "pay from cash
-// register?" choice anymore, mirroring expenses. Rejected outright (before
-// the invoice is touched) if the register can't cover it.
+// Pays what's left of the invoice out of the till - all of it, or the rest
+// after any part payments - and settles it. There's no "pay from cash
+// register?" choice anymore, mirroring expenses. Rejected outright, with
+// nothing changed, if the register can't cover it.
 invoicesRouter.post(
   "/:id/pay",
   asyncHandler(async (req, res) => {
-    const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
-    if (!existing) throw new HttpError(404, "Invoice not found");
-    if (existing.status === "PAID") throw new HttpError(400, "Invoice is already paid");
-
     const invoice = await prisma.$transaction(async (tx) => {
-      await applyCashDeduction(
-        tx,
-        { invoiceId: existing.id },
-        existing.amount,
-        paymentNote(existing.invoiceNumber, existing.supplier.name)
-      );
-      return tx.supplierInvoice.update({
-        where: { id: req.params.id },
-        data: { status: "PAID", paidAt: new Date() },
+      const existing = await tx.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
+      if (!existing) throw new HttpError(404, "Invoice not found");
+      if (existing.status === "PAID") throw new HttpError(400, "Invoice is already paid");
+      return settle(tx, existing);
+    });
+    res.json(invoice);
+  })
+);
+
+async function settle(
+  tx: Prisma.TransactionClient,
+  invoice: Parameters<typeof settleInvoiceCash>[1] & { amountPaid: Prisma.Decimal }
+) {
+  await settleInvoiceCash(tx, invoice);
+  // Only a still-pending invoice with this exact amount paid in parts can
+  // be settled here: one that moved on in between is left alone and the
+  // whole payment rolls back.
+  const { count } = await tx.supplierInvoice.updateMany({
+    where: { id: invoice.id, status: "PENDING", amountPaid: invoice.amountPaid },
+    data: { status: "PAID", paidAt: new Date() },
+  });
+  if (count === 0) throw new HttpError(409, "This invoice changed while it was being paid - refresh and try again");
+  return tx.supplierInvoice.findUniqueOrThrow({ where: { id: invoice.id } });
+}
+
+const payPartialInput = z.object({ amount: z.number().positive() });
+
+// Pays part of a pending invoice out of the till - a supplier taking it in
+// instalments. Each part is its own till entry and adds to amountPaid; the
+// invoice stays pending, owing the rest, until a payment covers what's left.
+//
+// A part that covers exactly what's left is the last one, so it settles the
+// invoice the way paying the rest does.
+invoicesRouter.post(
+  "/:id/pay-partial",
+  asyncHandler(async (req, res) => {
+    const amount = toMoney(payPartialInput.parse(req.body).amount);
+    const invoice = await prisma.$transaction(async (tx) => {
+      const existing = await tx.supplierInvoice.findUnique({ where: { id: req.params.id }, include: { supplier: true } });
+      if (!existing) throw new HttpError(404, "Invoice not found");
+      if (existing.status === "PAID") throw new HttpError(400, "Invoice is already paid");
+
+      const rest = existing.amount.sub(existing.amountPaid);
+      if (amount.lte(0) || amount.gt(rest)) {
+        throw new HttpError(400, `Amount must be between 0 and what's left to pay (${rest.toFixed(2)})`);
+      }
+      if (amount.equals(rest)) return settle(tx, existing);
+
+      // The same hard block as every other outflow: the till pays the whole
+      // part or nothing is recorded.
+      const balance = Prisma.Decimal.max(await getCashRegisterBalance(tx), 0);
+      if (amount.gt(balance)) {
+        throw new HttpError(
+          400,
+          `Insufficient cash register balance: this needs ${amount.toFixed(2)} but only ${balance.toFixed(2)} is available.`
+        );
+      }
+      // Counted against the amount read above, so two payments landing at
+      // once can't both be taken against the same remainder.
+      const { count } = await tx.supplierInvoice.updateMany({
+        where: { id: existing.id, status: "PENDING", amountPaid: existing.amountPaid },
+        data: { amountPaid: existing.amountPaid.add(amount) },
       });
+      if (count === 0) throw new HttpError(409, "This invoice changed while it was being paid - refresh and try again");
+      await tx.cashRegisterEntry.create({
+        data: {
+          amount: amount.neg(),
+          note: invoicePaymentNote("part", existing.invoiceNumber, existing.supplier.name),
+          invoiceId: existing.id,
+          isPartialInvoicePayment: true,
+        },
+      });
+      return tx.supplierInvoice.findUniqueOrThrow({ where: { id: existing.id } });
     });
     res.json(invoice);
   })
 );
 
 // Undoes a payment made by mistake: puts the money back in the till and
-// returns the invoice to PENDING. The stock the invoice covers is left
-// linked to it - that side wasn't wrong, only the payment was.
+// returns the invoice to PENDING, owing its full amount. Every payment goes -
+// the settling one and any parts before it - so a wrong part payment is
+// corrected the same way. The stock the invoice covers is left linked to
+// it - that side wasn't wrong, only the payment was.
 //
 // This is also what unblocks moving stock off an invoice: a restock can't
 // be re-financed away from an invoice that's already paid (it would charge
@@ -399,7 +457,9 @@ invoicesRouter.post(
   asyncHandler(async (req, res) => {
     const existing = await prisma.supplierInvoice.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new HttpError(404, "Invoice not found");
-    if (existing.status !== "PAID") throw new HttpError(400, "Invoice is not marked paid");
+    if (existing.status !== "PAID" && existing.amountPaid.lte(0)) {
+      throw new HttpError(400, "Nothing has been paid on this invoice");
+    }
 
     const invoice = await prisma.$transaction(async (tx) => {
       await tx.cashRegisterEntry.deleteMany({ where: { invoiceId: existing.id } });
@@ -407,7 +467,7 @@ invoicesRouter.post(
         where: { id: existing.id },
         // deficitAmount described a shortfall at the moment of payment;
         // with the payment undone there is no shortfall to carry.
-        data: { status: "PENDING", paidAt: null, deficitAmount: 0 },
+        data: { status: "PENDING", paidAt: null, deficitAmount: 0, amountPaid: 0 },
       });
     });
     res.json(invoice);

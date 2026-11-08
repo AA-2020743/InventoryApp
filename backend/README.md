@@ -41,11 +41,11 @@ All routes except `POST /api/auth/login` require `Authorization: Bearer <token>`
 | Auth | `POST /api/auth/login`, `POST /api/auth/change-password` |
 | Products | `GET/POST /api/products`, `GET/PUT/DELETE /api/products/:id`, `GET /api/products/barcode/:barcode`, `GET /api/products/categories` (distinct categories in use), `POST /api/products/:id/restock`, `POST /api/products/:id/adjust`, `GET /api/products/:id/transactions` |
 | Suppliers | `GET/POST /api/suppliers`, `GET/PUT/DELETE /api/suppliers/:id` |
-| Supplier invoices | `GET/POST /api/invoices`, `GET /api/invoices/upcoming?days=`, `PUT /api/invoices/:id`, `POST /api/invoices/:id/pay` (optional `{ payFromCashRegister: true }` deducts the amount from the cash register), `DELETE /api/invoices/:id` |
+| Supplier invoices | `GET/POST /api/invoices`, `GET /api/invoices/upcoming?days=`, `PUT /api/invoices/:id`, `POST /api/invoices/:id/pay` (pays what's left from the cash register and settles it), `POST /api/invoices/:id/pay-partial` (`{ amount }` — pays part of a pending invoice from the cash register; the invoice owes the rest), `POST /api/invoices/:id/unpay` (undoes every payment on it), `DELETE /api/invoices/:id` |
 | Sales | `GET /api/sales?from=&to=&limit=&paymentStatus=`, `POST /api/sales`, `GET/PUT/DELETE /api/sales/:id`, `POST /api/sales/:id/collect` (marks a deferred sale as collected) |
 | Expenses (recurring, e.g. salaries) | `GET/POST /api/expenses`, `PUT/DELETE /api/expenses/:id` |
 | Assets (non-inventory business property) | `GET/POST /api/assets`, `PUT/DELETE /api/assets/:id` |
-| Cash register | `GET /api/cash-register` (balance + last 100 ledger entries), `POST /api/cash-register/set` (`{ value, note }` — reconciles to a counted amount), `POST /api/cash-register/entries` (`{ amount, note }` — manual signed entry) |
+| Cash register | `GET /api/cash-register` (balance + last 100 ledger entries), `POST /api/cash-register/set` (`{ value, note }` — reconciles to a counted amount), `POST /api/cash-register/entries` (`{ amount, note }` — manual signed entry), `GET /api/cash-register/balance` |
 | Dashboard | `GET /api/dashboard/summary` — inventory valuation, net worth after pending invoices/plus deferred receivables/cash register balance, today/month revenue & profit, recurring expense burn rate, alert counts |
 | Stats | `GET /api/stats/top-products?period=day\|month&date=&sortBy=quantity\|profit` (each item includes `category`, so a client can chart sales by category without a separate endpoint), `GET /api/stats/margins?limit=` (highest-margin items), `GET /api/stats/revenue?period=day\|month&from=&to=` |
 | Alerts | `GET /api/alerts?days=` — low-stock items + due-soon/overdue supplier invoices (polled by the Android app for reminders) |

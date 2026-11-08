@@ -21,7 +21,8 @@ export async function getCashRegisterBalance(
 // Shared by expenses, supplier-invoice payments, non-invoiced restocks, and
 // debts - the places that pay themselves out of the till immediately:
 // reverses any prior entry linked via `link` (so an edit recomputes
-// cleanly instead of stacking), then requires the register to actually
+// cleanly instead of stacking) - never an invoice's part payments, which
+// are entries of their own - then requires the register to actually
 // cover the full `amount` - if it can't, the whole operation is rejected
 // rather than partially paying and booking the rest as a shortfall, so the
 // register can never be pushed negative and nothing gets recorded as paid
@@ -32,7 +33,7 @@ export async function applyCashDeduction(
   amount: Prisma.Decimal,
   note: string
 ): Promise<void> {
-  const existing = await tx.cashRegisterEntry.findFirst({ where: link });
+  const existing = await tx.cashRegisterEntry.findFirst({ where: { ...link, isPartialInvoicePayment: false } });
   if (existing) {
     await tx.cashRegisterEntry.delete({ where: { id: existing.id } });
   }
@@ -88,6 +89,15 @@ cashRegisterRouter.get(
     // every entry so it can't drift once history outgrows the page above.
     const balance = await getCashRegisterBalance();
     res.json({ balance, entries });
+  })
+);
+
+// Just the balance, for a screen that needs to say what the till will hold
+// after a payment without loading a month of entries to find out.
+cashRegisterRouter.get(
+  "/balance",
+  asyncHandler(async (_req, res) => {
+    res.json({ balance: await getCashRegisterBalance() });
   })
 );
 

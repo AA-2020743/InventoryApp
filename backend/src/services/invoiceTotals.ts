@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { applyCashDeduction } from "../routes/cashRegister.routes";
+import { syncInvoicePayments } from "./invoicePayments";
 
 // A supplier invoice in the purchase-document flow is worth exactly what it
 // delivered: the sum of the stock lines booked against it. This recomputes
@@ -14,7 +14,8 @@ import { applyCashDeduction } from "../routes/cashRegister.routes";
 // new total. That is the correction mechanism: removing or shrinking a line
 // hands the money back, adding or growing one takes more, and an increase
 // the register can't cover is refused like any other cash outflow, rolling
-// the whole change back.
+// the whole change back. A total can never drop below what has been paid
+// toward the invoice in parts; see syncInvoicePayments.
 export async function syncInvoiceTotalFromLines(
   tx: Prisma.TransactionClient,
   invoiceId: string
@@ -34,15 +35,7 @@ export async function syncInvoiceTotalFromLines(
   );
 
   await tx.supplierInvoice.update({ where: { id: invoiceId }, data: { amount: total } });
-
-  if (invoice.status === "PAID") {
-    await applyCashDeduction(
-      tx,
-      { invoiceId },
-      total,
-      `Paid invoice${invoice.invoiceNumber ? ` #${invoice.invoiceNumber}` : ""} — ${invoice.supplier.name}`
-    );
-  }
+  await syncInvoicePayments(tx, { ...invoice, amount: total });
 
   return total;
 }

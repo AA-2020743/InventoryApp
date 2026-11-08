@@ -196,7 +196,6 @@
     <string name="deferred_sale_invalid_amount">Enter a valid amount</string>
     <string name="deferred_sale_remaining">Remaining: %1$s</string>
     <string name="deferred_sale_collect_partial">Collect partial</string>
-    <string name="deferred_sale_partial_exceeds_remaining">Amount exceeds the remaining balance</string>
     <string name="deferred_sale_customer_unknown">Customer not recorded</string>
     <string name="deferred_sale_history_title">History</string>
     <string name="deferred_sale_history_entry_partial">%1$s (%2$s left)</string>
@@ -704,4 +703,26 @@
     <string name="dashboard_held_minus_owed">%1$s held − %2$s owed</string>
     <string name="pulse_quiet">Quiet</string>
     <string name="pulse_busy">Busy</string>
+    <string name="pay_confirm_amount">Amount</string>
+    <string name="pay_confirm_exceeds">That\'s more than what\'s left (%1$s)</string>
+    <string name="pay_confirm_till_short">The till only has %1$s</string>
+    <string name="pay_confirm_settles">That clears it in full</string>
+    <string name="pay_confirm_half">Half</string>
+    <string name="pay_confirm_all">All of it</string>
+    <string name="pay_confirm_was">was %1$s</string>
+    <string name="pay_confirm_slide_pay">Slide to pay</string>
+    <string name="pay_confirm_slide_collect">Slide to collect</string>
+    <string name="pay_confirm_till_caption">Cash in the till</string>
+    <string name="pay_confirm_supplier_caption">Owed to them</string>
+    <string name="pay_confirm_customer_caption">Still owes</string>
+    <string name="invoice_pay_confirm_full">Pay %1$s to %2$s and mark the invoice paid?</string>
+    <string name="invoice_pay_confirm_part">How much are you paying %1$s now?</string>
+    <string name="collect_confirm_full">Collect %1$s from %2$s and mark it collected?</string>
+    <string name="collect_confirm_part">How much is %1$s paying now?</string>
+    <string name="invoice_pay_part">Pay part</string>
+    <string name="invoice_pay_rest">Pay the rest</string>
+    <string name="invoice_paid_so_far">Paid %1$s · %2$s left</string>
+    <string name="invoice_undo_payments">Undo payments</string>
+    <string name="invoice_undo_payments_title">Undo the payments on this invoice?</string>
+    <string name="invoice_undo_payments_message">%1$s goes back to the till, and the invoice is owed in full again.</string>
 </resources>

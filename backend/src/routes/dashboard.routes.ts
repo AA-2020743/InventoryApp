@@ -71,8 +71,10 @@ dashboardRouter.get(
       new Prisma.Decimal(0)
     );
     const assetsValue = assets.reduce((acc, a) => acc.add(a.value), new Prisma.Decimal(0));
+    // What's still owed on them: an invoice paid in parts owes only the
+    // rest, the parts having already come out of cashRegisterBalance.
     const pendingInvoicesTotal = pendingInvoices.reduce(
-      (acc, i) => acc.add(i.amount),
+      (acc, i) => acc.add(i.amount.sub(i.amountPaid)),
       new Prisma.Decimal(0)
     );
     // Outstanding credit sales are a receivable - money owed to the

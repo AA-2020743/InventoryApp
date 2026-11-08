@@ -196,7 +196,6 @@
     <string name="deferred_sale_invalid_amount">أدخل مبلغًا صحيحًا</string>
     <string name="deferred_sale_remaining">المتبقي: %1$s</string>
     <string name="deferred_sale_collect_partial">تحصيل جزئي</string>
-    <string name="deferred_sale_partial_exceeds_remaining">المبلغ يتجاوز الرصيد المتبقي</string>
     <string name="deferred_sale_customer_unknown">لم يُسجَّل اسم العميل</string>
     <string name="deferred_sale_history_title">السجل</string>
     <string name="deferred_sale_history_entry_partial">%1$s (المتبقي %2$s)</string>
@@ -704,4 +703,26 @@
     <string name="dashboard_held_minus_owed">%1$s مملوك − %2$s مستحق</string>
     <string name="pulse_quiet">هادئ</string>
     <string name="pulse_busy">مزدحم</string>
+    <string name="pay_confirm_amount">المبلغ</string>
+    <string name="pay_confirm_exceeds">هذا أكثر من المتبقي (%1$s)</string>
+    <string name="pay_confirm_till_short">صندوق النقدية فيه %1$s فقط</string>
+    <string name="pay_confirm_settles">بهذا يُسدَّد بالكامل</string>
+    <string name="pay_confirm_half">النصف</string>
+    <string name="pay_confirm_all">الكل</string>
+    <string name="pay_confirm_was">كان %1$s</string>
+    <string name="pay_confirm_slide_pay">اسحب للدفع</string>
+    <string name="pay_confirm_slide_collect">اسحب للتحصيل</string>
+    <string name="pay_confirm_till_caption">النقدية الموجودة</string>
+    <string name="pay_confirm_supplier_caption">المستحق له</string>
+    <string name="pay_confirm_customer_caption">المتبقي عليه</string>
+    <string name="invoice_pay_confirm_full">دفع %1$s إلى %2$s وتحديد الفاتورة كمدفوعة؟</string>
+    <string name="invoice_pay_confirm_part">كم ستدفع لـ %1$s الآن؟</string>
+    <string name="collect_confirm_full">تحصيل %1$s من %2$s وتحديده كمُحصَّل؟</string>
+    <string name="collect_confirm_part">كم سيدفع %1$s الآن؟</string>
+    <string name="invoice_pay_part">دفع جزء</string>
+    <string name="invoice_pay_rest">دفع الباقي</string>
+    <string name="invoice_paid_so_far">دُفع %1$s · المتبقي %2$s</string>
+    <string name="invoice_undo_payments">إلغاء المدفوعات</string>
+    <string name="invoice_undo_payments_title">إلغاء المدفوعات على هذه الفاتورة؟</string>
+    <string name="invoice_undo_payments_message">سيعود %1$s إلى صندوق النقدية، وتعود الفاتورة مستحقة بالكامل.</string>
 </resources>

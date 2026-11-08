@@ -83,11 +83,17 @@ class InvoiceRepository @Inject constructor(private val api: ApiService) {
             )
         }
 
+    // Pays what's left of the invoice - all of it, or the rest after any part
+    // payments - and settles it.
     suspend fun markPaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoicePaid(id) }
 
-    // Undoes a payment made by mistake: the money goes back in the till and
-    // the invoice returns to pending.
+    // Pays part of a pending invoice; it keeps owing the rest.
+    suspend fun payPartial(id: String, amount: Double): ApiResult<SupplierInvoiceDto> =
+        apiCall { api.payInvoicePartial(id, CollectPartialRequest(amount)) }
+
+    // Undoes every payment on the invoice, parts included: the money goes
+    // back in the till and the invoice returns to pending, owing it all.
     suspend fun markUnpaid(id: String): ApiResult<SupplierInvoiceDto> =
         apiCall { api.markInvoiceUnpaid(id) }
 

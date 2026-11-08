@@ -93,7 +93,13 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneOffset
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.runtime.produceState
 import com.supermarket.inventory.ui.common.EmptyState
+import com.supermarket.inventory.ui.common.PaymentConfirmSheet
+import com.supermarket.inventory.ui.common.PaymentSide
+import com.supermarket.inventory.ui.stats.MeterBar
 
 private const val PAYMENT_CASH = "CASH"
 private const val PAYMENT_DEFERRED = "DEFERRED"
@@ -128,6 +134,10 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     // Settled invoices get their own shelf: what's still owed is the thing
     // you act on day to day, and a growing pile of paid paperwork buried it.
     var showSettled by remember { mutableStateOf(false) }
+    // The invoice being paid, and whether it's a part (asks how much) or
+    // what's left (confirms it).
+    var payTarget by remember { mutableStateOf<Pair<SupplierInvoiceDto, Boolean>?>(null) }
+    var undoTarget by remember { mutableStateOf<SupplierInvoiceDto?>(null) }
 
     // Overdue once the due day is over on the shop's calendar - not from the
     // UTC midnight a due date is stored as, which is 2 or 3 a.m. in Cairo on
@@ -136,7 +146,8 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
     val openInvoices = state.invoices.filter { it.status != "PAID" }.sortedBy { it.dueDate }
     val settledInvoices = state.invoices.filter { it.status == "PAID" }
         .sortedByDescending { it.paidAt ?: it.dueDate }
-    val outstanding = openInvoices.sumOf { it.amount.toDoubleOrNull() ?: 0.0 }
+    // What's still owed: an invoice paid in parts only owes the rest.
+    val outstanding = openInvoices.fold(BigDecimal.ZERO) { acc, invoice -> acc.add(invoice.owed) }
     val settledTotal = settledInvoices.sumOf { it.amount.toDoubleOrNull() ?: 0.0 }
     val overdueCount = openInvoices.count { invoice ->
         runCatching { Instant.parse(invoice.dueDate).isBefore(startOfToday) }.getOrDefault(false)
@@ -184,7 +195,7 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                formatAmount((if (showSettled) settledTotal else outstanding).toString()),
+                                formatAmount(if (showSettled) settledTotal.toString() else outstanding.toPlainString()),
                                 style = MaterialTheme.typography.titleLarge,
                                 color = if (showSettled) profitColor() else warningColor(),
                             )
@@ -219,8 +230,8 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
                     items(shown, key = { it.id }) { invoice ->
                         InvoiceRow(
                             invoice = invoice,
-                            onMarkPaid = { viewModel.markPaid(invoice.id) },
-                            onMarkUnpaid = { viewModel.markUnpaid(invoice.id) },
+                            onPay = { partial -> payTarget = invoice to partial },
+                            onUndoPayments = { undoTarget = invoice },
                             onEdit = { invoiceToEdit = invoice },
                             onDelete = { invoiceToDelete = invoice },
                             onViewImage = { invoice.imageUrl?.let { invoiceImageToView = viewModel.fullImageUrl(it) } },
@@ -359,9 +370,61 @@ fun InvoicesTabContent(viewModel: InvoicesViewModel = hiltViewModel()) {
         )
     }
 
-    // markPaid() is a one-tap action on the row with no dialog of its own
-    // to show a failure in (e.g. the till can't cover it) - surfaced here
-    // instead.
+    payTarget?.let { (invoice, partial) ->
+        val supplierName = invoice.supplier?.name ?: invoice.supplierId
+        val owed = invoice.owed
+        val till by produceState<BigDecimal?>(null, invoice.id) { value = viewModel.tillBalance() }
+        PaymentConfirmSheet(
+            question = if (partial) {
+                stringResource(R.string.invoice_pay_confirm_part, supplierName)
+            } else {
+                stringResource(R.string.invoice_pay_confirm_full, formatAmount(owed.toPlainString()), supplierName)
+            },
+            from = PaymentSide(
+                icon = Icons.Filled.PointOfSale,
+                name = stringResource(R.string.cash_register_title),
+                caption = stringResource(R.string.pay_confirm_till_caption),
+                before = till,
+                sign = -1,
+                tint = MaterialTheme.colorScheme.primary,
+            ),
+            to = PaymentSide(
+                icon = Icons.Filled.LocalShipping,
+                name = supplierName,
+                caption = stringResource(R.string.pay_confirm_supplier_caption),
+                before = owed,
+                sign = -1,
+                tint = warningColor(),
+            ),
+            accent = MaterialTheme.colorScheme.primary,
+            slideLabel = stringResource(R.string.pay_confirm_slide_pay),
+            maxAmount = owed,
+            fixedAmount = if (partial) null else owed,
+            tillBalance = till,
+            onConfirm = { amount -> viewModel.pay(invoice.id, if (partial) amount else null) },
+            onDismiss = { payTarget = null },
+        )
+    }
+
+    // Undoing hands every payment back to the till at once - the settling one
+    // and any parts - so it's asked rather than done on a tap.
+    undoTarget?.let { invoice ->
+        val returned = if (invoice.status == "PAID") invoice.amount else invoice.amountPaid
+        AlertDialog(
+            onDismissRequest = { undoTarget = null },
+            title = { Text(stringResource(R.string.invoice_undo_payments_title)) },
+            text = { Text(stringResource(R.string.invoice_undo_payments_message, formatAmount(returned))) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.markUnpaid(invoice.id); undoTarget = null }) {
+                    Text(stringResource(R.string.invoice_undo_payments))
+                }
+            },
+            dismissButton = { TextButton(onClick = { undoTarget = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+
+    // Undoing payments has no dialog of its own to show a failure in -
+    // surfaced here instead.
     state.error?.let { message ->
         AlertDialog(
             onDismissRequest = viewModel::dismissError,
@@ -652,10 +715,10 @@ private fun LinkedStockDialog(
 }
 
 @Composable
-private fun InvoiceRow(
+internal fun InvoiceRow(
     invoice: SupplierInvoiceDto,
-    onMarkPaid: () -> Unit,
-    onMarkUnpaid: () -> Unit,
+    onPay: (partial: Boolean) -> Unit,
+    onUndoPayments: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onViewImage: () -> Unit,
@@ -712,6 +775,27 @@ private fun InvoiceRow(
                 color = statusColor,
                 style = MaterialTheme.typography.bodySmall,
             )
+            // Paid in parts so far: how far along it is, what's left, and a
+            // way to take the payments back if one was a mistake.
+            if (invoice.isPartlyPaid) {
+                val total = invoice.amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                val paid = invoice.amountPaid.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                MeterBar(
+                    fraction = if (total.signum() > 0) paid.divide(total, 4, java.math.RoundingMode.HALF_UP).toFloat() else 0f,
+                    color = profitColor(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.invoice_paid_so_far, formatAmount(invoice.amountPaid), formatAmount(invoice.owed.toPlainString())),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onUndoPayments) {
+                        Text(stringResource(R.string.invoice_undo_payments), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    }
+                }
+            }
             // The actions get a row to themselves rather than sharing one
             // with the due date: sharing left them whatever width the date
             // didn't take, which in Arabic (longer labels, longer month
@@ -727,12 +811,17 @@ private fun InvoiceRow(
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.invoice_linked_stock), maxLines = 1)
                 }
-                // No "pay from cash register?" choice anymore - marking paid
-                // always tries to pay from the till, recording a deficit if
-                // it comes up short, so this is a direct one-tap action.
+                // Both pay from the till, and both ask first - in a sheet that
+                // shows the money moving and wants a slide, not a tap.
                 if (invoice.status == "PENDING") {
-                    TextButton(onClick = onMarkPaid) {
-                        Text(stringResource(R.string.invoice_mark_paid), maxLines = 1)
+                    TextButton(onClick = { onPay(true) }) {
+                        Text(stringResource(R.string.invoice_pay_part), maxLines = 1)
+                    }
+                    TextButton(onClick = { onPay(false) }) {
+                        Text(
+                            stringResource(if (invoice.isPartlyPaid) R.string.invoice_pay_rest else R.string.invoice_mark_paid),
+                            maxLines = 1,
+                        )
                     }
                 } else {
                     Text(
@@ -742,9 +831,9 @@ private fun InvoiceRow(
                         maxLines = 1,
                         modifier = Modifier.padding(start = 8.dp),
                     )
-                    // Marking paid is one tap and drains the till by the
-                    // invoice amount, so the way back needs to be one tap too.
-                    TextButton(onClick = onMarkUnpaid) {
+                    // Paying drained the till, so the way back is right here -
+                    // behind a question, since it hands every payment back.
+                    TextButton(onClick = onUndoPayments) {
                         Text(stringResource(R.string.invoice_unmark_paid), maxLines = 1)
                     }
                 }
